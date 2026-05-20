@@ -1,0 +1,118 @@
+{
+  "realm": "syndeocare",
+  "enabled": true,
+  "displayName": "Syndeocare Local",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "rememberMe": true,
+  "roles": {
+    "realm": [
+      {
+        "name": "admin",
+        "description": "Platform administrators"
+      },
+      {
+        "name": "clinic",
+        "description": "Clinic and hospital operators"
+      },
+      {
+        "name": "professional",
+        "description": "Healthcare professionals"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "syndeocare-api",
+      "name": "Syndeocare API Gateway",
+      "enabled": true,
+      "bearerOnly": true,
+      "protocol": "openid-connect"
+    },
+    {
+      "clientId": "syndeocare-web",
+      "name": "Syndeocare Web",
+      "enabled": true,
+      "publicClient": true,
+      "directAccessGrantsEnabled": true,
+      "standardFlowEnabled": true,
+      "redirectUris": ["http://localhost:3000/*", "http://127.0.0.1:3000/*"],
+      "webOrigins": ["http://localhost:3000", "http://127.0.0.1:3000"],
+      "protocol": "openid-connect",
+      "defaultClientScopes": ["profile", "email", "roles"]
+    },
+    {
+      "clientId": "syndeocare-mobile",
+      "name": "Syndeocare Mobile",
+      "enabled": true,
+      "publicClient": true,
+      "directAccessGrantsEnabled": true,
+      "standardFlowEnabled": true,
+      "redirectUris": [
+        "syndeocare://*",
+        "exp://127.0.0.1:8081/*",
+        "exp://localhost:8081/*"
+      ],
+      "protocol": "openid-connect",
+      "defaultClientScopes": ["profile", "email", "roles"]
+    }
+  ],
+  "users": [
+    {
+      "username": "admin.user",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "admin@local.syndeocare",
+      "firstName": "Platform",
+      "lastName": "Admin",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "ChangeMe123!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["admin"]
+    },
+    {
+      "username": "clinic.user",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "ops@local.syndeocare",
+      "firstName": "Clinic",
+      "lastName": "Operator",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "ChangeMe123!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["clinic"],
+      "attributes": {
+        "subject_hint": ["clinic-user-001"]
+      }
+    },
+    {
+      "username": "professional.user",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "professional@local.syndeocare",
+      "firstName": "Aseel",
+      "lastName": "Mohammed",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "ChangeMe123!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["professional"],
+      "attributes": {
+        "subject_hint": ["professional-user-001"]
+      }
+    }
+  ]
+}

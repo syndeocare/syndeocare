@@ -15,57 +15,19 @@ import {
   verificationStatusResponseSchema,
   type AuthPrincipal,
   type BookingDetail,
-  type ClinicProfileSummary,
   type JobListingDetail,
   type PlatformMetadata,
-  type ProfessionalProfileSummary,
 } from "@repo/contracts";
 import { createAccessControl, startService } from "@repo/service-core";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { z } from "zod";
 
-const professionalProfiles: Record<string, ProfessionalProfileSummary> = {
-  "profile-dental-assistant-001": {
-    id: "profile-dental-assistant-001",
-    fullName: "Aseel Mohammed",
-    specialty: "Dental Assistant",
-    yearsExperience: 6,
-    languages: ["ar", "en"],
-    rating: 4.8,
-    verificationStatus: "approved",
-    onboardingCompleted: true,
-    availability: {
-      status: "available",
-      nextAvailableAt: "2026-05-22T05:00:00.000Z",
-      locationRadiusKm: 18,
-    },
-  },
-};
-
-const clinicProfiles: Record<string, ClinicProfileSummary> = {
-  "clinic-sanaa-001": {
-    id: "clinic-sanaa-001",
-    organizationName: "Al Noor Dental Center",
-    facilityType: "Dental Clinic",
-    city: "Sanaa",
-    region: "Amanat Al Asimah",
-    verificationStatus: "approved",
-    onboardingCompleted: true,
-    openRoles: 3,
-    rating: 4.7,
-  },
-  "clinic-aden-002": {
-    id: "clinic-aden-002",
-    organizationName: "Aden Specialist Medical Center",
-    facilityType: "Multi-specialty Clinic",
-    city: "Aden",
-    region: "Aden",
-    verificationStatus: "pending_review",
-    onboardingCompleted: true,
-    openRoles: 2,
-    rating: 4.4,
-  },
-};
+const INTERNAL_SERVICE_TOKEN_HEADER = "x-internal-service-token";
+const downstreamServices = {
+  clinics: process.env.SERVICE_CLINICS_URL ?? "http://127.0.0.1:4113",
+  identity: process.env.SERVICE_IDENTITY_URL ?? "http://127.0.0.1:4111",
+  profiles: process.env.SERVICE_PROFILES_URL ?? "http://127.0.0.1:4112",
+} as const;
 
 const jobs = [
   {
@@ -239,77 +201,106 @@ function notFoundError(message: string) {
   };
 }
 
+function serviceUnavailableError(message: string) {
+  return {
+    code: "DOWNSTREAM_SERVICE_UNAVAILABLE",
+    message,
+  };
+}
+
+function downstreamSchemaError(message: string) {
+  return {
+    code: "DOWNSTREAM_SCHEMA_ERROR",
+    message,
+  };
+}
+
+function buildInternalServiceHeaders() {
+  const headers: Record<string, string> = {
+    accept: "application/json",
+  };
+  const token = process.env.INTERNAL_SERVICE_TOKEN;
+
+  if (token) {
+    headers[INTERNAL_SERVICE_TOKEN_HEADER] = token;
+  }
+
+  return headers;
+}
+
+type DownstreamServiceName = keyof typeof downstreamServices;
+
+type DownstreamResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; statusCode: number; body: { code: string; message: string } };
+
+function mapDownstreamStatusCode(statusCode: number): 404 | 503 {
+  return statusCode === 404 ? 404 : 503;
+}
+
+async function fetchDownstreamResource<T>(
+  serviceName: DownstreamServiceName,
+  resourcePath: string,
+  schema: z.ZodType<T>,
+): Promise<DownstreamResult<T>> {
+  try {
+    const response = await fetch(
+      new URL(resourcePath, `${downstreamServices[serviceName]}/`),
+      {
+        headers: buildInternalServiceHeaders(),
+      },
+    );
+    const parsedBody = (await response.json().catch(() => undefined)) as
+      | Record<string, unknown>
+      | undefined;
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        statusCode: response.status,
+        body: {
+          code:
+            typeof parsedBody?.code === "string"
+              ? parsedBody.code
+              : "DOWNSTREAM_REQUEST_FAILED",
+          message:
+            typeof parsedBody?.message === "string"
+              ? parsedBody.message
+              : `${serviceName} service rejected the request.`,
+        },
+      };
+    }
+
+    const validated = schema.safeParse(parsedBody);
+
+    if (!validated.success) {
+      return {
+        ok: false,
+        statusCode: 502,
+        body: downstreamSchemaError(
+          `${serviceName} service returned a response that did not match the expected contract.`,
+        ),
+      };
+    }
+
+    return { ok: true, data: validated.data };
+  } catch {
+    return {
+      ok: false,
+      statusCode: 503,
+      body: serviceUnavailableError(
+        `${serviceName} service is unavailable. Check the downstream service URL and health status.`,
+      ),
+    };
+  }
+}
+
 function getProfileIdForActor(actor: AuthPrincipal) {
   return actor.profileId ?? "profile-dental-assistant-001";
 }
 
 function getClinicIdForActor(actor: AuthPrincipal) {
   return actor.clinicId ?? "clinic-sanaa-001";
-}
-
-function buildOnboardingStatus(actor: AuthPrincipal) {
-  if (actor.role === "professional") {
-    return {
-      role: actor.role,
-      onboardingCompleted: actor.onboardingCompleted,
-      verificationStatus: actor.verificationStatus,
-      requiredDocuments: ["license", "government_id", "certifications"],
-      missingDocuments:
-        actor.verificationStatus === "approved" ? [] : ["certifications"],
-      nextAction:
-        actor.verificationStatus === "approved"
-          ? "You can accept job requests and apply for open shifts."
-          : "Upload the remaining certification documents for admin review.",
-      submittedAt: "2026-05-18T09:00:00.000Z",
-      reviewedAt:
-        actor.verificationStatus === "approved"
-          ? "2026-05-19T11:30:00.000Z"
-          : undefined,
-    };
-  }
-
-  return {
-    role: actor.role,
-    onboardingCompleted: actor.onboardingCompleted,
-    verificationStatus: actor.verificationStatus,
-    requiredDocuments: ["trade_license", "tax_card", "authorized_signatory_id"],
-    missingDocuments:
-      actor.verificationStatus === "approved"
-        ? []
-        : ["authorized_signatory_id"],
-    nextAction:
-      actor.verificationStatus === "approved"
-        ? "You can publish jobs and invite professionals."
-        : "Upload the missing signatory document to complete verification.",
-    submittedAt: "2026-05-19T07:15:00.000Z",
-    reviewedAt:
-      actor.verificationStatus === "approved"
-        ? "2026-05-20T08:45:00.000Z"
-        : undefined,
-  };
-}
-
-function buildVerificationStatus(actor: AuthPrincipal) {
-  if (actor.verificationStatus === "rejected") {
-    return {
-      status: actor.verificationStatus,
-      submittedAt: "2026-05-18T09:00:00.000Z",
-      reviewedAt: "2026-05-19T11:30:00.000Z",
-      rejectionReason: "The uploaded license image was incomplete.",
-      outstandingDocuments: ["license"],
-    };
-  }
-
-  return {
-    status: actor.verificationStatus,
-    submittedAt: "2026-05-18T09:00:00.000Z",
-    reviewedAt:
-      actor.verificationStatus === "approved"
-        ? "2026-05-19T11:30:00.000Z"
-        : undefined,
-    outstandingDocuments:
-      actor.verificationStatus === "approved" ? [] : ["certifications"],
-  };
 }
 
 function buildVisibleBookings(actor: AuthPrincipal) {
@@ -434,12 +425,28 @@ void startService({
           response: {
             200: toJsonSchema(authPrincipalSchema, "AuthPrincipal"),
             401: toJsonSchema(apiErrorSchema, "ApiError"),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorNotFound"),
             503: toJsonSchema(apiErrorSchema, "ApiErrorServiceUnavailable"),
           },
         },
         preHandler: auth.requireAccess(),
       },
-      async (request) => request.authContext,
+      async (request, reply) => {
+        const actor = request.authContext as AuthPrincipal;
+        const downstream = await fetchDownstreamResource(
+          "identity",
+          `/internal/actors/${encodeURIComponent(actor.sub)}`,
+          authPrincipalSchema,
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
     );
 
     app.get(
@@ -454,13 +461,28 @@ void startService({
           response: {
             200: toJsonSchema(onboardingStatusSchema, "OnboardingStatus"),
             401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorized"),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorNotFound"),
             503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
           },
         },
         preHandler: auth.requireAccess(),
       },
-      async (request) =>
-        buildOnboardingStatus(request.authContext as AuthPrincipal),
+      async (request, reply) => {
+        const actor = request.authContext as AuthPrincipal;
+        const downstream = await fetchDownstreamResource(
+          "identity",
+          `/internal/actors/${encodeURIComponent(actor.sub)}/onboarding`,
+          onboardingStatusSchema,
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
     );
 
     app.get(
@@ -477,13 +499,28 @@ void startService({
               "VerificationStatusResponse",
             ),
             401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorized"),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorNotFound"),
             503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
           },
         },
         preHandler: auth.requireAccess(),
       },
-      async (request) =>
-        buildVerificationStatus(request.authContext as AuthPrincipal),
+      async (request, reply) => {
+        const actor = request.authContext as AuthPrincipal;
+        const downstream = await fetchDownstreamResource(
+          "identity",
+          `/internal/actors/${encodeURIComponent(actor.sub)}/verification`,
+          verificationStatusResponseSchema,
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
     );
 
     app.get(
@@ -510,17 +547,19 @@ void startService({
       },
       async (request, reply) => {
         const actor = request.authContext as AuthPrincipal;
-        const profile = professionalProfiles[getProfileIdForActor(actor)];
+        const downstream = await fetchDownstreamResource(
+          "profiles",
+          `/internal/profiles/${encodeURIComponent(actor.sub)}`,
+          professionalProfileSummarySchema,
+        );
 
-        if (!profile) {
+        if (!downstream.ok) {
           return reply
-            .code(404)
-            .send(
-              notFoundError("No professional profile was found for the actor."),
-            );
+            .code(mapDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
         }
 
-        return profile;
+        return downstream.data;
       },
     );
 
@@ -543,19 +582,23 @@ void startService({
             503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
           },
         },
-        preHandler: auth.requireAccess({ roles: ["admin", "clinic"] }),
+        preHandler: auth.requireAccess({ roles: ["clinic"] }),
       },
       async (request, reply) => {
         const actor = request.authContext as AuthPrincipal;
-        const clinic = clinicProfiles[getClinicIdForActor(actor)];
+        const downstream = await fetchDownstreamResource(
+          "clinics",
+          `/internal/clinics/${encodeURIComponent(actor.sub)}`,
+          clinicProfileSummarySchema,
+        );
 
-        if (!clinic) {
+        if (!downstream.ok) {
           return reply
-            .code(404)
-            .send(notFoundError("No clinic profile was found for the actor."));
+            .code(mapDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
         }
 
-        return clinic;
+        return downstream.data;
       },
     );
 

@@ -24,6 +24,7 @@ import { z } from "zod";
 const DEFAULT_HOST = "0.0.0.0";
 const DEFAULT_NODE_ENV = "development";
 const DEFAULT_PORT = 4000;
+const INTERNAL_SERVICE_TOKEN_HEADER = "x-internal-service-token";
 const DEVELOPMENT_HEADER_NAMES = [
   "x-dev-user-id",
   "x-dev-user-role",
@@ -101,6 +102,13 @@ function resolveAuthMode(): AuthMode {
   return result.success ? result.data : "strict";
 }
 
+function isDevelopmentBypassEnabled() {
+  return (
+    process.env.ENABLE_DEV_AUTH_BYPASS === "true" &&
+    (process.env.NODE_ENV ?? DEFAULT_NODE_ENV) !== "production"
+  );
+}
+
 function loadAuthConfiguration(): InternalAuthConfiguration {
   const mode = resolveAuthMode();
   const issuer = process.env.AUTH_ISSUER_URL;
@@ -114,8 +122,7 @@ function loadAuthConfiguration(): InternalAuthConfiguration {
       : undefined);
 
   if (mode === "development-bypass") {
-    const configured =
-      (process.env.NODE_ENV ?? DEFAULT_NODE_ENV) !== "production";
+    const configured = isDevelopmentBypassEnabled();
 
     return gatewayAuthConfigurationSchema.parse({
       mode,
@@ -389,6 +396,31 @@ export async function createServiceApp(options: ServiceBootstrapOptions) {
   });
   await app.register(swaggerUi, {
     routePrefix: "/docs",
+  });
+
+  app.addHook("onRequest", async (request, reply) => {
+    if (!request.url.startsWith("/internal/")) {
+      return;
+    }
+
+    const configuredToken = process.env.INTERNAL_SERVICE_TOKEN;
+
+    if (!configuredToken) {
+      return;
+    }
+
+    const providedToken = readHeaderValue(
+      request.headers,
+      INTERNAL_SERVICE_TOKEN_HEADER,
+    );
+
+    if (providedToken !== configuredToken) {
+      return reply.code(401).send({
+        code: "INTERNAL_SERVICE_UNAUTHORIZED",
+        message:
+          "The internal service token is missing or invalid for this request.",
+      });
+    }
   });
 
   app.get("/health", async () => ({

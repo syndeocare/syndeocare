@@ -18,3 +18,5 @@ role/realm-based access control, and token issuance.
 - identity is controlled inside the platform boundary
 - services must validate JWTs consistently
 - operational ownership for Keycloak and its backing store is required
+- local development should use imported realm bootstrap assets so roles and clients match the contract assumptions
+- development bypass must be explicitly enabled and never treated as a production fallback

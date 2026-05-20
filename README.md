@@ -116,6 +116,8 @@ The platform is designed around **Keycloak** as the self-hosted identity
 provider. Application services should validate tokens at the edge and rely on
 service-to-service trust within the platform boundary.
 
+Local Keycloak bootstrap assets live in `infra/keycloak/realm-import/`.
+
 ## Deployment target
 
 - **Web / docs:** static or Next runtime on AWS

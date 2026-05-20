@@ -47,14 +47,20 @@ The API gateway supports two explicit auth modes:
 - `AUTH_MODE=strict` for Keycloak JWT validation
 - `AUTH_MODE=development-bypass` for local route testing without a live IdP
 
+`development-bypass` should only be enabled when `ENABLE_DEV_AUTH_BYPASS=true`.
+
 ### Strict mode variables
 
 ```sh
 AUTH_MODE=strict
-AUTH_ISSUER_URL=https://identity.example.com/realms/syndeocare
+AUTH_ISSUER_URL=http://127.0.0.1:8080/realms/syndeocare
 AUTH_AUDIENCE=syndeocare-api
 AUTH_CLIENT_ID=syndeocare-api
 AUTH_REALM=syndeocare
+INTERNAL_SERVICE_TOKEN=local-internal-token
+SERVICE_IDENTITY_URL=http://127.0.0.1:4111
+SERVICE_PROFILES_URL=http://127.0.0.1:4112
+SERVICE_CLINICS_URL=http://127.0.0.1:4113
 ```
 
 `AUTH_JWKS_URI` is optional. If omitted, the gateway derives the Keycloak certs endpoint from `AUTH_ISSUER_URL`.
@@ -71,6 +77,24 @@ When `AUTH_MODE=development-bypass`, protected routes accept these headers:
 - `x-dev-onboarding-completed`
 - `x-dev-verification-status`
 - `x-dev-display-name`
+
+## Local Keycloak bootstrap
+
+The local compose stack imports `infra/keycloak/realm-import/syndeocare-realm.json` automatically.
+
+Local users:
+
+- `admin.user / ChangeMe123!`
+- `clinic.user / ChangeMe123!`
+- `professional.user / ChangeMe123!`
+
+You can start only the auth stack with:
+
+```sh
+docker compose -f infra/docker/docker-compose.local.yml up -d postgres keycloak
+```
+
+For local service-to-service protection, set the same `INTERNAL_SERVICE_TOKEN` value on the gateway and internal services.
 
 ## Validate before pushing
 

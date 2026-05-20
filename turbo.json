@@ -4,15 +4,20 @@
   "globalEnv": [
     "AUTH_AUDIENCE",
     "AUTH_CLIENT_ID",
+    "ENABLE_DEV_AUTH_BYPASS",
     "AUTH_ISSUER_URL",
     "AUTH_JWKS_URI",
     "AUTH_MODE",
     "AUTH_REALM",
     "DATABASE_URL",
     "HOST",
+    "INTERNAL_SERVICE_TOKEN",
     "LOG_LEVEL",
     "NODE_ENV",
-    "PORT"
+    "PORT",
+    "SERVICE_CLINICS_URL",
+    "SERVICE_IDENTITY_URL",
+    "SERVICE_PROFILES_URL"
   ],
   "tasks": {
     "build": {
