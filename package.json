@@ -4,6 +4,8 @@
   "scripts": {
     "build": "turbo run build",
     "build:services": "turbo run build --filter='./services/*'",
+    "db:migrate": "pnpm --filter @repo/persistence db:migrate",
+    "db:seed": "pnpm --filter @repo/persistence db:seed",
     "dev": "turbo run dev --parallel",
     "lint": "turbo run lint",
     "lint:fix": "turbo run lint -- --fix",

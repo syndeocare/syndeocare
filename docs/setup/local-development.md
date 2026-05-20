@@ -12,6 +12,21 @@
 pnpm install
 ```
 
+## Database configuration
+
+The persistence layer expects `DATABASE_URL`. By default local development uses:
+
+```sh
+postgresql://syndeocare:syndeocare@127.0.0.1:5432/syndeocare
+```
+
+## Initialize persistence
+
+```sh
+pnpm db:migrate
+pnpm db:seed
+```
+
 ## Start workspace apps
 
 ```sh

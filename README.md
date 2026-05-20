@@ -80,6 +80,8 @@ docs/
 
 ```sh
 pnpm install
+pnpm db:migrate
+pnpm db:seed
 pnpm dev
 pnpm validate
 pnpm build
@@ -103,6 +105,7 @@ Start here:
 - `docs/architecture/event-model.md`
 - `docs/api/contract-strategy.md`
 - `docs/api/initial-v1-contracts.md`
+- `docs/architecture/persistence-overview.md`
 - `docs/setup/local-development.md`
 - `docs/runbooks/deployment.md`
 - `docs/adr/`

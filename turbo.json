@@ -8,6 +8,7 @@
     "AUTH_JWKS_URI",
     "AUTH_MODE",
     "AUTH_REALM",
+    "DATABASE_URL",
     "HOST",
     "LOG_LEVEL",
     "NODE_ENV",
