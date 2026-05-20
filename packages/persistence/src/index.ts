@@ -5,6 +5,10 @@ export {
   getOnboardingStatusBySubject,
   getProfessionalProfileBySubject,
   getVerificationStatusBySubject,
+  reviewVerificationBySubject,
+  updateClinicProfileBySubject,
+  updateOnboardingBySubject,
+  updateProfessionalProfileBySubject,
 } from "./repositories.js";
 export {
   actors,

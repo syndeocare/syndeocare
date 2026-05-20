@@ -40,6 +40,11 @@ export const verificationStatusSchema = z.enum([
   "approved",
   "rejected",
 ]);
+export const availabilityStatusSchema = z.enum([
+  "available",
+  "limited",
+  "unavailable",
+]);
 export const employmentTypeSchema = z.enum([
   "temporary_shift",
   "permanent_role",
@@ -155,9 +160,27 @@ export const professionalProfileSummarySchema = z.object({
   verificationStatus: verificationStatusSchema,
   onboardingCompleted: z.boolean(),
   availability: z.object({
-    status: z.enum(["available", "limited", "unavailable"]),
+    status: availabilityStatusSchema,
     nextAvailableAt: z.string().datetime().optional(),
     locationRadiusKm: z.number().positive(),
+  }),
+});
+
+export const professionalProfileUpdateInputSchema = z.object({
+  fullName: z.string().min(1),
+  specialty: z.string().min(1),
+  yearsExperience: z.number().int().nonnegative(),
+  languages: z.array(z.string().min(2)).min(1),
+  availability: z.object({
+    status: availabilityStatusSchema,
+    nextAvailableAt: z.string().datetime().optional(),
+    locationRadiusKm: z.number().int().positive(),
+  }),
+  location: z.object({
+    city: z.string().min(1),
+    region: z.string().min(1),
+    latitude: z.number().min(-90).max(90),
+    longitude: z.number().min(-180).max(180),
   }),
 });
 
@@ -171,6 +194,31 @@ export const clinicProfileSummarySchema = z.object({
   onboardingCompleted: z.boolean(),
   openRoles: z.number().int().nonnegative(),
   rating: z.number().min(0).max(5),
+});
+
+export const clinicProfileUpdateInputSchema = z.object({
+  organizationName: z.string().min(1),
+  facilityType: z.string().min(1),
+  location: z.object({
+    city: z.string().min(1),
+    region: z.string().min(1),
+    latitude: z.number().min(-90).max(90),
+    longitude: z.number().min(-180).max(180),
+  }),
+});
+
+export const onboardingSubmissionInputSchema = z.object({
+  requiredDocuments: z.array(z.string().min(1)),
+  missingDocuments: z.array(z.string().min(1)),
+  nextAction: z.string().min(1),
+  submitForReview: z.boolean().default(false),
+});
+
+export const verificationReviewInputSchema = z.object({
+  status: z.enum(["pending_review", "approved", "rejected"]),
+  outstandingDocuments: z.array(z.string().min(1)),
+  nextAction: z.string().min(1),
+  rejectionReason: z.string().min(1).optional(),
 });
 
 export const jobListingSchema = z.object({
@@ -265,9 +313,34 @@ export const initialV1RouteCatalog = [
     protected: true,
   },
   {
+    method: "PATCH",
+    path: "/v1/profiles/me",
+    summary: "Update the current professional profile",
+    protected: true,
+  },
+  {
     method: "GET",
     path: "/v1/clinics/me",
     summary: "Current clinic profile",
+    protected: true,
+  },
+  {
+    method: "PATCH",
+    path: "/v1/clinics/me",
+    summary: "Update the current clinic profile",
+    protected: true,
+  },
+  {
+    method: "PATCH",
+    path: "/v1/onboarding/status",
+    summary:
+      "Update onboarding document state and optionally submit for review",
+    protected: true,
+  },
+  {
+    method: "PATCH",
+    path: "/v1/admin/verification/:subject",
+    summary: "Review verification for a target actor",
     protected: true,
   },
   {
@@ -324,6 +397,7 @@ export type EventName = z.infer<typeof eventNameSchema>;
 export type EventEnvelope = z.infer<typeof eventEnvelopeSchema>;
 export type UserRole = z.infer<typeof userRoleSchema>;
 export type VerificationStatus = z.infer<typeof verificationStatusSchema>;
+export type AvailabilityStatus = z.infer<typeof availabilityStatusSchema>;
 export type EmploymentType = z.infer<typeof employmentTypeSchema>;
 export type JobStatus = z.infer<typeof jobStatusSchema>;
 export type BookingStatus = z.infer<typeof bookingStatusSchema>;
@@ -339,7 +413,19 @@ export type VerificationStatusResponse = z.infer<
 export type ProfessionalProfileSummary = z.infer<
   typeof professionalProfileSummarySchema
 >;
+export type ProfessionalProfileUpdateInput = z.infer<
+  typeof professionalProfileUpdateInputSchema
+>;
 export type ClinicProfileSummary = z.infer<typeof clinicProfileSummarySchema>;
+export type ClinicProfileUpdateInput = z.infer<
+  typeof clinicProfileUpdateInputSchema
+>;
+export type OnboardingSubmissionInput = z.infer<
+  typeof onboardingSubmissionInputSchema
+>;
+export type VerificationReviewInput = z.infer<
+  typeof verificationReviewInputSchema
+>;
 export type JobListing = z.infer<typeof jobListingSchema>;
 export type JobListingDetail = z.infer<typeof jobListingDetailSchema>;
 export type BookingSummary = z.infer<typeof bookingSummarySchema>;

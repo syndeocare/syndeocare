@@ -9,9 +9,13 @@ import {
   initialV1RouteCatalog,
   jobListingDetailSchema,
   jobListingListResponseSchema,
+  onboardingSubmissionInputSchema,
   onboardingStatusSchema,
   platformMetadataSchema,
+  professionalProfileUpdateInputSchema,
   professionalProfileSummarySchema,
+  clinicProfileUpdateInputSchema,
+  verificationReviewInputSchema,
   verificationStatusResponseSchema,
   type AuthPrincipal,
   type BookingDetail,
@@ -238,16 +242,25 @@ function mapDownstreamStatusCode(statusCode: number): 404 | 503 {
   return statusCode === 404 ? 404 : 503;
 }
 
-async function fetchDownstreamResource<T>(
+async function requestDownstreamResource<T>(
   serviceName: DownstreamServiceName,
   resourcePath: string,
   schema: z.ZodType<T>,
+  options?: {
+    method?: "GET" | "PATCH";
+    body?: Record<string, unknown>;
+  },
 ): Promise<DownstreamResult<T>> {
   try {
     const response = await fetch(
       new URL(resourcePath, `${downstreamServices[serviceName]}/`),
       {
-        headers: buildInternalServiceHeaders(),
+        method: options?.method ?? "GET",
+        headers: {
+          ...buildInternalServiceHeaders(),
+          ...(options?.body ? { "content-type": "application/json" } : {}),
+        },
+        body: options?.body ? JSON.stringify(options.body) : undefined,
       },
     );
     const parsedBody = (await response.json().catch(() => undefined)) as
@@ -433,7 +446,7 @@ void startService({
       },
       async (request, reply) => {
         const actor = request.authContext as AuthPrincipal;
-        const downstream = await fetchDownstreamResource(
+        const downstream = await requestDownstreamResource(
           "identity",
           `/internal/actors/${encodeURIComponent(actor.sub)}`,
           authPrincipalSchema,
@@ -469,7 +482,7 @@ void startService({
       },
       async (request, reply) => {
         const actor = request.authContext as AuthPrincipal;
-        const downstream = await fetchDownstreamResource(
+        const downstream = await requestDownstreamResource(
           "identity",
           `/internal/actors/${encodeURIComponent(actor.sub)}/onboarding`,
           onboardingStatusSchema,
@@ -507,7 +520,7 @@ void startService({
       },
       async (request, reply) => {
         const actor = request.authContext as AuthPrincipal;
-        const downstream = await fetchDownstreamResource(
+        const downstream = await requestDownstreamResource(
           "identity",
           `/internal/actors/${encodeURIComponent(actor.sub)}/verification`,
           verificationStatusResponseSchema,
@@ -547,7 +560,7 @@ void startService({
       },
       async (request, reply) => {
         const actor = request.authContext as AuthPrincipal;
-        const downstream = await fetchDownstreamResource(
+        const downstream = await requestDownstreamResource(
           "profiles",
           `/internal/profiles/${encodeURIComponent(actor.sub)}`,
           professionalProfileSummarySchema,
@@ -586,7 +599,7 @@ void startService({
       },
       async (request, reply) => {
         const actor = request.authContext as AuthPrincipal;
-        const downstream = await fetchDownstreamResource(
+        const downstream = await requestDownstreamResource(
           "clinics",
           `/internal/clinics/${encodeURIComponent(actor.sub)}`,
           clinicProfileSummarySchema,
@@ -672,6 +685,246 @@ void startService({
           items: filteredJobs.map(toJobSummary),
           total: filteredJobs.length,
         };
+      },
+    );
+
+    app.patch(
+      "/v1/onboarding/status",
+      {
+        schema: {
+          operationId: "updateOnboardingStatus",
+          summary:
+            "Update onboarding document state and optionally submit for review",
+          tags: ["onboarding"],
+          security: [{ bearerAuth: [] }],
+          body: toJsonSchema(
+            onboardingSubmissionInputSchema,
+            "OnboardingSubmissionInput",
+          ),
+          response: {
+            200: toJsonSchema(onboardingStatusSchema, "OnboardingStatus"),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorValidation"),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorized"),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorNotFound"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
+          },
+        },
+        preHandler: auth.requireAccess({ roles: ["clinic", "professional"] }),
+      },
+      async (request, reply) => {
+        const actor = request.authContext as AuthPrincipal;
+        const parsedBody = onboardingSubmissionInputSchema.safeParse(
+          request.body,
+        );
+
+        if (!parsedBody.success) {
+          return reply
+            .code(400)
+            .send(buildValidationError(parsedBody.error.issues));
+        }
+
+        const downstream = await requestDownstreamResource(
+          "identity",
+          `/internal/actors/${encodeURIComponent(actor.sub)}/onboarding`,
+          onboardingStatusSchema,
+          {
+            method: "PATCH",
+            body: parsedBody.data,
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.patch(
+      "/v1/profiles/me",
+      {
+        schema: {
+          operationId: "updateCurrentProfessionalProfile",
+          summary: "Update the current professional profile",
+          tags: ["profiles"],
+          security: [{ bearerAuth: [] }],
+          body: toJsonSchema(
+            professionalProfileUpdateInputSchema,
+            "ProfessionalProfileUpdateInput",
+          ),
+          response: {
+            200: toJsonSchema(
+              professionalProfileSummarySchema,
+              "ProfessionalProfileSummary",
+            ),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorValidation"),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorized"),
+            403: toJsonSchema(apiErrorSchema, "ApiErrorForbidden"),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorNotFound"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
+          },
+        },
+        preHandler: auth.requireAccess({ roles: ["professional"] }),
+      },
+      async (request, reply) => {
+        const actor = request.authContext as AuthPrincipal;
+        const parsedBody = professionalProfileUpdateInputSchema.safeParse(
+          request.body,
+        );
+
+        if (!parsedBody.success) {
+          return reply
+            .code(400)
+            .send(buildValidationError(parsedBody.error.issues));
+        }
+
+        const downstream = await requestDownstreamResource(
+          "profiles",
+          `/internal/profiles/${encodeURIComponent(actor.sub)}`,
+          professionalProfileSummarySchema,
+          {
+            method: "PATCH",
+            body: parsedBody.data,
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.patch(
+      "/v1/clinics/me",
+      {
+        schema: {
+          operationId: "updateCurrentClinicProfile",
+          summary: "Update the current clinic profile",
+          tags: ["clinics"],
+          security: [{ bearerAuth: [] }],
+          body: toJsonSchema(
+            clinicProfileUpdateInputSchema,
+            "ClinicProfileUpdateInput",
+          ),
+          response: {
+            200: toJsonSchema(
+              clinicProfileSummarySchema,
+              "ClinicProfileSummary",
+            ),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorValidation"),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorized"),
+            403: toJsonSchema(apiErrorSchema, "ApiErrorForbidden"),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorNotFound"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
+          },
+        },
+        preHandler: auth.requireAccess({ roles: ["clinic"] }),
+      },
+      async (request, reply) => {
+        const actor = request.authContext as AuthPrincipal;
+        const parsedBody = clinicProfileUpdateInputSchema.safeParse(
+          request.body,
+        );
+
+        if (!parsedBody.success) {
+          return reply
+            .code(400)
+            .send(buildValidationError(parsedBody.error.issues));
+        }
+
+        const downstream = await requestDownstreamResource(
+          "clinics",
+          `/internal/clinics/${encodeURIComponent(actor.sub)}`,
+          clinicProfileSummarySchema,
+          {
+            method: "PATCH",
+            body: parsedBody.data,
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.patch(
+      "/v1/admin/verification/:subject",
+      {
+        schema: {
+          operationId: "reviewVerification",
+          summary: "Review verification for a target actor",
+          tags: ["verification", "admin"],
+          security: [{ bearerAuth: [] }],
+          params: {
+            type: "object",
+            required: ["subject"],
+            properties: {
+              subject: { type: "string" },
+            },
+          },
+          body: toJsonSchema(
+            verificationReviewInputSchema,
+            "VerificationReviewInput",
+          ),
+          response: {
+            200: toJsonSchema(
+              verificationStatusResponseSchema,
+              "VerificationStatusResponse",
+            ),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorValidation"),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorized"),
+            403: toJsonSchema(apiErrorSchema, "ApiErrorForbidden"),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorNotFound"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
+          },
+        },
+        preHandler: auth.requireAccess({ roles: ["admin"] }),
+      },
+      async (request, reply) => {
+        const parsedParams = z
+          .object({ subject: z.string().min(1) })
+          .safeParse(request.params);
+        const parsedBody = verificationReviewInputSchema.safeParse(
+          request.body,
+        );
+
+        if (!parsedParams.success || !parsedBody.success) {
+          return reply.code(400).send({
+            code: "VALIDATION_ERROR",
+            message:
+              "A valid subject and verification review payload are required.",
+          });
+        }
+
+        const downstream = await requestDownstreamResource(
+          "identity",
+          `/internal/actors/${encodeURIComponent(parsedParams.data.subject)}/verification`,
+          verificationStatusResponseSchema,
+          {
+            method: "PATCH",
+            body: parsedBody.data,
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
       },
     );
 

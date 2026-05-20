@@ -1,9 +1,13 @@
 import { and, eq } from "drizzle-orm";
 import type {
+  ClinicProfileUpdateInput,
   AuthPrincipal,
   ClinicProfileSummary,
+  OnboardingSubmissionInput,
   OnboardingStatus,
+  ProfessionalProfileUpdateInput,
   ProfessionalProfileSummary,
+  VerificationReviewInput,
   VerificationStatusResponse,
 } from "@repo/contracts";
 import { getDb } from "./client.js";
@@ -172,4 +176,240 @@ export async function getClinicProfileBySubject(
     openRoles: row.clinic.openRoles,
     rating: numericToNumber(row.clinic.rating),
   };
+}
+
+export async function updateOnboardingBySubject(
+  subject: string,
+  input: OnboardingSubmissionInput,
+): Promise<OnboardingStatus | null> {
+  const aggregate = await getActorAggregateBySubject(subject);
+
+  if (!aggregate) {
+    return null;
+  }
+
+  const db = getDb();
+  const now = new Date();
+  const shouldMarkComplete =
+    input.submitForReview && input.missingDocuments.length === 0;
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(actors)
+      .set({
+        onboardingCompleted: shouldMarkComplete,
+        verificationStatus: input.submitForReview
+          ? "pending_review"
+          : aggregate.actor.verificationStatus,
+        updatedAt: now,
+      })
+      .where(eq(actors.id, aggregate.actor.id));
+
+    await tx
+      .insert(onboardingRecords)
+      .values({
+        actorId: aggregate.actor.id,
+        submittedAt: input.submitForReview
+          ? now
+          : aggregate.onboarding?.submittedAt,
+        reviewedAt: input.submitForReview
+          ? null
+          : aggregate.onboarding?.reviewedAt,
+        nextAction: input.nextAction,
+        requiredDocuments: input.requiredDocuments,
+        missingDocuments: input.missingDocuments,
+        rejectionReason: null,
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: onboardingRecords.actorId,
+        set: {
+          submittedAt: input.submitForReview
+            ? now
+            : (aggregate.onboarding?.submittedAt ?? null),
+          reviewedAt: input.submitForReview
+            ? null
+            : aggregate.onboarding?.reviewedAt,
+          nextAction: input.nextAction,
+          requiredDocuments: input.requiredDocuments,
+          missingDocuments: input.missingDocuments,
+          rejectionReason: null,
+          updatedAt: now,
+        },
+      });
+  });
+
+  return getOnboardingStatusBySubject(subject);
+}
+
+export async function reviewVerificationBySubject(
+  subject: string,
+  input: VerificationReviewInput,
+): Promise<VerificationStatusResponse | null> {
+  const aggregate = await getActorAggregateBySubject(subject);
+
+  if (!aggregate) {
+    return null;
+  }
+
+  const db = getDb();
+  const now = new Date();
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(actors)
+      .set({
+        onboardingCompleted:
+          input.status === "approved" &&
+          input.outstandingDocuments.length === 0,
+        verificationStatus: input.status,
+        updatedAt: now,
+      })
+      .where(eq(actors.id, aggregate.actor.id));
+
+    await tx
+      .insert(onboardingRecords)
+      .values({
+        actorId: aggregate.actor.id,
+        submittedAt: aggregate.onboarding?.submittedAt ?? now,
+        reviewedAt: now,
+        nextAction: input.nextAction,
+        requiredDocuments: aggregate.onboarding?.requiredDocuments ?? [],
+        missingDocuments: input.outstandingDocuments,
+        rejectionReason:
+          input.status === "rejected" ? (input.rejectionReason ?? null) : null,
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: onboardingRecords.actorId,
+        set: {
+          reviewedAt: now,
+          nextAction: input.nextAction,
+          missingDocuments: input.outstandingDocuments,
+          rejectionReason:
+            input.status === "rejected"
+              ? (input.rejectionReason ?? null)
+              : null,
+          updatedAt: now,
+        },
+      });
+  });
+
+  return getVerificationStatusBySubject(subject);
+}
+
+export async function updateProfessionalProfileBySubject(
+  subject: string,
+  input: ProfessionalProfileUpdateInput,
+): Promise<ProfessionalProfileSummary | null> {
+  const aggregate = await getActorAggregateBySubject(subject);
+
+  if (!aggregate || aggregate.actor.role !== "professional") {
+    return null;
+  }
+
+  const db = getDb();
+  const now = new Date();
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(actors)
+      .set({
+        displayName: input.fullName,
+        updatedAt: now,
+      })
+      .where(eq(actors.id, aggregate.actor.id));
+
+    await tx
+      .insert(professionalProfiles)
+      .values({
+        actorId: aggregate.actor.id,
+        fullName: input.fullName,
+        specialty: input.specialty,
+        yearsExperience: input.yearsExperience,
+        languages: input.languages,
+        availabilityStatus: input.availability.status,
+        nextAvailableAt: input.availability.nextAvailableAt
+          ? new Date(input.availability.nextAvailableAt)
+          : null,
+        locationRadiusKm: input.availability.locationRadiusKm,
+        city: input.location.city,
+        region: input.location.region,
+        latitude: String(input.location.latitude),
+        longitude: String(input.location.longitude),
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: professionalProfiles.actorId,
+        set: {
+          fullName: input.fullName,
+          specialty: input.specialty,
+          yearsExperience: input.yearsExperience,
+          languages: input.languages,
+          availabilityStatus: input.availability.status,
+          nextAvailableAt: input.availability.nextAvailableAt
+            ? new Date(input.availability.nextAvailableAt)
+            : null,
+          locationRadiusKm: input.availability.locationRadiusKm,
+          city: input.location.city,
+          region: input.location.region,
+          latitude: String(input.location.latitude),
+          longitude: String(input.location.longitude),
+          updatedAt: now,
+        },
+      });
+  });
+
+  return getProfessionalProfileBySubject(subject);
+}
+
+export async function updateClinicProfileBySubject(
+  subject: string,
+  input: ClinicProfileUpdateInput,
+): Promise<ClinicProfileSummary | null> {
+  const aggregate = await getActorAggregateBySubject(subject);
+
+  if (!aggregate || aggregate.actor.role !== "clinic") {
+    return null;
+  }
+
+  const db = getDb();
+  const now = new Date();
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(actors)
+      .set({
+        displayName: input.organizationName,
+        updatedAt: now,
+      })
+      .where(eq(actors.id, aggregate.actor.id));
+
+    await tx
+      .insert(clinicProfiles)
+      .values({
+        actorId: aggregate.actor.id,
+        organizationName: input.organizationName,
+        facilityType: input.facilityType,
+        city: input.location.city,
+        region: input.location.region,
+        latitude: String(input.location.latitude),
+        longitude: String(input.location.longitude),
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: clinicProfiles.actorId,
+        set: {
+          organizationName: input.organizationName,
+          facilityType: input.facilityType,
+          city: input.location.city,
+          region: input.location.region,
+          latitude: String(input.location.latitude),
+          longitude: String(input.location.longitude),
+          updatedAt: now,
+        },
+      });
+  });
+
+  return getClinicProfileBySubject(subject);
 }
