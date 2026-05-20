@@ -1,0 +1,41 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: syndeocare
+      POSTGRES_USER: syndeocare
+      POSTGRES_PASSWORD: syndeocare
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.2
+    command: start-dev
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_DB: postgres
+      KC_DB_URL_HOST: postgres
+      KC_DB_URL_DATABASE: syndeocare
+      KC_DB_USERNAME: syndeocare
+      KC_DB_PASSWORD: syndeocare
+    depends_on:
+      - postgres
+    ports:
+      - "8080:8080"
+
+  localstack:
+    image: localstack/localstack:4.0
+    environment:
+      SERVICES: sqs,eventbridge,s3,ssm,secretsmanager
+      DEBUG: 0
+    ports:
+      - "4566:4566"
+    volumes:
+      - localstack-data:/var/lib/localstack
+
+volumes:
+  postgres-data:
+  localstack-data:

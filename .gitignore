@@ -21,6 +21,16 @@ coverage
 # Vercel
 .vercel
 
+# Terraform
+.terraform
+*.tfstate
+*.tfstate.*
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
 # Build Outputs
 .next/
 out/
@@ -36,3 +46,6 @@ yarn-error.log*
 # Misc
 .DS_Store
 *.pem
+.idea
+.vscode
+localstack

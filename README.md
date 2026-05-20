@@ -1,179 +1,115 @@
-# Turborepo starter
+# SyndeoCare Platform Monorepo
 
-This Turborepo starter is maintained by the Turborepo core team.
+SyndeoCare is structured as an AWS-oriented **pnpm + Turborepo** monorepo for a
+**microservices** platform with **event-driven architecture**, **self-hosted
+authentication**, and a stable API front door.
 
-## Using this example
+## Platform principles
 
-Run the following command:
+- **Microservices by bounded context**, not a modular monolith
+- **EDA for side effects and workflow orchestration**
+- **Self-hosted OSS auth** with **Keycloak**
+- **Stable public contracts** through an API gateway / BFF
+- **AWS-first** deployment with Postgres, ECS/Fargate, Terraform, and OIDC
+- **Documentation as a required deliverable** through ADRs and runbooks
 
-```sh
-npx create-turbo@latest
+## Repository structure
+
+```text
+apps/
+  docs/              Next.js documentation portal
+  web/               Next.js web application
+packages/
+  contracts/         Shared event and API contract types
+  eslint-config/     Shared linting rules
+  service-core/      Shared Fastify bootstrap/runtime helpers
+  typescript-config/ Shared TypeScript baselines
+  ui/                Shared React UI package
+services/
+  api-gateway/
+  identity/
+  profiles/
+  clinics/
+  scheduling/
+  messaging/
+  notifications/
+infra/
+  docker/            Local platform containers
+  terraform/         AWS infrastructure skeleton
+docs/
+  adr/
+  api/
+  architecture/
+  runbooks/
+  setup/
 ```
 
-## What's inside?
+## Tooling
 
-This Turborepo includes the following packages/apps:
+- **Runtime:** Node `20.20.2`
+- **Package manager:** pnpm `9.0.0`
+- **Monorepo orchestration:** Turborepo
+- **Git hooks:** Husky + lint-staged + commitlint
+- **Versioning:** Changesets
+- **Services:** TypeScript + Fastify shared runtime
+- **Contracts:** Zod-based shared package
 
-### Apps and Packages
-
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
-
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Git hooks
-
-This repo uses **Husky** at the monorepo root.
-
-- `pre-commit` runs `lint-staged` for staged-file formatting and lint fixes
-- `pre-push` runs `pnpm validate`
-- `commit-msg` enforces Conventional Commits through `commitlint`
-
-If hooks stop running after reinstalling dependencies, run:
+## Core commands
 
 ```sh
 pnpm install
+pnpm dev
+pnpm validate
+pnpm build
+pnpm changeset
+pnpm version-packages
 ```
 
-If you need to update hook behavior later, edit the files in `.husky/` and keep the root scripts/config in sync:
+## Quality gates
+
+- `pre-commit` → staged formatting/lint hygiene
+- `commit-msg` → Conventional Commits
+- `pre-push` → root validation
+- CI runs formatting, linting, typechecks, build, and release checks
+
+## Architecture docs
+
+Start here:
+
+- `docs/architecture/platform-overview.md`
+- `docs/architecture/event-model.md`
+- `docs/api/contract-strategy.md`
+- `docs/setup/local-development.md`
+- `docs/runbooks/deployment.md`
+- `docs/adr/`
+
+## Authentication
+
+The platform is designed around **Keycloak** as the self-hosted identity
+provider. Application services should validate tokens at the edge and rely on
+service-to-service trust within the platform boundary.
+
+## Deployment target
+
+- **Web / docs:** static or Next runtime on AWS
+- **Services:** Docker images on **ECS Fargate**
+- **Database:** **AWS PostgreSQL**
+- **Events:** AWS event backbone
+- **Infrastructure:** Terraform
+
+## Git hooks
+
+This repo uses **Husky** at the monorepo root.
+
+- `pre-commit` runs `lint-staged`
+- `pre-commit` formats staged files with Prettier
+- `pre-push` runs `pnpm validate`
+- `commit-msg` enforces Conventional Commits
+
+If you update repo automation later, keep these files aligned:
 
 - `package.json`
+- `.husky/*`
 - `lint-staged.config.mjs`
 - `commitlint.config.cjs`
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo build
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo build
-pnpm dlx turbo build
-pnpm exec turbo build
-```
-
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo build --filter=docs
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-```
-
-### Develop
-
-To develop all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo dev
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo dev
-pnpm exec turbo dev
-pnpm exec turbo dev
-```
-
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo dev --filter=web
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-```
-
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo login
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo login
-pnpm exec turbo login
-pnpm exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo link
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo link
-pnpm exec turbo link
-pnpm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+- `.github/workflows/*`
