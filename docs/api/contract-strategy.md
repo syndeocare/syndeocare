@@ -9,6 +9,8 @@ The public API must remain stable even while internal services evolve.
 - generate shared client SDKs from source contracts over time
 - treat service APIs as internal unless explicitly promoted
 - preserve a stable client contract while backend services evolve independently
+- define contract schemas in `packages/contracts`
+- expose OpenAPI documentation from the gateway and service runtime
 
 ## Client audience
 
@@ -31,3 +33,10 @@ These flows must stay especially stable across backend changes:
 - additive changes are preferred
 - removals require deprecation windows
 - breaking changes require versioning and migration notes
+
+## Current implementation baseline
+
+- initial `/v1` contracts now exist in `services/api-gateway`
+- shared schemas live in `packages/contracts/src/index.ts`
+- gateway auth supports strict Keycloak JWT validation and an explicit development bypass mode
+- protected routes document bearer auth in the generated OpenAPI surface

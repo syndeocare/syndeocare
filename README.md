@@ -102,6 +102,7 @@ Start here:
 - `docs/architecture/product-overview.md`
 - `docs/architecture/event-model.md`
 - `docs/api/contract-strategy.md`
+- `docs/api/initial-v1-contracts.md`
 - `docs/setup/local-development.md`
 - `docs/runbooks/deployment.md`
 - `docs/adr/`

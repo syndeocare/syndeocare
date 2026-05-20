@@ -1,7 +1,18 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "ui": "tui",
-  "globalEnv": ["HOST", "LOG_LEVEL", "NODE_ENV", "PORT"],
+  "globalEnv": [
+    "AUTH_AUDIENCE",
+    "AUTH_CLIENT_ID",
+    "AUTH_ISSUER_URL",
+    "AUTH_JWKS_URI",
+    "AUTH_MODE",
+    "AUTH_REALM",
+    "HOST",
+    "LOG_LEVEL",
+    "NODE_ENV",
+    "PORT"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

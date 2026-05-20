@@ -25,6 +25,38 @@ pnpm dev
 - professional workflows are mobile-first
 - backend changes should preserve stable API behavior for those surfaces
 
+## Gateway auth modes
+
+The API gateway supports two explicit auth modes:
+
+- `AUTH_MODE=strict` for Keycloak JWT validation
+- `AUTH_MODE=development-bypass` for local route testing without a live IdP
+
+### Strict mode variables
+
+```sh
+AUTH_MODE=strict
+AUTH_ISSUER_URL=https://identity.example.com/realms/syndeocare
+AUTH_AUDIENCE=syndeocare-api
+AUTH_CLIENT_ID=syndeocare-api
+AUTH_REALM=syndeocare
+```
+
+`AUTH_JWKS_URI` is optional. If omitted, the gateway derives the Keycloak certs endpoint from `AUTH_ISSUER_URL`.
+
+### Development bypass headers
+
+When `AUTH_MODE=development-bypass`, protected routes accept these headers:
+
+- `x-dev-user-id`
+- `x-dev-user-role` (`admin`, `clinic`, or `professional`)
+- `x-dev-user-email`
+- `x-dev-clinic-id`
+- `x-dev-profile-id`
+- `x-dev-onboarding-completed`
+- `x-dev-verification-status`
+- `x-dev-display-name`
+
 ## Validate before pushing
 
 ```sh
