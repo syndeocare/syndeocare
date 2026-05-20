@@ -18,6 +18,13 @@ pnpm install
 pnpm dev
 ```
 
+## Product context for local work
+
+- admin workflows are web only
+- clinic workflows span web and mobile
+- professional workflows are mobile-first
+- backend changes should preserve stable API behavior for those surfaces
+
 ## Validate before pushing
 
 ```sh

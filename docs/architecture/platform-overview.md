@@ -3,9 +3,11 @@
 SyndeoCare is organized around these platform layers:
 
 1. **Clients**
-   - web
+   - admin web
+   - clinic web
+   - clinic mobile
+   - professional native mobile
    - docs
-   - mobile (to be migrated into this monorepo later)
 2. **Edge**
    - API gateway / BFF
    - authentication validation
@@ -23,6 +25,22 @@ SyndeoCare is organized around these platform layers:
    - object storage
    - secrets
    - observability
+
+## Business-aligned domain intent
+
+- **identity** handles Keycloak integration, auth assertions, and access policy
+- **profiles** handles professionals, licenses, certifications, and portfolio data
+- **clinics** handles organizations, services, and employer operations
+- **scheduling** handles job listings, shifts, bookings, and status transitions
+- **messaging** handles professional-clinic conversations
+- **notifications** handles push, email, and workflow alerts
+
+## Platform constraints
+
+- manual verification remains the MVP trust mechanism
+- the gateway protects client compatibility while services evolve
+- professionals remain mobile-first, while admin remains web-only
+- architecture choices should support Arabic-first regional expansion
 
 ## Boundary rules
 

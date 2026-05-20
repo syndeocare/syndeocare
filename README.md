@@ -4,6 +4,10 @@ SyndeoCare is structured as an AWS-oriented **pnpm + Turborepo** monorepo for a
 **microservices** platform with **event-driven architecture**, **self-hosted
 authentication**, and a stable API front door.
 
+It is a healthcare staffing marketplace connecting **verified professionals**
+with **clinics, hospitals, and medical centers** for temporary shifts,
+permanent hiring, and direct communication.
+
 ## Platform principles
 
 - **Microservices by bounded context**, not a modular monolith
@@ -12,6 +16,24 @@ authentication**, and a stable API front door.
 - **Stable public contracts** through an API gateway / BFF
 - **AWS-first** deployment with Postgres, ECS/Fargate, Terraform, and OIDC
 - **Documentation as a required deliverable** through ADRs and runbooks
+- **Arabic-friendly marketplace UX** with trust, speed, and verification at the center
+
+## Product surfaces
+
+- **Admin:** web only
+- **Clinics / hospitals:** web + mobile
+- **Professionals:** mobile-first / native app only
+
+## Core business scope
+
+- role-based onboarding and verification
+- professional profiles, licenses, certifications, and portfolios
+- clinic organization profiles and job / shift posting
+- search, filtering, and matching by specialty, rating, price, and proximity
+- booking lifecycle: request → accept/reject → confirm → service → review
+- in-app messaging and notifications
+- two-way ratings and reviews
+- optional payments and escrow as the platform evolves
 
 ## Repository structure
 
@@ -77,6 +99,7 @@ pnpm version-packages
 Start here:
 
 - `docs/architecture/platform-overview.md`
+- `docs/architecture/product-overview.md`
 - `docs/architecture/event-model.md`
 - `docs/api/contract-strategy.md`
 - `docs/setup/local-development.md`
@@ -101,7 +124,6 @@ service-to-service trust within the platform boundary.
 
 This repo uses **Husky** at the monorepo root.
 
-- `pre-commit` runs `lint-staged`
 - `pre-commit` formats staged files with Prettier
 - `pre-push` runs `pnpm validate`
 - `commit-msg` enforces Conventional Commits
