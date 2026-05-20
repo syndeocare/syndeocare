@@ -24,6 +24,26 @@ This Turborepo includes the following packages/apps:
 
 Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
 
+### Git hooks
+
+This repo uses **Husky** at the monorepo root.
+
+- `pre-commit` runs `lint-staged` for staged-file formatting and lint fixes
+- `pre-push` runs `pnpm validate`
+- `commit-msg` enforces Conventional Commits through `commitlint`
+
+If hooks stop running after reinstalling dependencies, run:
+
+```sh
+pnpm install
+```
+
+If you need to update hook behavior later, edit the files in `.husky/` and keep the root scripts/config in sync:
+
+- `package.json`
+- `lint-staged.config.mjs`
+- `commitlint.config.cjs`
+
 ### Utilities
 
 This Turborepo has some additional tools already setup for you:
