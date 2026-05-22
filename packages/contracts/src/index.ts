@@ -71,6 +71,7 @@ export const compensationUnitSchema = z.enum([
   "contract",
 ]);
 export const gatewayAuthModeSchema = z.enum(["strict", "development-bypass"]);
+export const publicRegistrationRoleSchema = z.enum(["clinic", "professional"]);
 
 export const apiErrorSchema = z.object({
   code: z.string().min(1),
@@ -113,6 +114,46 @@ export const gatewayAuthConfigurationSchema = z.object({
   realm: z.string().min(1).optional(),
   jwksUri: z.string().url().optional(),
   developmentHeaders: z.array(z.string()).optional(),
+});
+
+export const authSignInInputSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+});
+
+export const authSignUpInputSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+  role: publicRegistrationRoleSchema,
+  displayName: z.string().min(1),
+});
+
+export const authTokenSetSchema = z.object({
+  accessToken: z.string().min(1),
+  refreshToken: z.string().min(1).optional(),
+  tokenType: z.string().min(1),
+  expiresIn: z.number().int().positive(),
+  refreshExpiresIn: z.number().int().positive().optional(),
+  scope: z.string().min(1).optional(),
+});
+
+export const authSessionSchema = z.object({
+  principal: authPrincipalSchema,
+  tokens: authTokenSetSchema,
+  isNewUser: z.boolean(),
+});
+
+export const notificationEmailRequestSchema = z.object({
+  actorSubject: z.string().min(1).optional(),
+  html: z.string().min(1),
+  subject: z.string().min(1),
+  toEmail: z.string().email(),
+});
+
+export const notificationDeliveryResponseSchema = z.object({
+  accepted: z.boolean(),
+  deliveredTo: z.string().email(),
+  providerMessageId: z.string().min(1),
 });
 
 export const routeContractSchema = z.object({
@@ -289,6 +330,18 @@ export const initialV1RouteCatalog = [
     protected: false,
   },
   {
+    method: "POST",
+    path: "/v1/auth/signin",
+    summary: "Authenticate with email and password",
+    protected: false,
+  },
+  {
+    method: "POST",
+    path: "/v1/auth/signup",
+    summary: "Create a new professional or clinic account",
+    protected: false,
+  },
+  {
     method: "GET",
     path: "/v1/me",
     summary: "Authenticated subject context",
@@ -404,6 +457,19 @@ export type BookingStatus = z.infer<typeof bookingStatusSchema>;
 export type AuthPrincipal = z.infer<typeof authPrincipalSchema>;
 export type GatewayAuthConfiguration = z.infer<
   typeof gatewayAuthConfigurationSchema
+>;
+export type PublicRegistrationRole = z.infer<
+  typeof publicRegistrationRoleSchema
+>;
+export type AuthSignInInput = z.infer<typeof authSignInInputSchema>;
+export type AuthSignUpInput = z.infer<typeof authSignUpInputSchema>;
+export type AuthTokenSet = z.infer<typeof authTokenSetSchema>;
+export type AuthSession = z.infer<typeof authSessionSchema>;
+export type NotificationEmailRequest = z.infer<
+  typeof notificationEmailRequestSchema
+>;
+export type NotificationDeliveryResponse = z.infer<
+  typeof notificationDeliveryResponseSchema
 >;
 export type PlatformMetadata = z.infer<typeof platformMetadataSchema>;
 export type OnboardingStatus = z.infer<typeof onboardingStatusSchema>;

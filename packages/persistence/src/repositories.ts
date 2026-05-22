@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import type {
   ClinicProfileUpdateInput,
   AuthPrincipal,
+  PublicRegistrationRole,
   ClinicProfileSummary,
   OnboardingSubmissionInput,
   OnboardingStatus,
@@ -20,6 +21,41 @@ import {
 
 function numericToNumber(value: string) {
   return Number(value);
+}
+
+function buildDefaultDisplayName(subject: string, email?: string) {
+  if (email) {
+    return email.split("@")[0] ?? subject;
+  }
+
+  return subject;
+}
+
+function buildDefaultOnboarding(role: PublicRegistrationRole | "admin") {
+  if (role === "clinic") {
+    return {
+      nextAction:
+        "Complete clinic onboarding and upload the required facility documents.",
+      requiredDocuments: [
+        "trade_license",
+        "tax_card",
+        "authorized_signatory_id",
+      ],
+    };
+  }
+
+  if (role === "professional") {
+    return {
+      nextAction:
+        "Complete your professional onboarding and upload the required credentials.",
+      requiredDocuments: ["license", "government_id", "certifications"],
+    };
+  }
+
+  return {
+    nextAction: "Platform access has been granted.",
+    requiredDocuments: [],
+  };
 }
 
 type ActorAggregate = {
@@ -176,6 +212,110 @@ export async function getClinicProfileBySubject(
     openRoles: row.clinic.openRoles,
     rating: numericToNumber(row.clinic.rating),
   };
+}
+
+export async function ensureActorAccount(input: {
+  subject: string;
+  email?: string;
+  displayName?: string;
+  role: PublicRegistrationRole | "admin";
+}): Promise<AuthPrincipal> {
+  const db = getDb();
+  const now = new Date();
+  const onboarding = buildDefaultOnboarding(input.role);
+  const displayName =
+    input.displayName ?? buildDefaultDisplayName(input.subject, input.email);
+
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(actors)
+      .values({
+        authSubject: input.subject,
+        role: input.role,
+        email: input.email,
+        displayName,
+        onboardingCompleted: input.role === "admin",
+        verificationStatus: input.role === "admin" ? "approved" : "not_started",
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: actors.authSubject,
+        set: {
+          role: input.role,
+          email: input.email,
+          displayName,
+          updatedAt: now,
+        },
+      });
+
+    const actorRows = await tx
+      .select({
+        actor: actors,
+      })
+      .from(actors)
+      .where(eq(actors.authSubject, input.subject))
+      .limit(1);
+    const actor = actorRows[0]?.actor;
+
+    if (!actor) {
+      throw new Error("Actor upsert did not return a persisted record.");
+    }
+
+    await tx
+      .insert(onboardingRecords)
+      .values({
+        actorId: actor.id,
+        nextAction: onboarding.nextAction,
+        requiredDocuments: onboarding.requiredDocuments,
+        missingDocuments: onboarding.requiredDocuments,
+        updatedAt: now,
+      })
+      .onConflictDoNothing();
+
+    if (input.role === "professional") {
+      await tx
+        .insert(professionalProfiles)
+        .values({
+          actorId: actor.id,
+          fullName: displayName,
+          specialty: "Pending onboarding",
+          yearsExperience: 0,
+          languages: ["ar"],
+          availabilityStatus: "unavailable",
+          locationRadiusKm: 1,
+          city: "TBD",
+          region: "TBD",
+          latitude: "0",
+          longitude: "0",
+          updatedAt: now,
+        })
+        .onConflictDoNothing();
+    }
+
+    if (input.role === "clinic") {
+      await tx
+        .insert(clinicProfiles)
+        .values({
+          actorId: actor.id,
+          organizationName: displayName,
+          facilityType: "Pending onboarding",
+          city: "TBD",
+          region: "TBD",
+          latitude: "0",
+          longitude: "0",
+          updatedAt: now,
+        })
+        .onConflictDoNothing();
+    }
+  });
+
+  const actor = await getAuthPrincipalBySubject(input.subject);
+
+  if (!actor) {
+    throw new Error("Expected actor account to exist after bootstrap.");
+  }
+
+  return actor;
 }
 
 export async function updateOnboardingBySubject(

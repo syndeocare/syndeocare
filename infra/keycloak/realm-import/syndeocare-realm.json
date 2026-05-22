@@ -2,7 +2,7 @@
   "realm": "syndeocare",
   "enabled": true,
   "displayName": "Syndeocare Local",
-  "registrationAllowed": false,
+  "registrationAllowed": true,
   "resetPasswordAllowed": true,
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
@@ -41,7 +41,34 @@
       "redirectUris": ["http://localhost:3000/*", "http://127.0.0.1:3000/*"],
       "webOrigins": ["http://localhost:3000", "http://127.0.0.1:3000"],
       "protocol": "openid-connect",
-      "defaultClientScopes": ["profile", "email", "roles"]
+      "defaultClientScopes": ["profile", "email", "roles"],
+      "protocolMappers": [
+        {
+          "name": "subject-claim",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-property-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "id",
+            "claim.name": "sub",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "syndeocare-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
     },
     {
       "clientId": "syndeocare-mobile",
@@ -56,7 +83,34 @@
         "exp://localhost:8081/*"
       ],
       "protocol": "openid-connect",
-      "defaultClientScopes": ["profile", "email", "roles"]
+      "defaultClientScopes": ["profile", "email", "roles"],
+      "protocolMappers": [
+        {
+          "name": "subject-claim",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-property-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "id",
+            "claim.name": "sub",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "syndeocare-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
     }
   ],
   "users": [

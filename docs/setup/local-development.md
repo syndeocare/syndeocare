@@ -53,14 +53,23 @@ The API gateway supports two explicit auth modes:
 
 ```sh
 AUTH_MODE=strict
-AUTH_ISSUER_URL=http://127.0.0.1:8080/realms/syndeocare
+AUTH_ISSUER_URL=http://127.0.0.1:8180/realms/syndeocare
 AUTH_AUDIENCE=syndeocare-api
 AUTH_CLIENT_ID=syndeocare-api
 AUTH_REALM=syndeocare
+KEYCLOAK_BASE_URL=http://127.0.0.1:8180
+KEYCLOAK_REALM=syndeocare
+KEYCLOAK_PUBLIC_CLIENT_ID=syndeocare-web
+KEYCLOAK_ADMIN_USERNAME=admin
+KEYCLOAK_ADMIN_PASSWORD=admin
+RESEND_API_KEY=your_resend_api_key
+RESEND_FROM_EMAIL=onboarding@resend.dev
+RESEND_TEST_EMAIL=onboarding@resend.dev
 INTERNAL_SERVICE_TOKEN=local-internal-token
 SERVICE_IDENTITY_URL=http://127.0.0.1:4111
 SERVICE_PROFILES_URL=http://127.0.0.1:4112
 SERVICE_CLINICS_URL=http://127.0.0.1:4113
+SERVICE_NOTIFICATIONS_URL=http://127.0.0.1:4115
 ```
 
 `AUTH_JWKS_URI` is optional. If omitted, the gateway derives the Keycloak certs endpoint from `AUTH_ISSUER_URL`.
@@ -93,6 +102,37 @@ You can start only the auth stack with:
 ```sh
 docker compose -f infra/docker/docker-compose.local.yml up -d postgres keycloak
 ```
+
+By default local Keycloak binds to `http://127.0.0.1:8180` to avoid common `:8080`
+port conflicts with other developer tooling.
+
+## Local sign-up and sign-in
+
+When the gateway is running in `strict` mode and Keycloak is available, these
+public routes provide working local auth:
+
+- `POST /v1/auth/signup`
+- `POST /v1/auth/signin`
+
+Example sign-up:
+
+```sh
+curl -X POST http://127.0.0.1:4110/v1/auth/signup \
+  -H 'content-type: application/json' \
+  --data '{
+    "email": "tester@example.com",
+    "password": "ChangeMe123!",
+    "role": "professional",
+    "displayName": "Tester Example"
+  }'
+```
+
+The response includes a bearer token plus the bootstrapped platform actor
+context. Use `Authorization: Bearer <accessToken>` for protected `/v1/*` routes.
+
+Sign-up also sends a welcome email through the notifications service using
+Resend. For local testing, keep `RESEND_FROM_EMAIL=onboarding@resend.dev` and
+set `RESEND_TEST_EMAIL` to the safe inbox you want to receive development mail.
 
 For local service-to-service protection, set the same `INTERNAL_SERVICE_TOKEN` value on the gateway and internal services.
 

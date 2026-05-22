@@ -1,5 +1,8 @@
 import {
   apiErrorSchema,
+  authSessionSchema,
+  authSignInInputSchema,
+  authSignUpInputSchema,
   authPrincipalSchema,
   bookingDetailSchema,
   bookingListResponseSchema,
@@ -242,12 +245,28 @@ function mapDownstreamStatusCode(statusCode: number): 404 | 503 {
   return statusCode === 404 ? 404 : 503;
 }
 
+function mapSignInDownstreamStatusCode(statusCode: number): 400 | 401 | 503 {
+  if (statusCode === 400 || statusCode === 401) {
+    return statusCode;
+  }
+
+  return 503;
+}
+
+function mapSignUpDownstreamStatusCode(statusCode: number): 400 | 409 | 503 {
+  if (statusCode === 400 || statusCode === 409) {
+    return statusCode;
+  }
+
+  return 503;
+}
+
 async function requestDownstreamResource<T>(
   serviceName: DownstreamServiceName,
   resourcePath: string,
   schema: z.ZodType<T>,
   options?: {
-    method?: "GET" | "PATCH";
+    method?: "GET" | "PATCH" | "POST";
     body?: Record<string, unknown>;
   },
 ): Promise<DownstreamResult<T>> {
@@ -425,6 +444,102 @@ void startService({
         },
       },
       async () => auth.configuration,
+    );
+
+    app.post(
+      "/v1/auth/signin",
+      {
+        schema: {
+          operationId: "signIn",
+          summary: "Authenticate with email and password",
+          tags: ["auth"],
+          body: toJsonSchema(authSignInInputSchema, "AuthSignInInput"),
+          response: {
+            200: toJsonSchema(authSessionSchema, "AuthSession"),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorValidation"),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorized"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorServiceUnavailable"),
+          },
+        },
+      },
+      async (request, reply) => {
+        const parsedBody = authSignInInputSchema.safeParse(request.body);
+
+        if (!parsedBody.success) {
+          return reply.code(400).send({
+            code: "VALIDATION_ERROR",
+            message: "A valid email and password are required.",
+          });
+        }
+
+        const downstream = await requestDownstreamResource(
+          "identity",
+          "/internal/auth/signin",
+          authSessionSchema,
+          {
+            body: parsedBody.data,
+            method: "POST",
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapSignInDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.post(
+      "/v1/auth/signup",
+      {
+        schema: {
+          operationId: "signUp",
+          summary: "Create a new professional or clinic account",
+          tags: ["auth"],
+          body: toJsonSchema(authSignUpInputSchema, "AuthSignUpInput"),
+          response: {
+            200: toJsonSchema(authSessionSchema, "AuthSessionSignup"),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorValidationSignup"),
+            409: toJsonSchema(apiErrorSchema, "ApiErrorConflictSignup"),
+            503: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorServiceUnavailableSignup",
+            ),
+          },
+        },
+      },
+      async (request, reply) => {
+        const parsedBody = authSignUpInputSchema.safeParse(request.body);
+
+        if (!parsedBody.success) {
+          return reply.code(400).send({
+            code: "VALIDATION_ERROR",
+            message:
+              "A valid email, password, role, and display name are required.",
+          });
+        }
+
+        const downstream = await requestDownstreamResource(
+          "identity",
+          "/internal/auth/signup",
+          authSessionSchema,
+          {
+            body: parsedBody.data,
+            method: "POST",
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapSignUpDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
     );
 
     app.get(

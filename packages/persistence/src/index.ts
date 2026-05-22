@@ -1,5 +1,6 @@
 export { closePool, getDatabaseUrl, getDb, getPool } from "./client.js";
 export {
+  ensureActorAccount,
   getAuthPrincipalBySubject,
   getClinicProfileBySubject,
   getOnboardingStatusBySubject,

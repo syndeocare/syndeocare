@@ -7,7 +7,13 @@ import Fastify, {
   type FastifyRequest,
   type preHandlerHookHandler,
 } from "fastify";
-import { createRemoteJWKSet, errors, jwtVerify, type JWTPayload } from "jose";
+import {
+  createRemoteJWKSet,
+  decodeJwt,
+  errors,
+  jwtVerify,
+  type JWTPayload,
+} from "jose";
 import {
   authPrincipalSchema,
   domainEventCatalog,
@@ -201,7 +207,7 @@ function resolveUserRole(candidateRoles: string[]): UserRole | undefined {
   return roleOrder.find((role) => candidateRoles.includes(role));
 }
 
-function buildAuthPrincipalFromPayload(
+export function buildAuthPrincipalFromPayload(
   payload: JWTPayload,
   clientId: string,
 ): AuthPrincipal | undefined {
@@ -229,6 +235,27 @@ function buildAuthPrincipalFromPayload(
   });
 
   return parsed.success ? parsed.data : undefined;
+}
+
+export function buildAuthPrincipalFromAccessToken(
+  accessToken: string,
+  clientId: string,
+): AuthPrincipal | undefined {
+  const payload = decodeAccessToken(accessToken);
+
+  if (!payload) {
+    return undefined;
+  }
+
+  return buildAuthPrincipalFromPayload(payload, clientId);
+}
+
+export function decodeAccessToken(accessToken: string): JWTPayload | undefined {
+  try {
+    return decodeJwt(accessToken);
+  } catch {
+    return undefined;
+  }
 }
 
 function buildAuthPrincipalFromDevelopmentHeaders(

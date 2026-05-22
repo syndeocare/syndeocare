@@ -6,6 +6,8 @@ The API gateway now exposes the first stable `/v1` contract slice for the MVP fo
 
 - `GET /v1`
 - `GET /v1/auth/config`
+- `POST /v1/auth/signin`
+- `POST /v1/auth/signup`
 - `GET /v1/jobs`
 - `GET /v1/jobs/:jobId`
 
@@ -28,6 +30,7 @@ The API gateway now exposes the first stable `/v1` contract slice for the MVP fo
 This slice establishes:
 
 - auth-aware gateway behavior
+- local email/password sign-in and sign-up via Keycloak
 - role-aware access rules for professional and clinic contracts
 - onboarding and verification contract shapes
 - onboarding submission and verification review writes
