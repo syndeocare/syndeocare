@@ -1,6 +1,7 @@
 import { domainEventCatalog } from "@repo/contracts";
 import {
   getProfessionalProfileBySubject,
+  persistProfessionalProfileImageBySubject,
   updateProfessionalProfileBySubject,
 } from "@repo/persistence";
 import { startService } from "@repo/service-core";
@@ -25,6 +26,11 @@ const professionalProfileUpdateInputSchema = z.object({
     latitude: z.number().min(-90).max(90),
     longitude: z.number().min(-180).max(180),
   }),
+});
+const finalizeProfileImageInputSchema = z.object({
+  bucket: z.string().min(1),
+  key: z.string().min(1),
+  assetUrl: z.string().url(),
 });
 
 void startService({
@@ -77,6 +83,35 @@ void startService({
       }
 
       const profile = await updateProfessionalProfileBySubject(
+        parsedSubject.data.subject,
+        parsedBody.data,
+      );
+
+      if (!profile) {
+        return reply.code(404).send({
+          code: "PROFILE_NOT_FOUND",
+          message:
+            "No professional profile was found for the provided auth subject.",
+        });
+      }
+
+      return profile;
+    });
+
+    app.post("/internal/profiles/:subject/image", async (request, reply) => {
+      const parsedSubject = subjectParamsSchema.safeParse(request.params);
+      const parsedBody = finalizeProfileImageInputSchema.safeParse(
+        request.body,
+      );
+
+      if (!parsedSubject.success || !parsedBody.success) {
+        return reply.code(400).send({
+          code: "VALIDATION_ERROR",
+          message: "A valid subject and uploaded image payload are required.",
+        });
+      }
+
+      const profile = await persistProfessionalProfileImageBySubject(
         parsedSubject.data.subject,
         parsedBody.data,
       );

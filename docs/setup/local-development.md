@@ -142,7 +142,16 @@ The bootstrap creates:
 The gateway now exposes protected presigned upload routes for:
 
 - `POST /v1/uploads/profile-image`
+- `POST /v1/uploads/profile-image/complete`
 - `POST /v1/uploads/verification-document`
+- `POST /v1/uploads/verification-document/complete`
+
+The expected flow is:
+
+1. request a presigned upload URL from the gateway
+2. upload the object to MinIO/S3 with the returned `PUT` URL
+3. call the matching `/complete` route so the object key is persisted onto the
+   professional profile, clinic profile, or onboarding record
 
 The MinIO admin console is available at `http://127.0.0.1:9001` with
 `minioadmin / minioadmin`.

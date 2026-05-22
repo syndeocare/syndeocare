@@ -12,6 +12,7 @@ import {
   getAuthPrincipalBySubject,
   getOnboardingStatusBySubject,
   getVerificationStatusBySubject,
+  persistVerificationDocumentBySubject,
   reviewVerificationBySubject,
   updateOnboardingBySubject,
 } from "@repo/persistence";
@@ -36,6 +37,11 @@ const verificationReviewInputSchema = z.object({
   outstandingDocuments: z.array(z.string().min(1)),
   nextAction: z.string().min(1),
   rejectionReason: z.string().min(1).optional(),
+});
+const finalizeVerificationDocumentInputSchema = z.object({
+  bucket: z.string().min(1),
+  key: z.string().min(1),
+  documentType: z.string().min(1),
 });
 
 const keycloakAdminResponseSchema = z.object({
@@ -551,6 +557,38 @@ void startService({
         }
 
         const onboardingStatus = await updateOnboardingBySubject(
+          parsedSubject.data.subject,
+          parsedBody.data,
+        );
+
+        if (!onboardingStatus) {
+          return reply.code(404).send({
+            code: "ONBOARDING_NOT_FOUND",
+            message: "No actor was found for the provided auth subject.",
+          });
+        }
+
+        return onboardingStatus;
+      },
+    );
+
+    app.post(
+      "/internal/actors/:subject/onboarding/documents",
+      async (request, reply) => {
+        const parsedSubject = subjectParamsSchema.safeParse(request.params);
+        const parsedBody = finalizeVerificationDocumentInputSchema.safeParse(
+          request.body,
+        );
+
+        if (!parsedSubject.success || !parsedBody.success) {
+          return reply.code(400).send({
+            code: "VALIDATION_ERROR",
+            message:
+              "A valid subject and verification document payload are required.",
+          });
+        }
+
+        const onboardingStatus = await persistVerificationDocumentBySubject(
           parsedSubject.data.subject,
           parsedBody.data,
         );

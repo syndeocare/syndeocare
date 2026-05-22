@@ -1,13 +1,16 @@
 import { and, eq } from "drizzle-orm";
 import type {
-  ClinicProfileUpdateInput,
   AuthPrincipal,
-  PublicRegistrationRole,
   ClinicProfileSummary,
+  ClinicProfileUpdateInput,
+  FinalizeProfileImageUploadInput,
+  FinalizeVerificationDocumentUploadInput,
   OnboardingSubmissionInput,
   OnboardingStatus,
+  PublicRegistrationRole,
   ProfessionalProfileUpdateInput,
   ProfessionalProfileSummary,
+  UploadedDocument,
   VerificationReviewInput,
   VerificationStatusResponse,
 } from "@repo/contracts";
@@ -29,6 +32,18 @@ function buildDefaultDisplayName(subject: string, email?: string) {
   }
 
   return subject;
+}
+
+function dedupeUploadedDocuments(documents: UploadedDocument[]) {
+  const recordsByType = new Map<string, UploadedDocument>();
+
+  for (const document of documents) {
+    recordsByType.set(document.documentType, document);
+  }
+
+  return Array.from(recordsByType.values()).sort((left, right) =>
+    left.documentType.localeCompare(right.documentType),
+  );
 }
 
 function buildDefaultOnboarding(role: PublicRegistrationRole | "admin") {
@@ -115,6 +130,7 @@ export async function getOnboardingStatusBySubject(
     verificationStatus: aggregate.actor.verificationStatus,
     requiredDocuments: aggregate.onboarding.requiredDocuments,
     missingDocuments: aggregate.onboarding.missingDocuments,
+    uploadedDocuments: aggregate.onboarding.uploadedDocuments,
     nextAction: aggregate.onboarding.nextAction,
     submittedAt: aggregate.onboarding.submittedAt?.toISOString(),
     reviewedAt: aggregate.onboarding.reviewedAt?.toISOString(),
@@ -136,6 +152,7 @@ export async function getVerificationStatusBySubject(
     reviewedAt: aggregate.onboarding.reviewedAt?.toISOString(),
     rejectionReason: aggregate.onboarding.rejectionReason ?? undefined,
     outstandingDocuments: aggregate.onboarding.missingDocuments,
+    uploadedDocuments: aggregate.onboarding.uploadedDocuments,
   };
 }
 
@@ -173,6 +190,7 @@ export async function getProfessionalProfileBySubject(
     rating: numericToNumber(row.profile.rating),
     verificationStatus: row.actor.verificationStatus,
     onboardingCompleted: row.actor.onboardingCompleted,
+    profileImageUrl: row.profile.profileImageUrl ?? undefined,
     availability: {
       status: row.profile.availabilityStatus,
       nextAvailableAt: row.profile.nextAvailableAt?.toISOString(),
@@ -209,6 +227,7 @@ export async function getClinicProfileBySubject(
     region: row.clinic.region,
     verificationStatus: row.actor.verificationStatus,
     onboardingCompleted: row.actor.onboardingCompleted,
+    logoUrl: row.clinic.logoUrl ?? undefined,
     openRoles: row.clinic.openRoles,
     rating: numericToNumber(row.clinic.rating),
   };
@@ -268,6 +287,7 @@ export async function ensureActorAccount(input: {
         nextAction: onboarding.nextAction,
         requiredDocuments: onboarding.requiredDocuments,
         missingDocuments: onboarding.requiredDocuments,
+        uploadedDocuments: [],
         updatedAt: now,
       })
       .onConflictDoNothing();
@@ -358,6 +378,7 @@ export async function updateOnboardingBySubject(
         nextAction: input.nextAction,
         requiredDocuments: input.requiredDocuments,
         missingDocuments: input.missingDocuments,
+        uploadedDocuments: aggregate.onboarding?.uploadedDocuments ?? [],
         rejectionReason: null,
         updatedAt: now,
       })
@@ -373,6 +394,7 @@ export async function updateOnboardingBySubject(
           nextAction: input.nextAction,
           requiredDocuments: input.requiredDocuments,
           missingDocuments: input.missingDocuments,
+          uploadedDocuments: aggregate.onboarding?.uploadedDocuments ?? [],
           rejectionReason: null,
           updatedAt: now,
         },
@@ -416,6 +438,7 @@ export async function reviewVerificationBySubject(
         nextAction: input.nextAction,
         requiredDocuments: aggregate.onboarding?.requiredDocuments ?? [],
         missingDocuments: input.outstandingDocuments,
+        uploadedDocuments: aggregate.onboarding?.uploadedDocuments ?? [],
         rejectionReason:
           input.status === "rejected" ? (input.rejectionReason ?? null) : null,
         updatedAt: now,
@@ -426,6 +449,7 @@ export async function reviewVerificationBySubject(
           reviewedAt: now,
           nextAction: input.nextAction,
           missingDocuments: input.outstandingDocuments,
+          uploadedDocuments: aggregate.onboarding?.uploadedDocuments ?? [],
           rejectionReason:
             input.status === "rejected"
               ? (input.rejectionReason ?? null)
@@ -552,4 +576,94 @@ export async function updateClinicProfileBySubject(
   });
 
   return getClinicProfileBySubject(subject);
+}
+
+export async function persistProfessionalProfileImageBySubject(
+  subject: string,
+  input: FinalizeProfileImageUploadInput & { assetUrl: string },
+): Promise<ProfessionalProfileSummary | null> {
+  const aggregate = await getActorAggregateBySubject(subject);
+
+  if (!aggregate || aggregate.actor.role !== "professional") {
+    return null;
+  }
+
+  const db = getDb();
+  const now = new Date();
+
+  await db
+    .update(professionalProfiles)
+    .set({
+      profileImageUrl: input.assetUrl,
+      updatedAt: now,
+    })
+    .where(eq(professionalProfiles.actorId, aggregate.actor.id));
+
+  return getProfessionalProfileBySubject(subject);
+}
+
+export async function persistClinicLogoBySubject(
+  subject: string,
+  input: FinalizeProfileImageUploadInput & { assetUrl: string },
+): Promise<ClinicProfileSummary | null> {
+  const aggregate = await getActorAggregateBySubject(subject);
+
+  if (!aggregate || aggregate.actor.role !== "clinic") {
+    return null;
+  }
+
+  const db = getDb();
+  const now = new Date();
+
+  await db
+    .update(clinicProfiles)
+    .set({
+      logoUrl: input.assetUrl,
+      updatedAt: now,
+    })
+    .where(eq(clinicProfiles.actorId, aggregate.actor.id));
+
+  return getClinicProfileBySubject(subject);
+}
+
+export async function persistVerificationDocumentBySubject(
+  subject: string,
+  input: FinalizeVerificationDocumentUploadInput,
+): Promise<OnboardingStatus | null> {
+  const aggregate = await getActorAggregateBySubject(subject);
+
+  if (!aggregate?.onboarding) {
+    return null;
+  }
+
+  const db = getDb();
+  const now = new Date();
+  const uploadedDocuments = dedupeUploadedDocuments([
+    ...aggregate.onboarding.uploadedDocuments,
+    {
+      documentType: input.documentType,
+      bucket: input.bucket,
+      key: input.key,
+      uploadedAt: now.toISOString(),
+    },
+  ]);
+  const missingDocuments = aggregate.onboarding.missingDocuments.filter(
+    (documentType) => documentType !== input.documentType,
+  );
+  const nextAction =
+    missingDocuments.length === 0
+      ? "All required documents are uploaded. Submit your onboarding for review."
+      : aggregate.onboarding.nextAction;
+
+  await db
+    .update(onboardingRecords)
+    .set({
+      uploadedDocuments,
+      missingDocuments,
+      nextAction,
+      updatedAt: now,
+    })
+    .where(eq(onboardingRecords.actorId, aggregate.actor.id));
+
+  return getOnboardingStatusBySubject(subject);
 }

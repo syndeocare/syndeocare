@@ -7,7 +7,11 @@ import {
   bookingDetailSchema,
   bookingListResponseSchema,
   clinicProfileSummarySchema,
+  completeProfileImageUploadResponseSchema,
+  completeVerificationDocumentUploadResponseSchema,
   domainEventCatalog,
+  finalizeProfileImageUploadInputSchema,
+  finalizeVerificationDocumentUploadInputSchema,
   gatewayAuthConfigurationSchema,
   initialV1RouteCatalog,
   jobListingDetailSchema,
@@ -27,7 +31,13 @@ import {
   type JobListingDetail,
   type PlatformMetadata,
 } from "@repo/contracts";
-import { createUploadDescriptor } from "@repo/storage";
+import {
+  assertStoredObjectExists,
+  buildStoredAssetUrl,
+  createUploadDescriptor,
+  getStorageConfig,
+  isActorOwnedObjectKey,
+} from "@repo/storage";
 import { createAccessControl, startService } from "@repo/service-core";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { z } from "zod";
@@ -38,6 +48,7 @@ const downstreamServices = {
   identity: process.env.SERVICE_IDENTITY_URL ?? "http://127.0.0.1:4111",
   profiles: process.env.SERVICE_PROFILES_URL ?? "http://127.0.0.1:4112",
 } as const;
+const storageConfig = getStorageConfig();
 
 const jobs = [
   {
@@ -1093,6 +1104,162 @@ void startService({
     );
 
     app.post(
+      "/v1/uploads/profile-image/complete",
+      {
+        schema: {
+          operationId: "completeProfileImageUpload",
+          summary: "Persist the uploaded profile image or clinic logo",
+          tags: ["uploads"],
+          security: [{ bearerAuth: [] }],
+          body: toJsonSchema(
+            finalizeProfileImageUploadInputSchema,
+            "FinalizeProfileImageUploadInput",
+          ),
+          response: {
+            200: toJsonSchema(
+              completeProfileImageUploadResponseSchema,
+              "CompleteProfileImageUploadResponse",
+            ),
+            400: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorUploadFinalizeValidation",
+            ),
+            401: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorUploadFinalizeUnauthorized",
+            ),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorUploadFinalizeNotFound"),
+            503: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorUploadFinalizeUnavailable",
+            ),
+          },
+        },
+        preHandler: auth.requireAccess({ roles: ["clinic", "professional"] }),
+      },
+      async (request, reply) => {
+        const parsedBody = finalizeProfileImageUploadInputSchema.safeParse(
+          request.body,
+        );
+
+        if (!parsedBody.success) {
+          return reply.code(400).send({
+            code: "VALIDATION_ERROR",
+            message: "A valid uploaded image payload is required.",
+          });
+        }
+
+        const actor = request.authContext as AuthPrincipal;
+
+        if (parsedBody.data.bucket !== storageConfig.publicBucket) {
+          return reply.code(400).send({
+            code: "UPLOAD_BUCKET_INVALID",
+            message:
+              "Profile images must be persisted from the public asset bucket.",
+          });
+        }
+
+        if (
+          !isActorOwnedObjectKey({
+            actorRole: actor.role,
+            actorSubject: actor.sub,
+            key: parsedBody.data.key,
+          })
+        ) {
+          return reply.code(400).send({
+            code: "UPLOAD_KEY_INVALID",
+            message:
+              "Uploaded asset key does not belong to the authenticated actor.",
+          });
+        }
+
+        try {
+          await assertStoredObjectExists(parsedBody.data);
+        } catch {
+          return reply.code(404).send({
+            code: "UPLOAD_OBJECT_NOT_FOUND",
+            message: "The uploaded asset could not be found in object storage.",
+          });
+        }
+
+        if (actor.role === "professional") {
+          const downstream = await requestDownstreamResource(
+            "profiles",
+            `/internal/profiles/${encodeURIComponent(actor.sub)}/image`,
+            professionalProfileSummarySchema,
+            {
+              method: "POST",
+              body: {
+                ...parsedBody.data,
+                assetUrl: buildStoredAssetUrl(
+                  parsedBody.data.bucket,
+                  parsedBody.data.key,
+                ),
+              },
+            },
+          );
+
+          if (!downstream.ok) {
+            return reply
+              .code(mapDownstreamStatusCode(downstream.statusCode))
+              .send(downstream.body);
+          }
+
+          if (!downstream.data.profileImageUrl) {
+            return reply.code(503).send({
+              code: "UPLOAD_PERSISTENCE_FAILED",
+              message:
+                "The persisted professional profile image URL was missing.",
+            });
+          }
+
+          return {
+            persisted: true,
+            assetType: "profile-image",
+            resource: "professional-profile",
+            assetUrl: downstream.data.profileImageUrl,
+          };
+        }
+
+        const downstream = await requestDownstreamResource(
+          "clinics",
+          `/internal/clinics/${encodeURIComponent(actor.sub)}/logo`,
+          clinicProfileSummarySchema,
+          {
+            method: "POST",
+            body: {
+              ...parsedBody.data,
+              assetUrl: buildStoredAssetUrl(
+                parsedBody.data.bucket,
+                parsedBody.data.key,
+              ),
+            },
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        if (!downstream.data.logoUrl) {
+          return reply.code(503).send({
+            code: "UPLOAD_PERSISTENCE_FAILED",
+            message: "The persisted clinic logo URL was missing.",
+          });
+        }
+
+        return {
+          persisted: true,
+          assetType: "profile-image",
+          resource: "clinic-profile",
+          assetUrl: downstream.data.logoUrl,
+        };
+      },
+    );
+
+    app.post(
       "/v1/uploads/verification-document",
       {
         schema: {
@@ -1136,6 +1303,112 @@ void startService({
           contentType: parsedBody.data.contentType,
           fileName: parsedBody.data.fileName,
         });
+      },
+    );
+
+    app.post(
+      "/v1/uploads/verification-document/complete",
+      {
+        schema: {
+          operationId: "completeVerificationDocumentUpload",
+          summary: "Persist an uploaded verification document",
+          tags: ["uploads", "onboarding"],
+          security: [{ bearerAuth: [] }],
+          body: toJsonSchema(
+            finalizeVerificationDocumentUploadInputSchema,
+            "FinalizeVerificationDocumentUploadInput",
+          ),
+          response: {
+            200: toJsonSchema(
+              completeVerificationDocumentUploadResponseSchema,
+              "CompleteVerificationDocumentUploadResponse",
+            ),
+            400: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorUploadDocumentValidation",
+            ),
+            401: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorUploadDocumentUnauthorized",
+            ),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorUploadDocumentNotFound"),
+            503: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorUploadDocumentUnavailable",
+            ),
+          },
+        },
+        preHandler: auth.requireAccess({ roles: ["clinic", "professional"] }),
+      },
+      async (request, reply) => {
+        const parsedBody =
+          finalizeVerificationDocumentUploadInputSchema.safeParse(request.body);
+
+        if (!parsedBody.success) {
+          return reply.code(400).send({
+            code: "VALIDATION_ERROR",
+            message:
+              "A valid uploaded verification document payload is required.",
+          });
+        }
+
+        const actor = request.authContext as AuthPrincipal;
+
+        if (parsedBody.data.bucket !== storageConfig.privateBucket) {
+          return reply.code(400).send({
+            code: "UPLOAD_BUCKET_INVALID",
+            message:
+              "Verification documents must be persisted from the private document bucket.",
+          });
+        }
+
+        if (
+          !isActorOwnedObjectKey({
+            actorRole: actor.role,
+            actorSubject: actor.sub,
+            key: parsedBody.data.key,
+          })
+        ) {
+          return reply.code(400).send({
+            code: "UPLOAD_KEY_INVALID",
+            message:
+              "Uploaded asset key does not belong to the authenticated actor.",
+          });
+        }
+
+        try {
+          await assertStoredObjectExists(parsedBody.data);
+        } catch {
+          return reply.code(404).send({
+            code: "UPLOAD_OBJECT_NOT_FOUND",
+            message: "The uploaded asset could not be found in object storage.",
+          });
+        }
+
+        const downstream = await requestDownstreamResource(
+          "identity",
+          `/internal/actors/${encodeURIComponent(actor.sub)}/onboarding/documents`,
+          onboardingStatusSchema,
+          {
+            method: "POST",
+            body: parsedBody.data,
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return {
+          persisted: true,
+          assetType: "verification-document",
+          resource: "onboarding",
+          documentType: parsedBody.data.documentType,
+          outstandingDocuments: downstream.data.missingDocuments,
+          uploadedDocuments: downstream.data.uploadedDocuments,
+        };
       },
     );
 

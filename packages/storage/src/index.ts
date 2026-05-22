@@ -1,6 +1,7 @@
 import {
   CreateBucketCommand,
   HeadBucketCommand,
+  HeadObjectCommand,
   PutBucketCorsCommand,
   PutBucketPolicyCommand,
   PutObjectCommand,
@@ -81,6 +82,10 @@ function buildPublicAssetUrl(
   }
 
   return `https://${bucket}.s3.${config.region}.amazonaws.com/${key}`;
+}
+
+export function buildStoredAssetUrl(bucket: string, key: string) {
+  return buildPublicAssetUrl(getStorageConfig(), bucket, key);
 }
 
 export function getStorageConfig(): StorageConfig {
@@ -171,6 +176,27 @@ export async function createUploadDescriptor(params: {
         ? buildPublicAssetUrl(config, bucket, key)
         : undefined,
   });
+}
+
+export function isActorOwnedObjectKey(input: {
+  actorRole: UserRole;
+  actorSubject: string;
+  key: string;
+}) {
+  return input.key.startsWith(`${input.actorRole}/${input.actorSubject}/`);
+}
+
+export async function assertStoredObjectExists(input: {
+  bucket: string;
+  key: string;
+}) {
+  const client = createStorageClient();
+  await client.send(
+    new HeadObjectCommand({
+      Bucket: input.bucket,
+      Key: input.key,
+    }),
+  );
 }
 
 async function ensureBucket(client: S3Client, bucket: string) {

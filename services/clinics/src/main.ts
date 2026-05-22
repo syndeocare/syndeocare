@@ -1,6 +1,7 @@
 import { domainEventCatalog } from "@repo/contracts";
 import {
   getClinicProfileBySubject,
+  persistClinicLogoBySubject,
   updateClinicProfileBySubject,
 } from "@repo/persistence";
 import { startService } from "@repo/service-core";
@@ -18,6 +19,11 @@ const clinicProfileUpdateInputSchema = z.object({
     latitude: z.number().min(-90).max(90),
     longitude: z.number().min(-180).max(180),
   }),
+});
+const finalizeClinicLogoInputSchema = z.object({
+  bucket: z.string().min(1),
+  key: z.string().min(1),
+  assetUrl: z.string().url(),
 });
 
 void startService({
@@ -64,6 +70,32 @@ void startService({
       }
 
       const clinic = await updateClinicProfileBySubject(
+        parsedSubject.data.subject,
+        parsedBody.data,
+      );
+
+      if (!clinic) {
+        return reply.code(404).send({
+          code: "CLINIC_NOT_FOUND",
+          message: "No clinic profile was found for the provided auth subject.",
+        });
+      }
+
+      return clinic;
+    });
+
+    app.post("/internal/clinics/:subject/logo", async (request, reply) => {
+      const parsedSubject = subjectParamsSchema.safeParse(request.params);
+      const parsedBody = finalizeClinicLogoInputSchema.safeParse(request.body);
+
+      if (!parsedSubject.success || !parsedBody.success) {
+        return reply.code(400).send({
+          code: "VALIDATION_ERROR",
+          message: "A valid subject and uploaded logo payload are required.",
+        });
+      }
+
+      const clinic = await persistClinicLogoBySubject(
         parsedSubject.data.subject,
         parsedBody.data,
       );

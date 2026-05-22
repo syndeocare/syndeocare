@@ -1,7 +1,9 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
   index,
   integer,
+  jsonb,
   numeric,
   pgEnum,
   pgTable,
@@ -9,6 +11,7 @@ import {
   timestamp,
   uuid,
 } from "drizzle-orm/pg-core";
+import type { UploadedDocument } from "@repo/contracts";
 
 export const userRoleEnum = pgEnum("user_role", [
   "admin",
@@ -67,6 +70,10 @@ export const onboardingRecords = pgTable("onboarding_records", {
   nextAction: text("next_action").notNull(),
   requiredDocuments: text("required_documents").array().notNull().default([]),
   missingDocuments: text("missing_documents").array().notNull().default([]),
+  uploadedDocuments: jsonb("uploaded_documents")
+    .$type<UploadedDocument[]>()
+    .notNull()
+    .default(sql`'[]'::jsonb`),
   rejectionReason: text("rejection_reason"),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
@@ -97,6 +104,7 @@ export const professionalProfiles = pgTable(
     region: text("region").notNull(),
     latitude: numeric("latitude", { precision: 9, scale: 6 }).notNull(),
     longitude: numeric("longitude", { precision: 9, scale: 6 }).notNull(),
+    profileImageUrl: text("profile_image_url"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -129,6 +137,7 @@ export const clinicProfiles = pgTable(
     rating: numeric("rating", { precision: 3, scale: 2 })
       .notNull()
       .default("0"),
+    logoUrl: text("logo_url"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

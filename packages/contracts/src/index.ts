@@ -179,6 +179,40 @@ export const uploadDescriptorSchema = z.object({
   assetUrl: z.string().url().optional(),
 });
 
+export const uploadedDocumentSchema = z.object({
+  documentType: z.string().min(1),
+  bucket: z.string().min(1),
+  key: z.string().min(1),
+  uploadedAt: z.string().datetime(),
+});
+
+export const finalizeProfileImageUploadInputSchema = z.object({
+  bucket: z.string().min(1),
+  key: z.string().min(1),
+});
+
+export const finalizeVerificationDocumentUploadInputSchema = z.object({
+  bucket: z.string().min(1),
+  key: z.string().min(1),
+  documentType: z.string().min(1),
+});
+
+export const completeProfileImageUploadResponseSchema = z.object({
+  persisted: z.literal(true),
+  assetType: z.literal("profile-image"),
+  resource: z.enum(["professional-profile", "clinic-profile"]),
+  assetUrl: z.string().url(),
+});
+
+export const completeVerificationDocumentUploadResponseSchema = z.object({
+  persisted: z.literal(true),
+  assetType: z.literal("verification-document"),
+  resource: z.literal("onboarding"),
+  documentType: z.string().min(1),
+  outstandingDocuments: z.array(z.string().min(1)),
+  uploadedDocuments: z.array(uploadedDocumentSchema),
+});
+
 export const routeContractSchema = z.object({
   method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]),
   path: z.string().min(1),
@@ -201,6 +235,7 @@ export const onboardingStatusSchema = z.object({
   verificationStatus: verificationStatusSchema,
   requiredDocuments: z.array(z.string()),
   missingDocuments: z.array(z.string()),
+  uploadedDocuments: z.array(uploadedDocumentSchema),
   nextAction: z.string().min(1),
   submittedAt: z.string().datetime().optional(),
   reviewedAt: z.string().datetime().optional(),
@@ -212,6 +247,7 @@ export const verificationStatusResponseSchema = z.object({
   reviewedAt: z.string().datetime().optional(),
   rejectionReason: z.string().min(1).optional(),
   outstandingDocuments: z.array(z.string()),
+  uploadedDocuments: z.array(uploadedDocumentSchema),
 });
 
 export const professionalProfileSummarySchema = z.object({
@@ -223,6 +259,7 @@ export const professionalProfileSummarySchema = z.object({
   rating: z.number().min(0).max(5),
   verificationStatus: verificationStatusSchema,
   onboardingCompleted: z.boolean(),
+  profileImageUrl: z.string().url().optional(),
   availability: z.object({
     status: availabilityStatusSchema,
     nextAvailableAt: z.string().datetime().optional(),
@@ -256,6 +293,7 @@ export const clinicProfileSummarySchema = z.object({
   region: z.string().min(1),
   verificationStatus: verificationStatusSchema,
   onboardingCompleted: z.boolean(),
+  logoUrl: z.string().url().optional(),
   openRoles: z.number().int().nonnegative(),
   rating: z.number().min(0).max(5),
 });
@@ -427,8 +465,20 @@ export const initialV1RouteCatalog = [
   },
   {
     method: "POST",
+    path: "/v1/uploads/profile-image/complete",
+    summary: "Persist the uploaded profile image or clinic logo",
+    protected: true,
+  },
+  {
+    method: "POST",
     path: "/v1/uploads/verification-document",
     summary: "Create a presigned upload for a verification document",
+    protected: true,
+  },
+  {
+    method: "POST",
+    path: "/v1/uploads/verification-document/complete",
+    summary: "Persist an uploaded verification document",
     protected: true,
   },
   {
@@ -509,6 +559,19 @@ export type NotificationDeliveryResponse = z.infer<
 export type UploadAssetType = z.infer<typeof uploadAssetTypeSchema>;
 export type UploadRequest = z.infer<typeof uploadRequestSchema>;
 export type UploadDescriptor = z.infer<typeof uploadDescriptorSchema>;
+export type UploadedDocument = z.infer<typeof uploadedDocumentSchema>;
+export type FinalizeProfileImageUploadInput = z.infer<
+  typeof finalizeProfileImageUploadInputSchema
+>;
+export type FinalizeVerificationDocumentUploadInput = z.infer<
+  typeof finalizeVerificationDocumentUploadInputSchema
+>;
+export type CompleteProfileImageUploadResponse = z.infer<
+  typeof completeProfileImageUploadResponseSchema
+>;
+export type CompleteVerificationDocumentUploadResponse = z.infer<
+  typeof completeVerificationDocumentUploadResponseSchema
+>;
 export type PlatformMetadata = z.infer<typeof platformMetadataSchema>;
 export type OnboardingStatus = z.infer<typeof onboardingStatusSchema>;
 export type VerificationStatusResponse = z.infer<
