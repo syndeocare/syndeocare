@@ -15,9 +15,11 @@ import {
   onboardingSubmissionInputSchema,
   onboardingStatusSchema,
   platformMetadataSchema,
-  professionalProfileUpdateInputSchema,
-  professionalProfileSummarySchema,
   clinicProfileUpdateInputSchema,
+  professionalProfileSummarySchema,
+  professionalProfileUpdateInputSchema,
+  uploadDescriptorSchema,
+  uploadRequestSchema,
   verificationReviewInputSchema,
   verificationStatusResponseSchema,
   type AuthPrincipal,
@@ -25,6 +27,7 @@ import {
   type JobListingDetail,
   type PlatformMetadata,
 } from "@repo/contracts";
+import { createUploadDescriptor } from "@repo/storage";
 import { createAccessControl, startService } from "@repo/service-core";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { z } from "zod";
@@ -1040,6 +1043,99 @@ void startService({
         }
 
         return downstream.data;
+      },
+    );
+
+    app.post(
+      "/v1/uploads/profile-image",
+      {
+        schema: {
+          operationId: "createProfileImageUpload",
+          summary:
+            "Create a presigned upload URL for the current actor profile image",
+          tags: ["uploads"],
+          security: [{ bearerAuth: [] }],
+          body: toJsonSchema(uploadRequestSchema, "UploadRequestProfileImage"),
+          response: {
+            200: toJsonSchema(uploadDescriptorSchema, "UploadDescriptor"),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorUploadValidation"),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorUploadUnauthorized"),
+          },
+        },
+        preHandler: auth.requireAccess({ roles: ["clinic", "professional"] }),
+      },
+      async (request, reply) => {
+        const parsedBody = uploadRequestSchema.safeParse(request.body);
+
+        if (!parsedBody.success) {
+          return reply.code(400).send({
+            code: "VALIDATION_ERROR",
+            message: "A valid file name and content type are required.",
+          });
+        }
+
+        if (!parsedBody.data.contentType.startsWith("image/")) {
+          return reply.code(400).send({
+            code: "UNSUPPORTED_CONTENT_TYPE",
+            message: "Profile image uploads must use an image content type.",
+          });
+        }
+
+        const actor = request.authContext as AuthPrincipal;
+        return createUploadDescriptor({
+          actorRole: actor.role,
+          actorSubject: actor.sub,
+          assetType: "profile-image",
+          contentType: parsedBody.data.contentType,
+          fileName: parsedBody.data.fileName,
+        });
+      },
+    );
+
+    app.post(
+      "/v1/uploads/verification-document",
+      {
+        schema: {
+          operationId: "createVerificationDocumentUpload",
+          summary: "Create a presigned upload URL for a verification document",
+          tags: ["uploads"],
+          security: [{ bearerAuth: [] }],
+          body: toJsonSchema(uploadRequestSchema, "UploadRequestDocument"),
+          response: {
+            200: toJsonSchema(
+              uploadDescriptorSchema,
+              "UploadDescriptorDocument",
+            ),
+            400: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorUploadDocumentValidation",
+            ),
+            401: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorUploadDocumentUnauthorized",
+            ),
+          },
+        },
+        preHandler: auth.requireAccess({ roles: ["clinic", "professional"] }),
+      },
+      async (request, reply) => {
+        const parsedBody = uploadRequestSchema.safeParse(request.body);
+
+        if (!parsedBody.success) {
+          return reply.code(400).send({
+            code: "VALIDATION_ERROR",
+            message: "A valid file name and content type are required.",
+          });
+        }
+
+        const actor = request.authContext as AuthPrincipal;
+        return createUploadDescriptor({
+          actorRole: actor.role,
+          actorSubject: actor.sub,
+          assetType: "verification-document",
+          contentType: parsedBody.data.contentType,
+          fileName: parsedBody.data.fileName,
+        });
       },
     );
 

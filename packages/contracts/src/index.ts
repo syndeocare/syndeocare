@@ -156,6 +156,29 @@ export const notificationDeliveryResponseSchema = z.object({
   providerMessageId: z.string().min(1),
 });
 
+export const uploadAssetTypeSchema = z.enum([
+  "profile-image",
+  "verification-document",
+]);
+
+export const uploadRequestSchema = z.object({
+  fileName: z.string().min(1),
+  contentType: z.string().min(1),
+});
+
+export const uploadDescriptorSchema = z.object({
+  assetType: uploadAssetTypeSchema,
+  bucket: z.string().min(1),
+  key: z.string().min(1),
+  uploadMethod: z.literal("PUT"),
+  uploadUrl: z.string().url(),
+  uploadHeaders: z.object({
+    "content-type": z.string().min(1),
+  }),
+  expiresIn: z.number().int().positive(),
+  assetUrl: z.string().url().optional(),
+});
+
 export const routeContractSchema = z.object({
   method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]),
   path: z.string().min(1),
@@ -397,6 +420,18 @@ export const initialV1RouteCatalog = [
     protected: true,
   },
   {
+    method: "POST",
+    path: "/v1/uploads/profile-image",
+    summary: "Create a presigned upload for the current actor profile image",
+    protected: true,
+  },
+  {
+    method: "POST",
+    path: "/v1/uploads/verification-document",
+    summary: "Create a presigned upload for a verification document",
+    protected: true,
+  },
+  {
     method: "GET",
     path: "/v1/jobs",
     summary: "Browse open jobs and shifts",
@@ -471,6 +506,9 @@ export type NotificationEmailRequest = z.infer<
 export type NotificationDeliveryResponse = z.infer<
   typeof notificationDeliveryResponseSchema
 >;
+export type UploadAssetType = z.infer<typeof uploadAssetTypeSchema>;
+export type UploadRequest = z.infer<typeof uploadRequestSchema>;
+export type UploadDescriptor = z.infer<typeof uploadDescriptorSchema>;
 export type PlatformMetadata = z.infer<typeof platformMetadataSchema>;
 export type OnboardingStatus = z.infer<typeof onboardingStatusSchema>;
 export type VerificationStatusResponse = z.infer<

@@ -19,8 +19,10 @@ The API gateway now exposes the first stable `/v1` contract slice for the MVP fo
 - `GET /v1/verification/status`
 - `GET /v1/profiles/me`
 - `PATCH /v1/profiles/me`
+- `POST /v1/uploads/profile-image`
 - `GET /v1/clinics/me`
 - `PATCH /v1/clinics/me`
+- `POST /v1/uploads/verification-document`
 - `GET /v1/bookings`
 - `GET /v1/bookings/:bookingId`
 - `PATCH /v1/admin/verification/:subject`
@@ -32,6 +34,7 @@ This slice establishes:
 - auth-aware gateway behavior
 - local email/password sign-in and sign-up via Keycloak
 - role-aware access rules for professional and clinic contracts
+- presigned S3-compatible upload URLs for profile images and verification documents
 - onboarding and verification contract shapes
 - onboarding submission and verification review writes
 - first job and booking contract shapes for client integration

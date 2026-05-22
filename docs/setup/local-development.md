@@ -62,6 +62,14 @@ KEYCLOAK_REALM=syndeocare
 KEYCLOAK_PUBLIC_CLIENT_ID=syndeocare-web
 KEYCLOAK_ADMIN_USERNAME=admin
 KEYCLOAK_ADMIN_PASSWORD=admin
+STORAGE_REGION=us-east-1
+STORAGE_ENDPOINT=http://127.0.0.1:9000
+STORAGE_ACCESS_KEY_ID=minioadmin
+STORAGE_SECRET_ACCESS_KEY=minioadmin
+STORAGE_FORCE_PATH_STYLE=true
+STORAGE_PUBLIC_BUCKET=syndeocare-public-assets
+STORAGE_PRIVATE_BUCKET=syndeocare-private-documents
+STORAGE_UPLOAD_URL_TTL_SECONDS=900
 RESEND_API_KEY=your_resend_api_key
 RESEND_FROM_EMAIL=onboarding@resend.dev
 RESEND_TEST_EMAIL=onboarding@resend.dev
@@ -105,6 +113,39 @@ docker compose -f infra/docker/docker-compose.local.yml up -d postgres keycloak
 
 By default local Keycloak binds to `http://127.0.0.1:8180` to avoid common `:8080`
 port conflicts with other developer tooling.
+
+## Local object storage
+
+Local object storage runs through the `minio` container on
+`http://127.0.0.1:9000`.
+
+Start it and bootstrap the storage buckets with:
+
+```sh
+docker compose -f infra/docker/docker-compose.local.yml up -d minio
+pnpm storage:bootstrap
+```
+
+If `9000` or `9001` are already in use, override them for the compose command and
+match `STORAGE_ENDPOINT` to the API port you chose:
+
+```sh
+MINIO_API_PORT=9010 MINIO_CONSOLE_PORT=9011 \
+docker compose -f infra/docker/docker-compose.local.yml up -d minio
+```
+
+The bootstrap creates:
+
+- `syndeocare-public-assets`
+- `syndeocare-private-documents`
+
+The gateway now exposes protected presigned upload routes for:
+
+- `POST /v1/uploads/profile-image`
+- `POST /v1/uploads/verification-document`
+
+The MinIO admin console is available at `http://127.0.0.1:9001` with
+`minioadmin / minioadmin`.
 
 ## Local sign-up and sign-in
 
