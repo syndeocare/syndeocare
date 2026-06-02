@@ -43,6 +43,24 @@ jobs:
       - name: Build services
         run: pnpm build:services
 
+      - name: Build web frontend
+        env:
+          NEXT_PUBLIC_API_BASE_URL: ${{ vars.NEXT_PUBLIC_API_BASE_URL }}
+          NEXT_PUBLIC_DOCS_URL: ${{ vars.NEXT_PUBLIC_DOCS_URL }}
+          NEXT_PUBLIC_ANDROID_APP_URL: ${{ vars.NEXT_PUBLIC_ANDROID_APP_URL }}
+        run: pnpm build:web
+
+      - name: Upload web frontend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-frontend-${{ inputs.environment }}
+          path: apps/web/out
+          if-no-files-found: error
+
+      - name: Sync web frontend to S3
+        if: ${{ vars.WEB_FRONTEND_BUCKET != '' }}
+        run: aws s3 sync apps/web/out "s3://${{ vars.WEB_FRONTEND_BUCKET }}" --delete
+
       - name: Deployment placeholder
         run: |
-          echo "Hook Docker build, ECR push, Terraform apply, and ECS rollout here."
+          echo "Hook Docker build, ECR push, Terraform apply, CloudFront invalidation, and ECS rollout here."

@@ -32,3 +32,24 @@
 - booking, messaging, and notifications should be treated as critical business paths
 - prefer **S3 + CloudFront** for the public web frontend; reserve EC2 for workloads that truly need long-running servers
 - run backend services and NATS on the private platform network boundary, not on the same host as the static frontend
+
+## Frontend deployment path
+
+The `apps/web` frontend is now a real platform surface and should deploy
+independently from the backend services.
+
+1. build the web app with `pnpm build:web`
+2. publish the generated `apps/web/out` artifact
+3. sync the artifact to the environment-specific S3 bucket
+4. invalidate the CloudFront distribution after upload
+
+### Required frontend environment variables
+
+- `NEXT_PUBLIC_API_BASE_URL`
+- `NEXT_PUBLIC_DOCS_URL`
+- `NEXT_PUBLIC_ANDROID_APP_URL`
+- `WEB_FRONTEND_BUCKET`
+
+The GitHub Actions deployment workflow now builds the web app and uploads the
+static artifact before any bucket sync step, so frontend delivery can be traced
+separately from service image rollout.

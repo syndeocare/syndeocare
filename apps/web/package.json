@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev --port 3000",
     "build": "next build",
-    "start": "next start",
+    "start": "serve out --listen 3000",
     "lint": "eslint --max-warnings 0",
     "check-types": "next typegen && tsc --noEmit"
   },
@@ -23,6 +23,7 @@
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
     "eslint": "^9.39.1",
+    "serve": "^14.2.5",
     "typescript": "5.9.2"
   }
 }

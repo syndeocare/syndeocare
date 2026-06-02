@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "build": "turbo run build",
+    "build:web": "pnpm --filter web build",
     "build:services": "turbo run build --filter='./services/*'",
     "db:migrate": "pnpm --filter @repo/persistence db:migrate",
     "db:seed": "pnpm --filter @repo/persistence db:seed",
