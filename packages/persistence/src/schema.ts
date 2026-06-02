@@ -113,6 +113,10 @@ export const professionalProfiles = pgTable(
       .references(() => actors.id, { onDelete: "cascade" }),
     fullName: text("full_name").notNull(),
     specialty: text("specialty").notNull(),
+    headline: text("headline"),
+    bio: text("bio"),
+    licenseNumber: text("license_number"),
+    primaryPhone: text("primary_phone"),
     yearsExperience: integer("years_experience").notNull().default(0),
     languages: text("languages").array().notNull().default([]),
     rating: numeric("rating", { precision: 3, scale: 2 })
@@ -152,6 +156,10 @@ export const clinicProfiles = pgTable(
       .references(() => actors.id, { onDelete: "cascade" }),
     organizationName: text("organization_name").notNull(),
     facilityType: text("facility_type").notNull(),
+    description: text("description"),
+    contactPhone: text("contact_phone"),
+    websiteUrl: text("website_url"),
+    services: text("services").array().notNull().default([]),
     city: text("city").notNull(),
     region: text("region").notNull(),
     latitude: numeric("latitude", { precision: 9, scale: 6 }).notNull(),
@@ -170,6 +178,9 @@ export const clinicProfiles = pgTable(
   },
   (table) => ({
     cityIdx: index("clinic_profiles_city_idx").on(table.city),
+    facilityTypeIdx: index("clinic_profiles_facility_type_idx").on(
+      table.facilityType,
+    ),
   }),
 );
 

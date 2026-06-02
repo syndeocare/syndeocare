@@ -7,6 +7,7 @@ import {
   authPrincipalSchema,
   bookingDetailSchema,
   bookingListResponseSchema,
+  clinicProfileListResponseSchema,
   clinicProfileSummarySchema,
   completeProfileImageUploadResponseSchema,
   completeVerificationDocumentUploadResponseSchema,
@@ -22,6 +23,7 @@ import {
   onboardingStatusSchema,
   platformMetadataSchema,
   clinicProfileUpdateInputSchema,
+  professionalProfileListResponseSchema,
   professionalProfileSummarySchema,
   professionalProfileUpdateInputSchema,
   uploadDescriptorSchema,
@@ -66,6 +68,27 @@ const jobIdParamsSchema = z.object({
 
 const bookingIdParamsSchema = z.object({
   bookingId: z.string().min(1),
+});
+const profileIdParamsSchema = z.object({
+  profileId: z.string().min(1),
+});
+const clinicIdParamsSchema = z.object({
+  clinicId: z.string().min(1),
+});
+const profileDirectoryFiltersSchema = z.object({
+  city: z.string().min(1).optional(),
+  language: z.string().min(1).optional(),
+  specialty: z.string().min(1).optional(),
+  verificationStatus: z
+    .enum(["not_started", "pending_review", "approved", "rejected"])
+    .optional(),
+});
+const clinicDirectoryFiltersSchema = z.object({
+  city: z.string().min(1).optional(),
+  facilityType: z.string().min(1).optional(),
+  verificationStatus: z
+    .enum(["not_started", "pending_review", "approved", "rejected"])
+    .optional(),
 });
 
 const auth = createAccessControl();
@@ -475,6 +498,120 @@ void startService({
     );
 
     app.get(
+      "/v1/profiles",
+      {
+        schema: {
+          operationId: "listProfessionalProfiles",
+          summary: "Browse professional profiles",
+          tags: ["profiles"],
+          querystring: {
+            type: "object",
+            properties: {
+              city: { type: "string" },
+              language: { type: "string" },
+              specialty: { type: "string" },
+              verificationStatus: {
+                type: "string",
+                enum: ["not_started", "pending_review", "approved", "rejected"],
+              },
+            },
+          },
+          response: {
+            200: toJsonSchema(
+              professionalProfileListResponseSchema,
+              "ProfessionalProfileListResponse",
+            ),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorValidation"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
+          },
+        },
+      },
+      async (request, reply) => {
+        const parsedQuery = profileDirectoryFiltersSchema.safeParse(
+          request.query,
+        );
+
+        if (!parsedQuery.success) {
+          return reply
+            .code(400)
+            .send(buildValidationError(parsedQuery.error.issues));
+        }
+
+        const searchParams = new URLSearchParams();
+
+        for (const [key, value] of Object.entries(parsedQuery.data)) {
+          if (value) {
+            searchParams.set(key, value);
+          }
+        }
+
+        const downstream = await requestDownstreamResource(
+          "profiles",
+          `/internal/profiles${searchParams.size > 0 ? `?${searchParams.toString()}` : ""}`,
+          professionalProfileListResponseSchema,
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(downstream.statusCode === 400 ? 400 : 503)
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.get(
+      "/v1/profiles/:profileId",
+      {
+        schema: {
+          operationId: "getProfessionalProfileById",
+          summary: "Get public professional profile details",
+          tags: ["profiles"],
+          params: {
+            type: "object",
+            required: ["profileId"],
+            properties: {
+              profileId: { type: "string" },
+            },
+          },
+          response: {
+            200: toJsonSchema(
+              professionalProfileSummarySchema,
+              "ProfessionalProfileSummaryPublic",
+            ),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorValidation"),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorNotFound"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
+          },
+        },
+      },
+      async (request, reply) => {
+        const parsedParams = profileIdParamsSchema.safeParse(request.params);
+
+        if (!parsedParams.success) {
+          return reply
+            .code(400)
+            .send(buildValidationError(parsedParams.error.issues));
+        }
+
+        const downstream = await requestDownstreamResource(
+          "profiles",
+          `/internal/profiles/by-id/${encodeURIComponent(parsedParams.data.profileId)}`,
+          professionalProfileSummarySchema,
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.get(
       "/v1/profiles/me",
       {
         schema: {
@@ -502,6 +639,119 @@ void startService({
           "profiles",
           `/internal/profiles/${encodeURIComponent(actor.sub)}`,
           professionalProfileSummarySchema,
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.get(
+      "/v1/clinics",
+      {
+        schema: {
+          operationId: "listClinics",
+          summary: "Browse clinic and facility profiles",
+          tags: ["clinics"],
+          querystring: {
+            type: "object",
+            properties: {
+              city: { type: "string" },
+              facilityType: { type: "string" },
+              verificationStatus: {
+                type: "string",
+                enum: ["not_started", "pending_review", "approved", "rejected"],
+              },
+            },
+          },
+          response: {
+            200: toJsonSchema(
+              clinicProfileListResponseSchema,
+              "ClinicProfileListResponse",
+            ),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorValidation"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
+          },
+        },
+      },
+      async (request, reply) => {
+        const parsedQuery = clinicDirectoryFiltersSchema.safeParse(
+          request.query,
+        );
+
+        if (!parsedQuery.success) {
+          return reply
+            .code(400)
+            .send(buildValidationError(parsedQuery.error.issues));
+        }
+
+        const searchParams = new URLSearchParams();
+
+        for (const [key, value] of Object.entries(parsedQuery.data)) {
+          if (value) {
+            searchParams.set(key, value);
+          }
+        }
+
+        const downstream = await requestDownstreamResource(
+          "clinics",
+          `/internal/clinics${searchParams.size > 0 ? `?${searchParams.toString()}` : ""}`,
+          clinicProfileListResponseSchema,
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(downstream.statusCode === 400 ? 400 : 503)
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.get(
+      "/v1/clinics/:clinicId",
+      {
+        schema: {
+          operationId: "getClinicById",
+          summary: "Get public clinic profile details",
+          tags: ["clinics"],
+          params: {
+            type: "object",
+            required: ["clinicId"],
+            properties: {
+              clinicId: { type: "string" },
+            },
+          },
+          response: {
+            200: toJsonSchema(
+              clinicProfileSummarySchema,
+              "ClinicProfileSummaryPublic",
+            ),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorValidation"),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorNotFound"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
+          },
+        },
+      },
+      async (request, reply) => {
+        const parsedParams = clinicIdParamsSchema.safeParse(request.params);
+
+        if (!parsedParams.success) {
+          return reply
+            .code(400)
+            .send(buildValidationError(parsedParams.error.issues));
+        }
+
+        const downstream = await requestDownstreamResource(
+          "clinics",
+          `/internal/clinics/by-id/${encodeURIComponent(parsedParams.data.clinicId)}`,
+          clinicProfileSummarySchema,
         );
 
         if (!downstream.ok) {

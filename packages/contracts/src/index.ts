@@ -254,12 +254,18 @@ export const professionalProfileSummarySchema = z.object({
   id: z.string().min(1),
   fullName: z.string().min(1),
   specialty: z.string().min(1),
+  headline: z.string().min(1).optional(),
+  bio: z.string().min(1).optional(),
+  licenseNumber: z.string().min(1).optional(),
+  primaryPhone: z.string().min(1).optional(),
   yearsExperience: z.number().int().nonnegative(),
   languages: z.array(z.string().min(2)),
   rating: z.number().min(0).max(5),
   verificationStatus: verificationStatusSchema,
   onboardingCompleted: z.boolean(),
   profileImageUrl: z.string().url().optional(),
+  city: z.string().min(1),
+  region: z.string().min(1),
   availability: z.object({
     status: availabilityStatusSchema,
     nextAvailableAt: z.string().datetime().optional(),
@@ -270,6 +276,10 @@ export const professionalProfileSummarySchema = z.object({
 export const professionalProfileUpdateInputSchema = z.object({
   fullName: z.string().min(1),
   specialty: z.string().min(1),
+  headline: z.string().min(1).optional(),
+  bio: z.string().min(1).optional(),
+  licenseNumber: z.string().min(1).optional(),
+  primaryPhone: z.string().min(1).optional(),
   yearsExperience: z.number().int().nonnegative(),
   languages: z.array(z.string().min(2)).min(1),
   availability: z.object({
@@ -285,10 +295,19 @@ export const professionalProfileUpdateInputSchema = z.object({
   }),
 });
 
+export const professionalProfileListResponseSchema = z.object({
+  items: z.array(professionalProfileSummarySchema),
+  total: z.number().int().nonnegative(),
+});
+
 export const clinicProfileSummarySchema = z.object({
   id: z.string().min(1),
   organizationName: z.string().min(1),
   facilityType: z.string().min(1),
+  description: z.string().min(1).optional(),
+  contactPhone: z.string().min(1).optional(),
+  websiteUrl: z.string().url().optional(),
+  services: z.array(z.string().min(1)),
   city: z.string().min(1),
   region: z.string().min(1),
   verificationStatus: verificationStatusSchema,
@@ -301,12 +320,21 @@ export const clinicProfileSummarySchema = z.object({
 export const clinicProfileUpdateInputSchema = z.object({
   organizationName: z.string().min(1),
   facilityType: z.string().min(1),
+  description: z.string().min(1).optional(),
+  contactPhone: z.string().min(1).optional(),
+  websiteUrl: z.string().url().optional(),
+  services: z.array(z.string().min(1)).default([]),
   location: z.object({
     city: z.string().min(1),
     region: z.string().min(1),
     latitude: z.number().min(-90).max(90),
     longitude: z.number().min(-180).max(180),
   }),
+});
+
+export const clinicProfileListResponseSchema = z.object({
+  items: z.array(clinicProfileSummarySchema),
+  total: z.number().int().nonnegative(),
 });
 
 export const onboardingSubmissionInputSchema = z.object({
@@ -443,6 +471,18 @@ export const initialV1RouteCatalog = [
   },
   {
     method: "GET",
+    path: "/v1/profiles",
+    summary: "Browse verified professional profiles",
+    protected: false,
+  },
+  {
+    method: "GET",
+    path: "/v1/profiles/:profileId",
+    summary: "Read professional profile details",
+    protected: false,
+  },
+  {
+    method: "GET",
     path: "/v1/profiles/me",
     summary: "Current professional profile",
     protected: true,
@@ -452,6 +492,18 @@ export const initialV1RouteCatalog = [
     path: "/v1/profiles/me",
     summary: "Update the current professional profile",
     protected: true,
+  },
+  {
+    method: "GET",
+    path: "/v1/clinics",
+    summary: "Browse clinic and facility profiles",
+    protected: false,
+  },
+  {
+    method: "GET",
+    path: "/v1/clinics/:clinicId",
+    summary: "Read clinic profile details",
+    protected: false,
   },
   {
     method: "GET",
@@ -616,9 +668,15 @@ export type ProfessionalProfileSummary = z.infer<
 export type ProfessionalProfileUpdateInput = z.infer<
   typeof professionalProfileUpdateInputSchema
 >;
+export type ProfessionalProfileListResponse = z.infer<
+  typeof professionalProfileListResponseSchema
+>;
 export type ClinicProfileSummary = z.infer<typeof clinicProfileSummarySchema>;
 export type ClinicProfileUpdateInput = z.infer<
   typeof clinicProfileUpdateInputSchema
+>;
+export type ClinicProfileListResponse = z.infer<
+  typeof clinicProfileListResponseSchema
 >;
 export type OnboardingSubmissionInput = z.infer<
   typeof onboardingSubmissionInputSchema

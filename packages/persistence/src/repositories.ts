@@ -3,6 +3,7 @@ import type {
   AuthPrincipal,
   BookingDetail,
   BookingRequestInput,
+  ClinicProfileListResponse,
   ClinicProfileSummary,
   ClinicProfileUpdateInput,
   FinalizeProfileImageUploadInput,
@@ -12,6 +13,7 @@ import type {
   OnboardingSubmissionInput,
   OnboardingStatus,
   PublicRegistrationRole,
+  ProfessionalProfileListResponse,
   ProfessionalProfileUpdateInput,
   ProfessionalProfileSummary,
   UploadedDocument,
@@ -50,6 +52,56 @@ function dedupeUploadedDocuments(documents: UploadedDocument[]) {
   return Array.from(recordsByType.values()).sort((left, right) =>
     left.documentType.localeCompare(right.documentType),
   );
+}
+
+function mapProfessionalProfileSummary(row: {
+  actor: typeof actors.$inferSelect;
+  profile: typeof professionalProfiles.$inferSelect;
+}): ProfessionalProfileSummary {
+  return {
+    id: row.profile.id,
+    fullName: row.profile.fullName,
+    specialty: row.profile.specialty,
+    headline: row.profile.headline ?? undefined,
+    bio: row.profile.bio ?? undefined,
+    licenseNumber: row.profile.licenseNumber ?? undefined,
+    primaryPhone: row.profile.primaryPhone ?? undefined,
+    yearsExperience: row.profile.yearsExperience,
+    languages: row.profile.languages,
+    rating: numericToNumber(row.profile.rating),
+    verificationStatus: row.actor.verificationStatus,
+    onboardingCompleted: row.actor.onboardingCompleted,
+    profileImageUrl: row.profile.profileImageUrl ?? undefined,
+    city: row.profile.city,
+    region: row.profile.region,
+    availability: {
+      status: row.profile.availabilityStatus,
+      nextAvailableAt: row.profile.nextAvailableAt?.toISOString(),
+      locationRadiusKm: row.profile.locationRadiusKm,
+    },
+  };
+}
+
+function mapClinicProfileSummary(row: {
+  actor: typeof actors.$inferSelect;
+  clinic: typeof clinicProfiles.$inferSelect;
+}): ClinicProfileSummary {
+  return {
+    id: row.clinic.id,
+    organizationName: row.clinic.organizationName,
+    facilityType: row.clinic.facilityType,
+    description: row.clinic.description ?? undefined,
+    contactPhone: row.clinic.contactPhone ?? undefined,
+    websiteUrl: row.clinic.websiteUrl ?? undefined,
+    services: row.clinic.services,
+    city: row.clinic.city,
+    region: row.clinic.region,
+    verificationStatus: row.actor.verificationStatus,
+    onboardingCompleted: row.actor.onboardingCompleted,
+    logoUrl: row.clinic.logoUrl ?? undefined,
+    openRoles: row.clinic.openRoles,
+    rating: numericToNumber(row.clinic.rating),
+  };
 }
 
 function buildDefaultOnboarding(role: PublicRegistrationRole | "admin") {
@@ -187,22 +239,7 @@ export async function getProfessionalProfileBySubject(
     return null;
   }
 
-  return {
-    id: row.profile.id,
-    fullName: row.profile.fullName,
-    specialty: row.profile.specialty,
-    yearsExperience: row.profile.yearsExperience,
-    languages: row.profile.languages,
-    rating: numericToNumber(row.profile.rating),
-    verificationStatus: row.actor.verificationStatus,
-    onboardingCompleted: row.actor.onboardingCompleted,
-    profileImageUrl: row.profile.profileImageUrl ?? undefined,
-    availability: {
-      status: row.profile.availabilityStatus,
-      nextAvailableAt: row.profile.nextAvailableAt?.toISOString(),
-      locationRadiusKm: row.profile.locationRadiusKm,
-    },
-  };
+  return mapProfessionalProfileSummary(row);
 }
 
 export async function getClinicProfileBySubject(
@@ -225,17 +262,152 @@ export async function getClinicProfileBySubject(
     return null;
   }
 
+  return mapClinicProfileSummary(row);
+}
+
+export async function getProfessionalProfileById(
+  profileId: string,
+): Promise<ProfessionalProfileSummary | null> {
+  const db = getDb();
+  const rows = await db
+    .select({
+      actor: actors,
+      profile: professionalProfiles,
+    })
+    .from(professionalProfiles)
+    .innerJoin(actors, eq(professionalProfiles.actorId, actors.id))
+    .where(eq(professionalProfiles.id, profileId))
+    .limit(1);
+  const row = rows[0];
+
+  return row ? mapProfessionalProfileSummary(row) : null;
+}
+
+export async function listProfessionalProfiles(
+  filters: {
+    city?: string;
+    language?: string;
+    specialty?: string;
+    verificationStatus?: AuthPrincipal["verificationStatus"];
+  } = {},
+): Promise<ProfessionalProfileListResponse> {
+  const db = getDb();
+  const rows = await db
+    .select({
+      actor: actors,
+      profile: professionalProfiles,
+    })
+    .from(professionalProfiles)
+    .innerJoin(actors, eq(professionalProfiles.actorId, actors.id));
+
+  const items = rows
+    .filter((row) => {
+      if (
+        filters.specialty &&
+        row.profile.specialty.toLowerCase() !== filters.specialty.toLowerCase()
+      ) {
+        return false;
+      }
+
+      if (
+        filters.city &&
+        row.profile.city.toLowerCase() !== filters.city.toLowerCase()
+      ) {
+        return false;
+      }
+
+      if (
+        filters.language &&
+        !row.profile.languages.some(
+          (language) =>
+            language.toLowerCase() === filters.language?.toLowerCase(),
+        )
+      ) {
+        return false;
+      }
+
+      if (
+        filters.verificationStatus &&
+        row.actor.verificationStatus !== filters.verificationStatus
+      ) {
+        return false;
+      }
+
+      return true;
+    })
+    .map(mapProfessionalProfileSummary);
+
   return {
-    id: row.clinic.id,
-    organizationName: row.clinic.organizationName,
-    facilityType: row.clinic.facilityType,
-    city: row.clinic.city,
-    region: row.clinic.region,
-    verificationStatus: row.actor.verificationStatus,
-    onboardingCompleted: row.actor.onboardingCompleted,
-    logoUrl: row.clinic.logoUrl ?? undefined,
-    openRoles: row.clinic.openRoles,
-    rating: numericToNumber(row.clinic.rating),
+    items,
+    total: items.length,
+  };
+}
+
+export async function getClinicProfileById(
+  clinicId: string,
+): Promise<ClinicProfileSummary | null> {
+  const db = getDb();
+  const rows = await db
+    .select({
+      actor: actors,
+      clinic: clinicProfiles,
+    })
+    .from(clinicProfiles)
+    .innerJoin(actors, eq(clinicProfiles.actorId, actors.id))
+    .where(eq(clinicProfiles.id, clinicId))
+    .limit(1);
+  const row = rows[0];
+
+  return row ? mapClinicProfileSummary(row) : null;
+}
+
+export async function listClinicProfiles(
+  filters: {
+    city?: string;
+    facilityType?: string;
+    verificationStatus?: AuthPrincipal["verificationStatus"];
+  } = {},
+): Promise<ClinicProfileListResponse> {
+  const db = getDb();
+  const rows = await db
+    .select({
+      actor: actors,
+      clinic: clinicProfiles,
+    })
+    .from(clinicProfiles)
+    .innerJoin(actors, eq(clinicProfiles.actorId, actors.id));
+
+  const items = rows
+    .filter((row) => {
+      if (
+        filters.facilityType &&
+        row.clinic.facilityType.toLowerCase() !==
+          filters.facilityType.toLowerCase()
+      ) {
+        return false;
+      }
+
+      if (
+        filters.city &&
+        row.clinic.city.toLowerCase() !== filters.city.toLowerCase()
+      ) {
+        return false;
+      }
+
+      if (
+        filters.verificationStatus &&
+        row.actor.verificationStatus !== filters.verificationStatus
+      ) {
+        return false;
+      }
+
+      return true;
+    })
+    .map(mapClinicProfileSummary);
+
+  return {
+    items,
+    total: items.length,
   };
 }
 
@@ -305,6 +477,7 @@ export async function ensureActorAccount(input: {
           actorId: actor.id,
           fullName: displayName,
           specialty: "Pending onboarding",
+          headline: "Complete your professional onboarding profile.",
           yearsExperience: 0,
           languages: ["ar"],
           availabilityStatus: "unavailable",
@@ -325,6 +498,9 @@ export async function ensureActorAccount(input: {
           actorId: actor.id,
           organizationName: displayName,
           facilityType: "Pending onboarding",
+          description:
+            "Complete clinic onboarding to publish roles and shifts.",
+          services: [],
           city: "TBD",
           region: "TBD",
           latitude: "0",
@@ -496,6 +672,10 @@ export async function updateProfessionalProfileBySubject(
         actorId: aggregate.actor.id,
         fullName: input.fullName,
         specialty: input.specialty,
+        headline: input.headline,
+        bio: input.bio,
+        licenseNumber: input.licenseNumber,
+        primaryPhone: input.primaryPhone,
         yearsExperience: input.yearsExperience,
         languages: input.languages,
         availabilityStatus: input.availability.status,
@@ -514,6 +694,10 @@ export async function updateProfessionalProfileBySubject(
         set: {
           fullName: input.fullName,
           specialty: input.specialty,
+          headline: input.headline,
+          bio: input.bio,
+          licenseNumber: input.licenseNumber,
+          primaryPhone: input.primaryPhone,
           yearsExperience: input.yearsExperience,
           languages: input.languages,
           availabilityStatus: input.availability.status,
@@ -561,6 +745,10 @@ export async function updateClinicProfileBySubject(
         actorId: aggregate.actor.id,
         organizationName: input.organizationName,
         facilityType: input.facilityType,
+        description: input.description,
+        contactPhone: input.contactPhone,
+        websiteUrl: input.websiteUrl,
+        services: input.services,
         city: input.location.city,
         region: input.location.region,
         latitude: String(input.location.latitude),
@@ -572,6 +760,10 @@ export async function updateClinicProfileBySubject(
         set: {
           organizationName: input.organizationName,
           facilityType: input.facilityType,
+          description: input.description,
+          contactPhone: input.contactPhone,
+          websiteUrl: input.websiteUrl,
+          services: input.services,
           city: input.location.city,
           region: input.location.region,
           latitude: String(input.location.latitude),
