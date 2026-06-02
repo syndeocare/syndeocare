@@ -48,6 +48,7 @@ independently from the backend services.
 - `NEXT_PUBLIC_API_BASE_URL`
 - `NEXT_PUBLIC_DOCS_URL`
 - `NEXT_PUBLIC_ANDROID_APP_URL`
+- `NEXT_PUBLIC_SITE_BASE_PATH`
 - `WEB_FRONTEND_BUCKET`
 
 The GitHub Actions deployment workflow now builds the web app and uploads the

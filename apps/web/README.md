@@ -15,6 +15,7 @@ Build-time public variables:
 - `NEXT_PUBLIC_API_BASE_URL`
 - `NEXT_PUBLIC_DOCS_URL`
 - `NEXT_PUBLIC_ANDROID_APP_URL`
+- `NEXT_PUBLIC_SITE_BASE_PATH` (optional, for non-root deployments such as `/platform`)
 
 ## Commands
 
