@@ -2,7 +2,9 @@ import { eq } from "drizzle-orm";
 import { getDb, closePool } from "../client.js";
 import {
   actors,
+  bookings,
   clinicProfiles,
+  jobListings,
   onboardingRecords,
   professionalProfiles,
 } from "../schema.js";
@@ -108,6 +110,109 @@ async function run() {
       longitude: "44.1910",
       openRoles: 3,
       rating: "4.7",
+    })
+    .onConflictDoNothing();
+
+  const professionalProfile = await db.query.professionalProfiles.findFirst({
+    where: eq(professionalProfiles.actorId, professionalActor.id),
+  });
+  const clinicProfile = await db.query.clinicProfiles.findFirst({
+    where: eq(clinicProfiles.actorId, clinicActor.id),
+  });
+
+  if (!professionalProfile || !clinicProfile) {
+    throw new Error("Expected seed profile records to exist.");
+  }
+
+  const seededJobs = await db
+    .insert(jobListings)
+    .values([
+      {
+        clinicId: clinicProfile.id,
+        title: "Temporary Dental Assistant Shift",
+        specialty: "Dental Assistant",
+        employmentType: "temporary_shift",
+        status: "open",
+        city: "Sanaa",
+        region: "Amanat Al Asimah",
+        latitude: "15.3694",
+        longitude: "44.1910",
+        radiusKm: 12,
+        startsAt: new Date("2026-05-22T05:00:00.000Z"),
+        endsAt: new Date("2026-05-22T13:00:00.000Z"),
+        compensationAmount: "18000",
+        compensationCurrency: "YER",
+        compensationUnit: "shift",
+        verificationRequired: true,
+        summary: "Same-day dental assistant coverage for a high-volume clinic.",
+        description:
+          "Support chairside procedures, sterilization workflow, and patient preparation during a busy morning-to-afternoon shift.",
+        requirements: [
+          "Active dental assistant license",
+          "At least 2 years of chairside support experience",
+          "Comfort working with digital x-ray workflow",
+        ],
+        languages: ["ar", "en"],
+        contactPreference: "in_app_chat",
+      },
+      {
+        clinicId: clinicProfile.id,
+        title: "General Dentist",
+        specialty: "Dentist",
+        employmentType: "permanent_role",
+        status: "open",
+        city: "Sanaa",
+        region: "Amanat Al Asimah",
+        latitude: "15.3694",
+        longitude: "44.1910",
+        radiusKm: 20,
+        startsAt: new Date("2026-06-01T05:00:00.000Z"),
+        compensationAmount: "420000",
+        compensationCurrency: "YER",
+        compensationUnit: "contract",
+        verificationRequired: true,
+        summary:
+          "Permanent general dentistry role with growth into clinic leadership.",
+        description:
+          "Lead general dentistry appointments, coordinate treatment plans, and support quality assurance for long-term patient relationships.",
+        requirements: [
+          "Valid dentist license",
+          "Minimum 4 years of clinic practice",
+          "Strong patient communication and case documentation",
+        ],
+        languages: ["ar", "en"],
+        contactPreference: "direct_phone",
+      },
+    ])
+    .onConflictDoNothing()
+    .returning({ id: jobListings.id, title: jobListings.title });
+
+  const availableJobs =
+    seededJobs.length > 0
+      ? seededJobs
+      : await db
+          .select({ id: jobListings.id, title: jobListings.title })
+          .from(jobListings)
+          .where(eq(jobListings.clinicId, clinicProfile.id));
+
+  const shiftJob = availableJobs.find(
+    (job) => job.title === "Temporary Dental Assistant Shift",
+  );
+
+  if (!shiftJob) {
+    throw new Error("Expected seeded shift job to exist.");
+  }
+
+  await db
+    .insert(bookings)
+    .values({
+      jobId: shiftJob.id,
+      clinicId: clinicProfile.id,
+      professionalId: professionalProfile.id,
+      status: "confirmed",
+      notes: "Bring clinic-issued ID for front-desk verification on arrival.",
+      requestedAt: new Date("2026-05-20T08:30:00.000Z"),
+      lastUpdatedAt: new Date("2026-05-20T10:15:00.000Z"),
     })
     .onConflictDoNothing();
 

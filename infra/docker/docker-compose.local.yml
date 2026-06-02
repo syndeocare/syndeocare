@@ -38,6 +38,15 @@ services:
     volumes:
       - localstack-data:/var/lib/localstack
 
+  nats:
+    image: nats:2.10-alpine
+    command:
+      - "--jetstream"
+      - "--http_port=8222"
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+
   minio:
     image: minio/minio:latest
     command: server /data --console-address ":9001"

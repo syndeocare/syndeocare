@@ -1,6 +1,7 @@
 import {
   apiErrorSchema,
   authSessionSchema,
+  bookingRequestInputSchema,
   authSignInInputSchema,
   authSignUpInputSchema,
   authPrincipalSchema,
@@ -14,6 +15,7 @@ import {
   finalizeVerificationDocumentUploadInputSchema,
   gatewayAuthConfigurationSchema,
   initialV1RouteCatalog,
+  jobListingCreateInputSchema,
   jobListingDetailSchema,
   jobListingListResponseSchema,
   onboardingSubmissionInputSchema,
@@ -27,8 +29,6 @@ import {
   verificationReviewInputSchema,
   verificationStatusResponseSchema,
   type AuthPrincipal,
-  type BookingDetail,
-  type JobListingDetail,
   type PlatformMetadata,
 } from "@repo/contracts";
 import {
@@ -47,135 +47,9 @@ const downstreamServices = {
   clinics: process.env.SERVICE_CLINICS_URL ?? "http://127.0.0.1:4113",
   identity: process.env.SERVICE_IDENTITY_URL ?? "http://127.0.0.1:4111",
   profiles: process.env.SERVICE_PROFILES_URL ?? "http://127.0.0.1:4112",
+  scheduling: process.env.SERVICE_SCHEDULING_URL ?? "http://127.0.0.1:4114",
 } as const;
 const storageConfig = getStorageConfig();
-
-const jobs = [
-  {
-    id: "job-shift-001",
-    title: "Temporary Dental Assistant Shift",
-    specialty: "Dental Assistant",
-    employmentType: "temporary_shift",
-    status: "open",
-    clinicId: "clinic-sanaa-001",
-    clinicName: "Al Noor Dental Center",
-    location: {
-      city: "Sanaa",
-      region: "Amanat Al Asimah",
-      latitude: 15.3694,
-      longitude: 44.191,
-      radiusKm: 12,
-    },
-    startsAt: "2026-05-22T05:00:00.000Z",
-    endsAt: "2026-05-22T13:00:00.000Z",
-    compensation: {
-      amount: 18000,
-      currency: "YER",
-      unit: "shift",
-    },
-    verificationRequired: true,
-    summary: "Same-day dental assistant coverage for a high-volume clinic.",
-    languages: ["ar", "en"],
-    description:
-      "Support chairside procedures, sterilization workflow, and patient preparation during a busy morning-to-afternoon shift.",
-    requirements: [
-      "Active dental assistant license",
-      "At least 2 years of chairside support experience",
-      "Comfort working with digital x-ray workflow",
-    ],
-    contactPreference: "in_app_chat",
-  },
-  {
-    id: "job-permanent-002",
-    title: "General Dentist",
-    specialty: "Dentist",
-    employmentType: "permanent_role",
-    status: "open",
-    clinicId: "clinic-aden-002",
-    clinicName: "Aden Specialist Medical Center",
-    location: {
-      city: "Aden",
-      region: "Aden",
-      latitude: 12.7797,
-      longitude: 45.0367,
-      radiusKm: 20,
-    },
-    startsAt: "2026-06-01T05:00:00.000Z",
-    compensation: {
-      amount: 420000,
-      currency: "YER",
-      unit: "contract",
-    },
-    verificationRequired: true,
-    summary:
-      "Permanent general dentistry role with growth into clinic leadership.",
-    languages: ["ar", "en"],
-    description:
-      "Lead general dentistry appointments, coordinate treatment plans, and support quality assurance for long-term patient relationships.",
-    requirements: [
-      "Valid dentist license",
-      "Minimum 4 years of clinic practice",
-      "Strong patient communication and case documentation",
-    ],
-    contactPreference: "direct_phone",
-  },
-] satisfies JobListingDetail[];
-
-const bookings = [
-  {
-    id: "booking-001",
-    jobId: "job-shift-001",
-    jobTitle: "Temporary Dental Assistant Shift",
-    status: "confirmed",
-    clinicId: "clinic-sanaa-001",
-    clinicName: "Al Noor Dental Center",
-    professionalId: "profile-dental-assistant-001",
-    professionalName: "Aseel Mohammed",
-    startsAt: "2026-05-22T05:00:00.000Z",
-    endsAt: "2026-05-22T13:00:00.000Z",
-    location: {
-      city: "Sanaa",
-      region: "Amanat Al Asimah",
-      latitude: 15.3694,
-      longitude: 44.191,
-      radiusKm: 12,
-    },
-    compensation: {
-      amount: 18000,
-      currency: "YER",
-      unit: "shift",
-    },
-    requestedAt: "2026-05-20T08:30:00.000Z",
-    lastUpdatedAt: "2026-05-20T10:15:00.000Z",
-    notes: "Bring clinic-issued ID for front-desk verification on arrival.",
-  },
-  {
-    id: "booking-002",
-    jobId: "job-permanent-002",
-    jobTitle: "General Dentist",
-    status: "requested",
-    clinicId: "clinic-aden-002",
-    clinicName: "Aden Specialist Medical Center",
-    professionalId: "profile-dentist-002",
-    professionalName: "Dr. Rawan Saleh",
-    startsAt: "2026-06-01T05:00:00.000Z",
-    location: {
-      city: "Aden",
-      region: "Aden",
-      latitude: 12.7797,
-      longitude: 45.0367,
-      radiusKm: 20,
-    },
-    compensation: {
-      amount: 420000,
-      currency: "YER",
-      unit: "contract",
-    },
-    requestedAt: "2026-05-20T12:00:00.000Z",
-    lastUpdatedAt: "2026-05-20T12:00:00.000Z",
-    notes: "Pending final clinic review and credential confirmation.",
-  },
-] satisfies BookingDetail[];
 
 const jobFiltersSchema = z.object({
   specialty: z.string().min(1).optional(),
@@ -212,13 +86,6 @@ function buildValidationError(issues: z.ZodIssue[]) {
       const path = issue.path.join(".");
       return path.length > 0 ? `${path}: ${issue.message}` : issue.message;
     }),
-  };
-}
-
-function notFoundError(message: string) {
-  return {
-    code: "NOT_FOUND",
-    message,
   };
 }
 
@@ -339,64 +206,6 @@ async function requestDownstreamResource<T>(
       ),
     };
   }
-}
-
-function getProfileIdForActor(actor: AuthPrincipal) {
-  return actor.profileId ?? "profile-dental-assistant-001";
-}
-
-function getClinicIdForActor(actor: AuthPrincipal) {
-  return actor.clinicId ?? "clinic-sanaa-001";
-}
-
-function buildVisibleBookings(actor: AuthPrincipal) {
-  if (actor.role === "admin") {
-    return bookings;
-  }
-
-  if (actor.role === "clinic") {
-    const clinicId = getClinicIdForActor(actor);
-    return bookings.filter((booking) => booking.clinicId === clinicId);
-  }
-
-  const profileId = getProfileIdForActor(actor);
-  return bookings.filter((booking) => booking.professionalId === profileId);
-}
-
-function toJobSummary(job: JobListingDetail) {
-  return {
-    id: job.id,
-    title: job.title,
-    specialty: job.specialty,
-    employmentType: job.employmentType,
-    status: job.status,
-    clinicId: job.clinicId,
-    clinicName: job.clinicName,
-    location: job.location,
-    startsAt: job.startsAt,
-    endsAt: job.endsAt,
-    compensation: job.compensation,
-    verificationRequired: job.verificationRequired,
-    summary: job.summary,
-    languages: job.languages,
-  };
-}
-
-function toBookingSummary(booking: BookingDetail) {
-  return {
-    id: booking.id,
-    jobId: booking.jobId,
-    jobTitle: booking.jobTitle,
-    status: booking.status,
-    clinicId: booking.clinicId,
-    clinicName: booking.clinicName,
-    professionalId: booking.professionalId,
-    professionalName: booking.professionalName,
-    startsAt: booking.startsAt,
-    endsAt: booking.endsAt,
-    location: booking.location,
-    compensation: booking.compensation,
-  };
 }
 
 function buildPlatformMetadata(): PlatformMetadata {
@@ -769,6 +578,7 @@ void startService({
               "JobListingListResponse",
             ),
             400: toJsonSchema(apiErrorSchema, "ApiErrorValidation"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
           },
         },
       },
@@ -781,39 +591,97 @@ void startService({
             .send(buildValidationError(parsedQuery.error.issues));
         }
 
-        const { specialty, city, employmentType, verificationRequired } =
-          parsedQuery.data;
+        const searchParams = new URLSearchParams();
 
-        const filteredJobs = jobs.filter((job) => {
-          if (
-            specialty &&
-            job.specialty.toLowerCase() !== specialty.toLowerCase()
-          ) {
-            return false;
-          }
+        if (parsedQuery.data.specialty) {
+          searchParams.set("specialty", parsedQuery.data.specialty);
+        }
 
-          if (city && job.location.city.toLowerCase() !== city.toLowerCase()) {
-            return false;
-          }
+        if (parsedQuery.data.city) {
+          searchParams.set("city", parsedQuery.data.city);
+        }
 
-          if (employmentType && job.employmentType !== employmentType) {
-            return false;
-          }
+        if (parsedQuery.data.employmentType) {
+          searchParams.set("employmentType", parsedQuery.data.employmentType);
+        }
 
-          if (
-            verificationRequired &&
-            job.verificationRequired !== (verificationRequired === "true")
-          ) {
-            return false;
-          }
+        if (parsedQuery.data.verificationRequired) {
+          searchParams.set(
+            "verificationRequired",
+            parsedQuery.data.verificationRequired,
+          );
+        }
 
-          return job.status === "open";
-        });
+        const downstream = await requestDownstreamResource(
+          "scheduling",
+          `/internal/jobs${searchParams.size > 0 ? `?${searchParams.toString()}` : ""}`,
+          jobListingListResponseSchema,
+        );
 
-        return {
-          items: filteredJobs.map(toJobSummary),
-          total: filteredJobs.length,
-        };
+        if (!downstream.ok) {
+          return reply
+            .code(downstream.statusCode === 400 ? 400 : 503)
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.post(
+      "/v1/jobs",
+      {
+        schema: {
+          operationId: "createJob",
+          summary: "Create a new job or shift for the authenticated clinic",
+          tags: ["jobs"],
+          security: [{ bearerAuth: [] }],
+          body: toJsonSchema(
+            jobListingCreateInputSchema,
+            "JobListingCreateInput",
+          ),
+          response: {
+            200: toJsonSchema(
+              jobListingDetailSchema,
+              "CreatedJobListingDetail",
+            ),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorValidationCreateJob"),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorizedCreateJob"),
+            403: toJsonSchema(apiErrorSchema, "ApiErrorForbiddenCreateJob"),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorNotFoundCreateJob"),
+            409: toJsonSchema(apiErrorSchema, "ApiErrorConflictCreateJob"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailableCreateJob"),
+          },
+        },
+        preHandler: auth.requireAccess({ roles: ["clinic"] }),
+      },
+      async (request, reply) => {
+        const actor = request.authContext as AuthPrincipal;
+        const parsedBody = jobListingCreateInputSchema.safeParse(request.body);
+
+        if (!parsedBody.success) {
+          return reply
+            .code(400)
+            .send(buildValidationError(parsedBody.error.issues));
+        }
+
+        const downstream = await requestDownstreamResource(
+          "scheduling",
+          `/internal/jobs/${encodeURIComponent(actor.sub)}`,
+          jobListingDetailSchema,
+          {
+            body: parsedBody.data,
+            method: "POST",
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
       },
     );
 
@@ -1430,6 +1298,7 @@ void startService({
             200: toJsonSchema(jobListingDetailSchema, "JobListingDetail"),
             400: toJsonSchema(apiErrorSchema, "ApiErrorValidation"),
             404: toJsonSchema(apiErrorSchema, "ApiErrorNotFound"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
           },
         },
       },
@@ -1442,15 +1311,87 @@ void startService({
             .send(buildValidationError(parsedParams.error.issues));
         }
 
-        const job = jobs.find(
-          (candidate) => candidate.id === parsedParams.data.jobId,
+        const downstream = await requestDownstreamResource(
+          "scheduling",
+          `/internal/jobs/${encodeURIComponent(parsedParams.data.jobId)}`,
+          jobListingDetailSchema,
         );
 
-        if (!job) {
-          return reply.code(404).send(notFoundError("Job was not found."));
+        if (!downstream.ok) {
+          return reply.code(503).send(downstream.body);
         }
 
-        return job;
+        return downstream.data;
+      },
+    );
+
+    app.post(
+      "/v1/bookings",
+      {
+        schema: {
+          operationId: "requestBooking",
+          summary: "Request a booking for the authenticated professional",
+          tags: ["bookings"],
+          security: [{ bearerAuth: [] }],
+          body: toJsonSchema(bookingRequestInputSchema, "BookingRequestInput"),
+          response: {
+            200: toJsonSchema(bookingDetailSchema, "CreatedBookingDetail"),
+            400: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorValidationCreateBooking",
+            ),
+            401: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorUnauthorizedCreateBooking",
+            ),
+            403: toJsonSchema(apiErrorSchema, "ApiErrorForbiddenCreateBooking"),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorNotFoundCreateBooking"),
+            409: toJsonSchema(apiErrorSchema, "ApiErrorConflictCreateBooking"),
+            503: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorUnavailableCreateBooking",
+            ),
+          },
+        },
+        preHandler: auth.requireAccess({ roles: ["professional"] }),
+      },
+      async (request, reply) => {
+        const actor = request.authContext as AuthPrincipal;
+        const parsedBody = bookingRequestInputSchema.safeParse(request.body);
+
+        if (!parsedBody.success) {
+          return reply
+            .code(400)
+            .send(buildValidationError(parsedBody.error.issues));
+        }
+
+        const downstream = await requestDownstreamResource(
+          "scheduling",
+          `/internal/bookings/${encodeURIComponent(actor.sub)}`,
+          bookingDetailSchema,
+          {
+            body: parsedBody.data,
+            method: "POST",
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(
+              downstream.statusCode === 400
+                ? 400
+                : downstream.statusCode === 403
+                  ? 403
+                  : downstream.statusCode === 404
+                    ? 404
+                    : downstream.statusCode === 409
+                      ? 409
+                      : 503,
+            )
+            .send(downstream.body);
+        }
+
+        return downstream.data;
       },
     );
 
@@ -1470,15 +1411,19 @@ void startService({
         },
         preHandler: auth.requireAccess(),
       },
-      async (request) => {
-        const items = buildVisibleBookings(
-          request.authContext as AuthPrincipal,
-        ).map(toBookingSummary);
+      async (request, reply) => {
+        const actor = request.authContext as AuthPrincipal;
+        const downstream = await requestDownstreamResource(
+          "scheduling",
+          `/internal/bookings/${encodeURIComponent(actor.sub)}`,
+          bookingListResponseSchema,
+        );
 
-        return {
-          items,
-          total: items.length,
-        };
+        if (!downstream.ok) {
+          return reply.code(503).send(downstream.body);
+        }
+
+        return downstream.data;
       },
     );
 
@@ -1508,6 +1453,7 @@ void startService({
         preHandler: auth.requireAccess(),
       },
       async (request, reply) => {
+        const actor = request.authContext as AuthPrincipal;
         const parsedParams = bookingIdParamsSchema.safeParse(request.params);
 
         if (!parsedParams.success) {
@@ -1516,24 +1462,25 @@ void startService({
             .send(buildValidationError(parsedParams.error.issues));
         }
 
-        const visibleBookings = buildVisibleBookings(
-          request.authContext as AuthPrincipal,
-        );
-        const booking = visibleBookings.find(
-          (candidate) => candidate.id === parsedParams.data.bookingId,
+        const downstream = await requestDownstreamResource(
+          "scheduling",
+          `/internal/bookings/${encodeURIComponent(actor.sub)}/${encodeURIComponent(parsedParams.data.bookingId)}`,
+          bookingDetailSchema,
         );
 
-        if (!booking) {
+        if (!downstream.ok) {
           return reply
-            .code(404)
-            .send(
-              notFoundError(
-                "Booking was not found or is not visible to the authenticated actor.",
-              ),
-            );
+            .code(
+              downstream.statusCode === 400
+                ? 400
+                : downstream.statusCode === 404
+                  ? 404
+                  : 503,
+            )
+            .send(downstream.body);
         }
 
-        return booking;
+        return downstream.data;
       },
     );
   },

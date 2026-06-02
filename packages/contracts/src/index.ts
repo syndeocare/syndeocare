@@ -346,6 +346,22 @@ export const jobListingDetailSchema = jobListingSchema.extend({
   contactPreference: z.enum(["in_app_chat", "direct_phone"]),
 });
 
+export const jobListingCreateInputSchema = z.object({
+  title: z.string().min(1),
+  specialty: z.string().min(1),
+  employmentType: employmentTypeSchema,
+  location: locationSchema,
+  startsAt: z.string().datetime(),
+  endsAt: z.string().datetime().optional(),
+  compensation: moneySchema,
+  verificationRequired: z.boolean(),
+  summary: z.string().min(1),
+  description: z.string().min(1),
+  requirements: z.array(z.string().min(1)).min(1),
+  languages: z.array(z.string().min(2)).min(1),
+  contactPreference: z.enum(["in_app_chat", "direct_phone"]),
+});
+
 export const jobListingListResponseSchema = z.object({
   items: z.array(jobListingSchema),
   total: z.number().int().nonnegative(),
@@ -375,6 +391,11 @@ export const bookingDetailSchema = bookingSummarySchema.extend({
 export const bookingListResponseSchema = z.object({
   items: z.array(bookingSummarySchema),
   total: z.number().int().nonnegative(),
+});
+
+export const bookingRequestInputSchema = z.object({
+  jobId: z.string().min(1),
+  notes: z.string().min(1).optional(),
 });
 
 export const initialV1RouteCatalog = [
@@ -488,10 +509,22 @@ export const initialV1RouteCatalog = [
     protected: false,
   },
   {
+    method: "POST",
+    path: "/v1/jobs",
+    summary: "Create a new job or shift as an authenticated clinic",
+    protected: true,
+  },
+  {
     method: "GET",
     path: "/v1/jobs/:jobId",
     summary: "Read job or shift details",
     protected: false,
+  },
+  {
+    method: "POST",
+    path: "/v1/bookings",
+    summary: "Request a booking for an authenticated professional",
+    protected: true,
   },
   {
     method: "GET",
@@ -595,5 +628,7 @@ export type VerificationReviewInput = z.infer<
 >;
 export type JobListing = z.infer<typeof jobListingSchema>;
 export type JobListingDetail = z.infer<typeof jobListingDetailSchema>;
+export type JobListingCreateInput = z.infer<typeof jobListingCreateInputSchema>;
 export type BookingSummary = z.infer<typeof bookingSummarySchema>;
 export type BookingDetail = z.infer<typeof bookingDetailSchema>;
+export type BookingRequestInput = z.infer<typeof bookingRequestInputSchema>;

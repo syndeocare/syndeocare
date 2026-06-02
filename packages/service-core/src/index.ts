@@ -14,12 +14,15 @@ import {
   jwtVerify,
   type JWTPayload,
 } from "jose";
+import { JSONCodec, connect, type NatsConnection } from "nats";
 import {
   authPrincipalSchema,
   domainEventCatalog,
+  eventEnvelopeSchema,
   gatewayAuthConfigurationSchema,
   gatewayAuthModeSchema,
   type AuthPrincipal,
+  type EventEnvelope,
   type EventName,
   type ServiceName,
   type UserRole,
@@ -28,9 +31,12 @@ import {
 import { z } from "zod";
 
 const DEFAULT_HOST = "0.0.0.0";
+const DEFAULT_NATS_URL = "nats://127.0.0.1:4222";
 const DEFAULT_NODE_ENV = "development";
 const DEFAULT_PORT = 4000;
 const INTERNAL_SERVICE_TOKEN_HEADER = "x-internal-service-token";
+const eventEnvelopeCodec = JSONCodec<EventEnvelope>();
+let natsConnectionPromise: Promise<NatsConnection> | undefined;
 const DEVELOPMENT_HEADER_NAMES = [
   "x-dev-user-id",
   "x-dev-user-role",
@@ -394,6 +400,47 @@ export function createAccessControl(): AccessControl {
       };
     },
   };
+}
+
+function getEventBusUrl() {
+  return process.env.NATS_URL ?? DEFAULT_NATS_URL;
+}
+
+async function getEventBusConnection() {
+  if (!natsConnectionPromise) {
+    natsConnectionPromise = connect({
+      maxReconnectAttempts: -1,
+      name: process.env.SERVICE_INSTANCE_NAME ?? "syndeocare-service",
+      servers: getEventBusUrl(),
+    });
+  }
+
+  return natsConnectionPromise;
+}
+
+export async function publishDomainEvent(input: {
+  name: EventName;
+  producer: ServiceName;
+  subject: string;
+  payload: Record<string, unknown>;
+}) {
+  const envelope = eventEnvelopeSchema.parse({
+    id: crypto.randomUUID(),
+    name: input.name,
+    occurredAt: new Date().toISOString(),
+    payload: input.payload,
+    producer: input.producer,
+    subject: input.subject,
+    version: 1,
+  });
+  const connection = await getEventBusConnection();
+
+  connection.publish(
+    `syndeocare.events.${envelope.name}`,
+    eventEnvelopeCodec.encode(envelope),
+  );
+
+  return envelope;
 }
 
 export async function createServiceApp(options: ServiceBootstrapOptions) {

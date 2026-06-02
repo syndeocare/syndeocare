@@ -32,6 +32,29 @@ export const availabilityStatusEnum = pgEnum("availability_status", [
   "unavailable",
 ]);
 
+export const employmentTypeEnum = pgEnum("employment_type", [
+  "temporary_shift",
+  "permanent_role",
+  "contract",
+]);
+
+export const jobStatusEnum = pgEnum("job_status", ["open", "filled", "closed"]);
+
+export const bookingStatusEnum = pgEnum("booking_status", [
+  "requested",
+  "accepted",
+  "confirmed",
+  "completed",
+  "cancelled",
+]);
+
+export const compensationUnitEnum = pgEnum("compensation_unit", [
+  "hour",
+  "day",
+  "shift",
+  "contract",
+]);
+
 export const actors = pgTable(
   "actors",
   {
@@ -150,9 +173,103 @@ export const clinicProfiles = pgTable(
   }),
 );
 
+export const jobListings = pgTable(
+  "job_listings",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    clinicId: uuid("clinic_id")
+      .notNull()
+      .references(() => clinicProfiles.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    specialty: text("specialty").notNull(),
+    employmentType: employmentTypeEnum("employment_type").notNull(),
+    status: jobStatusEnum("status").notNull().default("open"),
+    city: text("city").notNull(),
+    region: text("region").notNull(),
+    latitude: numeric("latitude", { precision: 9, scale: 6 }).notNull(),
+    longitude: numeric("longitude", { precision: 9, scale: 6 }).notNull(),
+    radiusKm: integer("radius_km"),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true }),
+    compensationAmount: numeric("compensation_amount", {
+      precision: 12,
+      scale: 2,
+    }).notNull(),
+    compensationCurrency: text("compensation_currency").notNull(),
+    compensationUnit: compensationUnitEnum("compensation_unit").notNull(),
+    verificationRequired: boolean("verification_required")
+      .notNull()
+      .default(true),
+    summary: text("summary").notNull(),
+    description: text("description").notNull(),
+    requirements: text("requirements").array().notNull().default([]),
+    languages: text("languages").array().notNull().default([]),
+    contactPreference: text("contact_preference").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    clinicStatusIdx: index("job_listings_clinic_status_idx").on(
+      table.clinicId,
+      table.status,
+    ),
+    cityIdx: index("job_listings_city_idx").on(table.city),
+    specialtyIdx: index("job_listings_specialty_idx").on(table.specialty),
+    startsAtIdx: index("job_listings_starts_at_idx").on(table.startsAt),
+  }),
+);
+
+export const bookings = pgTable(
+  "bookings",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    jobId: uuid("job_id")
+      .notNull()
+      .references(() => jobListings.id, { onDelete: "cascade" }),
+    clinicId: uuid("clinic_id")
+      .notNull()
+      .references(() => clinicProfiles.id, { onDelete: "cascade" }),
+    professionalId: uuid("professional_id")
+      .notNull()
+      .references(() => professionalProfiles.id, { onDelete: "cascade" }),
+    status: bookingStatusEnum("status").notNull().default("requested"),
+    notes: text("notes"),
+    requestedAt: timestamp("requested_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    lastUpdatedAt: timestamp("last_updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    clinicStatusIdx: index("bookings_clinic_status_idx").on(
+      table.clinicId,
+      table.status,
+    ),
+    professionalStatusIdx: index("bookings_professional_status_idx").on(
+      table.professionalId,
+      table.status,
+    ),
+    jobProfessionalIdx: index("bookings_job_professional_idx").on(
+      table.jobId,
+      table.professionalId,
+    ),
+  }),
+);
+
 export const schema = {
   actors,
+  bookings,
   onboardingRecords,
+  compensationUnitEnum,
   professionalProfiles,
+  employmentTypeEnum,
+  jobListings,
+  jobStatusEnum,
+  bookingStatusEnum,
   clinicProfiles,
 };

@@ -19,6 +19,7 @@ import {
 import {
   buildAuthPrincipalFromAccessToken,
   decodeAccessToken,
+  publishDomainEvent,
   startService,
 } from "@repo/service-core";
 import { z } from "zod";
@@ -495,6 +496,16 @@ void startService({
         return reply.code(session.statusCode).send(session.body);
       }
 
+      await publishDomainEvent({
+        name: "identity.user.authenticated",
+        payload: {
+          email: session.data.principal.email,
+          role: session.data.principal.role,
+        },
+        producer: "identity",
+        subject: session.data.principal.sub,
+      });
+
       return session.data;
     });
 
@@ -534,6 +545,16 @@ void startService({
       }
 
       await sendWelcomeNotification(session.data);
+      await publishDomainEvent({
+        name: "identity.user.registered",
+        payload: {
+          email: session.data.principal.email,
+          isNewUser: true,
+          role: session.data.principal.role,
+        },
+        producer: "identity",
+        subject: session.data.principal.sub,
+      });
 
       return authSessionSchema.parse({
         ...session.data,

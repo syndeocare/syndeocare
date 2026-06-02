@@ -77,7 +77,9 @@ INTERNAL_SERVICE_TOKEN=local-internal-token
 SERVICE_IDENTITY_URL=http://127.0.0.1:4111
 SERVICE_PROFILES_URL=http://127.0.0.1:4112
 SERVICE_CLINICS_URL=http://127.0.0.1:4113
+SERVICE_SCHEDULING_URL=http://127.0.0.1:4114
 SERVICE_NOTIFICATIONS_URL=http://127.0.0.1:4115
+NATS_URL=nats://127.0.0.1:4222
 ```
 
 `AUTH_JWKS_URI` is optional. If omitted, the gateway derives the Keycloak certs endpoint from `AUTH_ISSUER_URL`.
@@ -155,6 +157,26 @@ The expected flow is:
 
 The MinIO admin console is available at `http://127.0.0.1:9001` with
 `minioadmin / minioadmin`.
+
+## Local event backbone
+
+The local compose stack now includes **NATS with JetStream** on:
+
+- `nats://127.0.0.1:4222` for service publish / subscribe traffic
+- `http://127.0.0.1:8222` for monitoring
+
+Start it with:
+
+```sh
+docker compose -f infra/docker/docker-compose.local.yml up -d nats
+```
+
+Identity and scheduling now publish domain events into NATS using subjects like:
+
+- `syndeocare.events.identity.user.registered`
+- `syndeocare.events.identity.user.authenticated`
+- `syndeocare.events.scheduling.shift.posted`
+- `syndeocare.events.scheduling.booking.requested`
 
 ## Local sign-up and sign-in
 

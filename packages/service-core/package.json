@@ -24,6 +24,7 @@
     "@repo/contracts": "workspace:*",
     "fastify": "^5.6.1",
     "jose": "^6.2.3",
+    "nats": "^2.29.3",
     "zod": "^3.25.76"
   },
   "devDependencies": {

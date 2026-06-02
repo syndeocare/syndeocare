@@ -1,10 +1,14 @@
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import type {
   AuthPrincipal,
+  BookingDetail,
+  BookingRequestInput,
   ClinicProfileSummary,
   ClinicProfileUpdateInput,
   FinalizeProfileImageUploadInput,
   FinalizeVerificationDocumentUploadInput,
+  JobListingDetail,
+  JobListingCreateInput,
   OnboardingSubmissionInput,
   OnboardingStatus,
   PublicRegistrationRole,
@@ -17,7 +21,9 @@ import type {
 import { getDb } from "./client.js";
 import {
   actors,
+  bookings,
   clinicProfiles,
+  jobListings,
   onboardingRecords,
   professionalProfiles,
 } from "./schema.js";
@@ -666,4 +672,378 @@ export async function persistVerificationDocumentBySubject(
     .where(eq(onboardingRecords.actorId, aggregate.actor.id));
 
   return getOnboardingStatusBySubject(subject);
+}
+
+function mapJobListingDetail(row: {
+  clinic: typeof clinicProfiles.$inferSelect;
+  job: typeof jobListings.$inferSelect;
+}): JobListingDetail {
+  return {
+    id: row.job.id,
+    title: row.job.title,
+    specialty: row.job.specialty,
+    employmentType: row.job.employmentType,
+    status: row.job.status,
+    clinicId: row.clinic.id,
+    clinicName: row.clinic.organizationName,
+    location: {
+      city: row.job.city,
+      region: row.job.region,
+      latitude: numericToNumber(row.job.latitude),
+      longitude: numericToNumber(row.job.longitude),
+      radiusKm: row.job.radiusKm ?? undefined,
+    },
+    startsAt: row.job.startsAt.toISOString(),
+    endsAt: row.job.endsAt?.toISOString(),
+    compensation: {
+      amount: numericToNumber(row.job.compensationAmount),
+      currency: row.job.compensationCurrency,
+      unit: row.job.compensationUnit,
+    },
+    verificationRequired: row.job.verificationRequired,
+    summary: row.job.summary,
+    languages: row.job.languages,
+    description: row.job.description,
+    requirements: row.job.requirements,
+    contactPreference:
+      row.job.contactPreference === "direct_phone"
+        ? "direct_phone"
+        : "in_app_chat",
+  };
+}
+
+function mapBookingDetail(row: {
+  booking: typeof bookings.$inferSelect;
+  clinic: typeof clinicProfiles.$inferSelect;
+  job: typeof jobListings.$inferSelect;
+  professional: typeof professionalProfiles.$inferSelect;
+}): BookingDetail {
+  return {
+    id: row.booking.id,
+    jobId: row.job.id,
+    jobTitle: row.job.title,
+    status: row.booking.status,
+    clinicId: row.clinic.id,
+    clinicName: row.clinic.organizationName,
+    professionalId: row.professional.id,
+    professionalName: row.professional.fullName,
+    startsAt: row.job.startsAt.toISOString(),
+    endsAt: row.job.endsAt?.toISOString(),
+    location: {
+      city: row.job.city,
+      region: row.job.region,
+      latitude: numericToNumber(row.job.latitude),
+      longitude: numericToNumber(row.job.longitude),
+      radiusKm: row.job.radiusKm ?? undefined,
+    },
+    compensation: {
+      amount: numericToNumber(row.job.compensationAmount),
+      currency: row.job.compensationCurrency,
+      unit: row.job.compensationUnit,
+    },
+    requestedAt: row.booking.requestedAt.toISOString(),
+    lastUpdatedAt: row.booking.lastUpdatedAt.toISOString(),
+    notes: row.booking.notes ?? undefined,
+  };
+}
+
+export async function listJobListings(
+  filters: {
+    specialty?: string;
+    city?: string;
+    employmentType?: JobListingCreateInput["employmentType"];
+    verificationRequired?: boolean;
+  } = {},
+): Promise<JobListingDetail[]> {
+  const db = getDb();
+  const rows = await db
+    .select({
+      clinic: clinicProfiles,
+      job: jobListings,
+    })
+    .from(jobListings)
+    .innerJoin(clinicProfiles, eq(jobListings.clinicId, clinicProfiles.id))
+    .orderBy(desc(jobListings.startsAt));
+
+  return rows
+    .filter((row) => {
+      if (row.job.status !== "open") {
+        return false;
+      }
+
+      if (
+        filters.specialty &&
+        row.job.specialty.toLowerCase() !== filters.specialty.toLowerCase()
+      ) {
+        return false;
+      }
+
+      if (
+        filters.city &&
+        row.job.city.toLowerCase() !== filters.city.toLowerCase()
+      ) {
+        return false;
+      }
+
+      if (
+        filters.employmentType &&
+        row.job.employmentType !== filters.employmentType
+      ) {
+        return false;
+      }
+
+      if (
+        typeof filters.verificationRequired === "boolean" &&
+        row.job.verificationRequired !== filters.verificationRequired
+      ) {
+        return false;
+      }
+
+      return true;
+    })
+    .map(mapJobListingDetail);
+}
+
+export async function getJobListingById(
+  jobId: string,
+): Promise<JobListingDetail | null> {
+  const db = getDb();
+  const rows = await db
+    .select({
+      clinic: clinicProfiles,
+      job: jobListings,
+    })
+    .from(jobListings)
+    .innerJoin(clinicProfiles, eq(jobListings.clinicId, clinicProfiles.id))
+    .where(eq(jobListings.id, jobId))
+    .limit(1);
+  const row = rows[0];
+
+  return row ? mapJobListingDetail(row) : null;
+}
+
+export async function createJobListingBySubject(
+  subject: string,
+  input: JobListingCreateInput,
+): Promise<JobListingDetail | null> {
+  const aggregate = await getActorAggregateBySubject(subject);
+
+  if (!aggregate || aggregate.actor.role !== "clinic") {
+    return null;
+  }
+
+  const clinic = await getClinicProfileBySubject(subject);
+
+  if (!clinic) {
+    return null;
+  }
+
+  const db = getDb();
+  const now = new Date();
+  const inserted = await db
+    .insert(jobListings)
+    .values({
+      clinicId: clinic.id,
+      title: input.title,
+      specialty: input.specialty,
+      employmentType: input.employmentType,
+      status: "open",
+      city: input.location.city,
+      region: input.location.region,
+      latitude: String(input.location.latitude),
+      longitude: String(input.location.longitude),
+      radiusKm: input.location.radiusKm ?? null,
+      startsAt: new Date(input.startsAt),
+      endsAt: input.endsAt ? new Date(input.endsAt) : null,
+      compensationAmount: String(input.compensation.amount),
+      compensationCurrency: input.compensation.currency,
+      compensationUnit: input.compensation.unit,
+      verificationRequired: input.verificationRequired,
+      summary: input.summary,
+      description: input.description,
+      requirements: input.requirements,
+      languages: input.languages,
+      contactPreference: input.contactPreference,
+      updatedAt: now,
+    })
+    .returning({ id: jobListings.id });
+
+  await db
+    .update(clinicProfiles)
+    .set({
+      openRoles: sql`${clinicProfiles.openRoles} + 1`,
+      updatedAt: now,
+    })
+    .where(eq(clinicProfiles.id, clinic.id));
+
+  return inserted[0] ? getJobListingById(inserted[0].id) : null;
+}
+
+export async function listBookingsForSubject(
+  subject: string,
+): Promise<BookingDetail[]> {
+  const aggregate = await getActorAggregateBySubject(subject);
+
+  if (!aggregate) {
+    return [];
+  }
+
+  const [clinic, professional] = await Promise.all([
+    aggregate.actor.role === "clinic"
+      ? getClinicProfileBySubject(subject)
+      : null,
+    aggregate.actor.role === "professional"
+      ? getProfessionalProfileBySubject(subject)
+      : null,
+  ]);
+
+  const db = getDb();
+  const rows = await db
+    .select({
+      booking: bookings,
+      clinic: clinicProfiles,
+      job: jobListings,
+      professional: professionalProfiles,
+    })
+    .from(bookings)
+    .innerJoin(jobListings, eq(bookings.jobId, jobListings.id))
+    .innerJoin(clinicProfiles, eq(bookings.clinicId, clinicProfiles.id))
+    .innerJoin(
+      professionalProfiles,
+      eq(bookings.professionalId, professionalProfiles.id),
+    )
+    .orderBy(desc(bookings.requestedAt));
+
+  return rows
+    .filter((row) => {
+      if (aggregate.actor.role === "admin") {
+        return true;
+      }
+
+      if (aggregate.actor.role === "clinic") {
+        return clinic ? row.booking.clinicId === clinic.id : false;
+      }
+
+      return professional
+        ? row.booking.professionalId === professional.id
+        : false;
+    })
+    .map(mapBookingDetail);
+}
+
+export async function getBookingByIdForSubject(
+  subject: string,
+  bookingId: string,
+): Promise<BookingDetail | null> {
+  const bookingsVisibleToActor = await listBookingsForSubject(subject);
+
+  return (
+    bookingsVisibleToActor.find((booking) => booking.id === bookingId) ?? null
+  );
+}
+
+export async function requestBookingBySubject(
+  subject: string,
+  input: BookingRequestInput,
+): Promise<
+  | { ok: true; data: BookingDetail }
+  | { ok: false; code: string; message: string; statusCode: 403 | 404 | 409 }
+> {
+  const aggregate = await getActorAggregateBySubject(subject);
+
+  if (!aggregate || aggregate.actor.role !== "professional") {
+    return {
+      ok: false,
+      code: "PROFILE_NOT_FOUND",
+      message: "No professional profile exists for the authenticated actor.",
+      statusCode: 404,
+    };
+  }
+
+  const [job, professional] = await Promise.all([
+    getJobListingById(input.jobId),
+    getProfessionalProfileBySubject(subject),
+  ]);
+
+  if (!job) {
+    return {
+      ok: false,
+      code: "JOB_NOT_FOUND",
+      message: "No open job was found for the requested booking.",
+      statusCode: 404,
+    };
+  }
+
+  if (!professional) {
+    return {
+      ok: false,
+      code: "PROFILE_NOT_FOUND",
+      message: "No professional profile exists for the authenticated actor.",
+      statusCode: 404,
+    };
+  }
+
+  if (
+    job.verificationRequired &&
+    aggregate.actor.verificationStatus !== "approved"
+  ) {
+    return {
+      ok: false,
+      code: "BOOKING_VERIFICATION_REQUIRED",
+      message:
+        "The professional must be verification-approved before requesting this booking.",
+      statusCode: 403,
+    };
+  }
+
+  const db = getDb();
+  const existing = await db
+    .select({ booking: bookings })
+    .from(bookings)
+    .where(
+      and(
+        eq(bookings.jobId, input.jobId),
+        eq(bookings.professionalId, professional.id),
+      ),
+    )
+    .limit(1);
+
+  if (existing[0]) {
+    return {
+      ok: false,
+      code: "BOOKING_ALREADY_EXISTS",
+      message:
+        "A booking request already exists for this professional and job combination.",
+      statusCode: 409,
+    };
+  }
+
+  const now = new Date();
+  const inserted = await db
+    .insert(bookings)
+    .values({
+      jobId: job.id,
+      clinicId: job.clinicId,
+      professionalId: professional.id,
+      status: "requested",
+      notes: input.notes ?? null,
+      requestedAt: now,
+      lastUpdatedAt: now,
+    })
+    .returning({ id: bookings.id });
+
+  const booking = inserted[0]
+    ? await getBookingByIdForSubject(subject, inserted[0].id)
+    : null;
+
+  if (!booking) {
+    return {
+      ok: false,
+      code: "BOOKING_CREATE_FAILED",
+      message: "The booking request could not be persisted.",
+      statusCode: 404,
+    };
+  }
+
+  return { ok: true, data: booking };
 }
