@@ -59,7 +59,7 @@ services/
   notifications/
 infra/
   docker/            Local platform containers
-  terraform/         AWS infrastructure skeleton
+  terraform/         AWS infrastructure modules and environments
 docs/
   adr/
   api/
@@ -126,7 +126,7 @@ Local Keycloak bootstrap assets live in `infra/keycloak/realm-import/`.
 - **Web / docs:** static or Next runtime on AWS
 - **Services:** Docker images on **ECS Fargate**
 - **Database:** **AWS PostgreSQL**
-- **Events:** AWS event backbone
+- **Events:** NATS backbone on AWS private platform networking
 - **Infrastructure:** Terraform
 
 ## Git hooks

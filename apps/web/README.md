@@ -6,7 +6,7 @@ This app is the separate web surface for the new SyndeoCare platform monorepo.
 
 - provide the admin and clinic-oriented web entry point
 - stay deployable independently from the backend services
-- consume the stable API gateway contract as the platform grows
+- consume the stable platform API contract as the platform grows
 
 ## Environment
 
@@ -27,3 +27,9 @@ pnpm --filter web start
 
 `build` generates a static export in `apps/web/out`, which is intended for S3 +
 CloudFront deployment.
+
+The homepage now performs client-side reads against:
+
+- `GET ${NEXT_PUBLIC_API_BASE_URL}`
+- `GET ${NEXT_PUBLIC_API_BASE_URL}/health/live`
+- `GET ${NEXT_PUBLIC_API_BASE_URL}/jobs`

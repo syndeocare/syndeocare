@@ -25,6 +25,19 @@
 5. Terraform apply and ECS rollout happen through approved environment jobs
 6. static frontend assets deploy independently through CloudFront/S3 (preferred) rather than a dedicated EC2 instance
 
+## Terraform module layout
+
+The AWS foundation now lives in reusable modules under `infra/terraform/modules/`:
+
+- `vpc` for public/private/database subnet topology and the public ALB security group
+- `postgres` for encrypted RDS PostgreSQL, subnet groups, and Secrets Manager wiring
+- `cache` for encrypted ElastiCache Redis and Redis connection secret wiring
+- `event-backbone` for the shared ECS cluster, private DNS namespace, and NATS JetStream service
+- `ecs-service` for reusable ALB-routed Fargate services with CloudWatch logs and service discovery
+
+Each environment in `infra/terraform/environments/{dev,staging,prod}` now composes
+those modules into a concrete platform shape.
+
 ## Product-aware deployment notes
 
 - admin web releases should not block professional mobile flows
@@ -93,3 +106,4 @@ and dedicated hostname.
 - attach `x-correlation-id` to every Fastify/Nest request at the platform edge
 - use Redis-backed caching for public profiles, clinics, and jobs reads
 - keep retry/backoff and timeout knobs configurable per environment
+- provision VPC, RDS, Redis, NATS, and ECS service infrastructure from reusable Terraform modules

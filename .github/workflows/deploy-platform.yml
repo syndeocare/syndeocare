@@ -40,6 +40,9 @@ jobs:
           role-to-assume: ${{ secrets.AWS_GITHUB_ACTIONS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
       - name: Build services
         run: pnpm build:services
 
@@ -62,6 +65,38 @@ jobs:
         if: ${{ vars.WEB_FRONTEND_BUCKET != '' }}
         run: aws s3 sync apps/web/out "s3://${{ vars.WEB_FRONTEND_BUCKET }}" --delete
 
-      - name: Deployment placeholder
-        run: |
-          echo "Hook Docker build, ECR push, Terraform apply, CloudFront invalidation, and ECS rollout here."
+      - name: Terraform init
+        working-directory: infra/terraform/environments/${{ inputs.environment }}
+        env:
+          TF_VAR_aws_region: ${{ vars.AWS_REGION }}
+          TF_VAR_api_public_base_url: ${{ vars.NEXT_PUBLIC_API_BASE_URL }}
+          TF_VAR_platform_api_image: ${{ vars.PLATFORM_API_IMAGE }}
+        run: terraform init
+
+      - name: Terraform validate
+        working-directory: infra/terraform/environments/${{ inputs.environment }}
+        env:
+          TF_VAR_aws_region: ${{ vars.AWS_REGION }}
+          TF_VAR_api_public_base_url: ${{ vars.NEXT_PUBLIC_API_BASE_URL }}
+          TF_VAR_platform_api_image: ${{ vars.PLATFORM_API_IMAGE }}
+        run: terraform validate
+
+      - name: Terraform plan
+        working-directory: infra/terraform/environments/${{ inputs.environment }}
+        env:
+          TF_VAR_aws_region: ${{ vars.AWS_REGION }}
+          TF_VAR_api_public_base_url: ${{ vars.NEXT_PUBLIC_API_BASE_URL }}
+          TF_VAR_platform_api_image: ${{ vars.PLATFORM_API_IMAGE }}
+        run: terraform plan -out=tfplan
+
+      - name: Terraform apply
+        working-directory: infra/terraform/environments/${{ inputs.environment }}
+        env:
+          TF_VAR_aws_region: ${{ vars.AWS_REGION }}
+          TF_VAR_api_public_base_url: ${{ vars.NEXT_PUBLIC_API_BASE_URL }}
+          TF_VAR_platform_api_image: ${{ vars.PLATFORM_API_IMAGE }}
+        run: terraform apply -auto-approve tfplan
+
+      - name: Invalidate CloudFront
+        if: ${{ vars.WEB_FRONTEND_DISTRIBUTION_ID != '' }}
+        run: aws cloudfront create-invalidation --distribution-id "${{ vars.WEB_FRONTEND_DISTRIBUTION_ID }}" --paths "/*"

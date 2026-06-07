@@ -1,4 +1,5 @@
 import styles from "./page.module.css";
+import { PlatformStatusPanel } from "./platform-status-panel";
 
 const audienceCards = [
   {
@@ -140,6 +141,10 @@ export default function Home() {
       </section>
 
       <section className={styles.section}>
+        <PlatformStatusPanel />
+      </section>
+
+      <section className={styles.section}>
         <div className={styles.sectionHeader}>
           <p className={styles.sectionEyebrow}>Current platform progress</p>
           <h2>What is already real in the new stack</h2>
@@ -192,10 +197,10 @@ export default function Home() {
           <p className={styles.sectionEyebrow}>What comes after this</p>
           <h2>Next implementation slice</h2>
           <p>
-            Messaging, notifications, and AWS deployment remain the next major
-            platform work. After that, the existing live app can be connected to
-            this new gateway progressively instead of being left on the old
-            stack.
+            Messaging, notifications, and deeper AWS rollout remain the next
+            major platform work. The web shell now reads the new Nest API
+            directly, so future admin and clinic flows can move onto the new
+            platform incrementally instead of staying trapped on the old stack.
           </p>
         </div>
       </section>

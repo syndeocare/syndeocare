@@ -659,6 +659,9 @@ export type CompleteVerificationDocumentUploadResponse = z.infer<
   typeof completeVerificationDocumentUploadResponseSchema
 >;
 export type PlatformMetadata = z.infer<typeof platformMetadataSchema>;
+export type JobListingListResponse = z.infer<
+  typeof jobListingListResponseSchema
+>;
 export type OnboardingStatus = z.infer<typeof onboardingStatusSchema>;
 export type VerificationStatusResponse = z.infer<
   typeof verificationStatusResponseSchema
