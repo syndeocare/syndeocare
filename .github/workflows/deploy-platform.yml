@@ -21,7 +21,7 @@ jobs:
     environment: ${{ inputs.environment }}
     env:
       TF_VAR_aws_region: ${{ vars.AWS_REGION }}
-      TF_VAR_api_public_base_url: ${{ vars.NEXT_PUBLIC_API_BASE_URL }}
+      TF_VAR_api_public_base_url: ${{ vars.API_PUBLIC_BASE_URL }}
       TF_VAR_platform_api_image: ${{ vars.PLATFORM_API_IMAGE }}
       TF_VAR_api_gateway_image: ${{ vars.API_GATEWAY_IMAGE }}
       TF_VAR_identity_image: ${{ vars.IDENTITY_IMAGE }}

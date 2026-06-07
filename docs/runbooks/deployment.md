@@ -132,6 +132,8 @@ and dedicated hostname.
 
 ### Auth and integration variables
 
+- `API_PUBLIC_BASE_URL`
+- `NEXT_PUBLIC_API_BASE_URL`
 - `KEYCLOAK_BASE_URL`
 - `KEYCLOAK_ADMIN_USERNAME`
 - `KEYCLOAK_ADMIN_PASSWORD`
