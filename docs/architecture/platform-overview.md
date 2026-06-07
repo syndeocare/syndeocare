@@ -10,6 +10,7 @@ SyndeoCare is organized around these platform layers:
    - docs
 2. **Edge**
    - API gateway / BFF
+   - NestJS public API surface for external clients
    - authentication validation
    - rate limiting and request policy
 3. **Domain services**
@@ -45,6 +46,7 @@ SyndeoCare is organized around these platform layers:
 ## Boundary rules
 
 - public clients only talk to the **gateway**
+- the NestJS platform API is the preferred external integration layer for new clients and mobile surfaces
 - services do not bypass contracts casually
 - side effects should publish domain events
 - synchronous calls are reserved for user-critical flows

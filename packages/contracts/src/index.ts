@@ -645,6 +645,7 @@ export type UploadAssetType = z.infer<typeof uploadAssetTypeSchema>;
 export type UploadRequest = z.infer<typeof uploadRequestSchema>;
 export type UploadDescriptor = z.infer<typeof uploadDescriptorSchema>;
 export type UploadedDocument = z.infer<typeof uploadedDocumentSchema>;
+export type RouteContract = z.infer<typeof routeContractSchema>;
 export type FinalizeProfileImageUploadInput = z.infer<
   typeof finalizeProfileImageUploadInputSchema
 >;

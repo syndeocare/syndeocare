@@ -33,6 +33,39 @@ pnpm db:seed
 pnpm dev
 ```
 
+## NestJS platform API
+
+The monorepo now includes a dedicated NestJS public API service in
+`services/platform-api`.
+
+Default local runtime:
+
+```sh
+HOST=0.0.0.0
+PORT=4300
+API_DOCS_PATH=docs
+API_PUBLIC_URL=http://127.0.0.1:4300
+API_CORS_ORIGINS=http://127.0.0.1:3000,http://127.0.0.1:3001
+```
+
+Start it directly with:
+
+```sh
+pnpm --filter @repo/platform-api-service dev
+```
+
+Docs and health endpoints:
+
+- `GET /v1`
+- `GET /v1/health/live`
+- `GET /v1/health/ready`
+- `GET /v1/docs`
+
+For subject-scoped testing before auth is wired end to end, use the temporary
+header:
+
+- `x-actor-subject`
+
 ## Product context for local work
 
 - admin workflows are web only

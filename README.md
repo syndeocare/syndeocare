@@ -49,6 +49,7 @@ packages/
   ui/                Shared React UI package
 services/
   api-gateway/
+  platform-api/
   identity/
   profiles/
   clinics/
@@ -73,7 +74,7 @@ docs/
 - **Monorepo orchestration:** Turborepo
 - **Git hooks:** Husky + lint-staged + commitlint
 - **Versioning:** Changesets
-- **Services:** TypeScript + Fastify shared runtime
+- **Services:** TypeScript + Fastify domain services plus a NestJS public API
 - **Contracts:** Zod-based shared package
 
 ## Core commands
@@ -105,6 +106,7 @@ Start here:
 - `docs/architecture/event-model.md`
 - `docs/api/contract-strategy.md`
 - `docs/api/initial-v1-contracts.md`
+- `docs/api/nest-platform-api.md`
 - `docs/architecture/persistence-overview.md`
 - `docs/setup/local-development.md`
 - `docs/runbooks/deployment.md`

@@ -32,6 +32,7 @@
 - booking, messaging, and notifications should be treated as critical business paths
 - prefer **S3 + CloudFront** for the public web frontend; reserve EC2 for workloads that truly need long-running servers
 - run backend services and NATS on the private platform network boundary, not on the same host as the static frontend
+- expose the public API through a dedicated URL path or host so mobile and partner integrations do not depend on the legacy app origin
 
 ## Frontend deployment path
 
@@ -54,3 +55,28 @@ independently from the backend services.
 The GitHub Actions deployment workflow now builds the web app and uploads the
 static artifact before any bucket sync step, so frontend delivery can be traced
 separately from service image rollout.
+
+## NestJS public API deployment path
+
+The `services/platform-api` service is the dedicated NestJS integration surface
+for future mobile and external clients.
+
+Recommended production shape:
+
+1. deploy the service as its own container workload
+2. expose it behind a dedicated API URL or reverse-proxied path
+3. publish Swagger docs separately from the client web shell
+4. keep auth, rate limiting, and observability at this edge layer
+
+### Required API runtime variables
+
+- `HOST`
+- `PORT`
+- `DATABASE_URL`
+- `API_PUBLIC_URL`
+- `API_DOCS_PATH`
+- `API_CORS_ORIGINS`
+
+For the temporary EC2-based rollout, a separate reverse-proxied API path is an
+acceptable bridge until the service moves onto its own ECS/Fargate deployment
+and dedicated hostname.

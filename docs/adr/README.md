@@ -8,3 +8,4 @@ Current ADRs:
 - `0002-microservices-and-eda.md`
 - `0003-keycloak-authentication.md`
 - `0004-aws-postgres-and-fargate.md`
+- `0005-nestjs-public-api.md`
