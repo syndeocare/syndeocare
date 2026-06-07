@@ -28,6 +28,120 @@ variable "platform_api_image" {
   default = "public.ecr.aws/docker/library/nginx:stable-alpine"
 }
 
+variable "api_gateway_image" {
+  type    = string
+  default = "public.ecr.aws/docker/library/nginx:stable-alpine"
+}
+
+variable "identity_image" {
+  type    = string
+  default = "public.ecr.aws/docker/library/nginx:stable-alpine"
+}
+
+variable "profiles_image" {
+  type    = string
+  default = "public.ecr.aws/docker/library/nginx:stable-alpine"
+}
+
+variable "clinics_image" {
+  type    = string
+  default = "public.ecr.aws/docker/library/nginx:stable-alpine"
+}
+
+variable "scheduling_image" {
+  type    = string
+  default = "public.ecr.aws/docker/library/nginx:stable-alpine"
+}
+
+variable "notifications_image" {
+  type    = string
+  default = "public.ecr.aws/docker/library/nginx:stable-alpine"
+}
+
+variable "keycloak_base_url" {
+  type    = string
+  default = "https://auth.syndeocare.example.com"
+}
+
+variable "keycloak_admin_username" {
+  type    = string
+  default = "admin"
+}
+
+variable "keycloak_admin_password" {
+  type      = string
+  sensitive = true
+  default   = "ChangeMe123!"
+}
+
+variable "keycloak_admin_realm" {
+  type    = string
+  default = "master"
+}
+
+variable "keycloak_public_client_id" {
+  type    = string
+  default = "syndeocare-web"
+}
+
+variable "auth_api_client_id" {
+  type    = string
+  default = "syndeocare-api"
+}
+
+variable "auth_realm" {
+  type    = string
+  default = "syndeocare"
+}
+
+variable "resend_api_key" {
+  type      = string
+  sensitive = true
+  default   = ""
+}
+
+variable "resend_from_email" {
+  type    = string
+  default = "onboarding@resend.dev"
+}
+
+variable "resend_test_email" {
+  type    = string
+  default = "onboarding@resend.dev"
+}
+
+variable "storage_access_key_id" {
+  type      = string
+  sensitive = true
+  default   = ""
+}
+
+variable "storage_secret_access_key" {
+  type      = string
+  sensitive = true
+  default   = ""
+}
+
+variable "storage_region" {
+  type    = string
+  default = "us-east-1"
+}
+
+variable "storage_public_bucket" {
+  type    = string
+  default = "syndeocare-prod-public-assets"
+}
+
+variable "storage_private_bucket" {
+  type    = string
+  default = "syndeocare-prod-private-documents"
+}
+
+variable "storage_public_base_url" {
+  type    = string
+  default = ""
+}
+
 provider "aws" {
   region = var.aws_region
 }
@@ -47,14 +161,37 @@ locals {
   }
 }
 
+resource "random_password" "internal_service_token" {
+  length  = 32
+  special = false
+}
+
+resource "aws_secretsmanager_secret" "runtime" {
+  name                    = "${local.name}/runtime"
+  recovery_window_in_days = 7
+
+  tags = local.tags
+}
+
+resource "aws_secretsmanager_secret_version" "runtime" {
+  secret_id = aws_secretsmanager_secret.runtime.id
+  secret_string = jsonencode({
+    internal_service_token   = random_password.internal_service_token.result
+    keycloak_admin_password  = var.keycloak_admin_password
+    resend_api_key           = var.resend_api_key
+    storage_access_key_id    = var.storage_access_key_id
+    storage_secret_access_key = var.storage_secret_access_key
+  })
+}
+
 module "vpc" {
   source                = "../../modules/vpc"
   name                  = local.name
   cidr_block            = local.vpc_cidr_block
-  availability_zones    = slice(data.aws_availability_zones.available.names, 0, 3)
-  public_subnet_cidrs   = ["10.30.0.0/24", "10.30.1.0/24", "10.30.2.0/24"]
-  private_subnet_cidrs  = ["10.30.10.0/24", "10.30.11.0/24", "10.30.12.0/24"]
-  database_subnet_cidrs = ["10.30.20.0/24", "10.30.21.0/24", "10.30.22.0/24"]
+  availability_zones    = slice(data.aws_availability_zones.available.names, 0, 2)
+  public_subnet_cidrs   = ["10.30.0.0/24", "10.30.1.0/24"]
+  private_subnet_cidrs  = ["10.30.10.0/24", "10.30.11.0/24"]
+  database_subnet_cidrs = ["10.30.20.0/24", "10.30.21.0/24"]
   tags                  = local.tags
 }
 
@@ -78,10 +215,8 @@ resource "aws_lb_listener" "http" {
 
     fixed_response {
       content_type = "application/json"
-      message_body = jsonencode({
-        message = "No matching SyndeoCare route configured."
-      })
-      status_code = "404"
+      message_body = jsonencode({ message = "No matching SyndeoCare route configured." })
+      status_code  = "404"
     }
   }
 }
@@ -95,7 +230,7 @@ module "event_backbone" {
   service_discovery_namespace_name = "prod.syndeocare.internal"
   nats_cpu                         = 1024
   nats_memory                      = 2048
-  nats_desired_count               = 2
+  nats_desired_count               = 1
   tags                             = local.tags
 }
 
@@ -107,10 +242,10 @@ module "postgres" {
   allowed_cidr_blocks     = [module.vpc.vpc_cidr_block]
   db_name                 = "syndeocare"
   username                = "syndeocare"
-  instance_class          = "db.t4g.medium"
-  allocated_storage       = 100
-  max_allocated_storage   = 500
-  backup_retention_period = 30
+  instance_class          = "db.t4g.small"
+  allocated_storage       = 80
+  max_allocated_storage   = 300
+  backup_retention_period = 14
   deletion_protection     = true
   skip_final_snapshot     = false
   multi_az                = true
@@ -123,9 +258,202 @@ module "cache" {
   vpc_id              = module.vpc.vpc_id
   subnet_ids          = module.vpc.database_subnet_ids
   allowed_cidr_blocks = [module.vpc.vpc_cidr_block]
-  node_type           = "cache.t4g.medium"
+  node_type           = "cache.t4g.small"
   num_cache_clusters  = 2
   tags                = local.tags
+}
+
+module "notifications_service" {
+  source                           = "../../modules/ecs-service"
+  name                             = "${local.name}-notifications"
+  cluster_arn                      = module.event_backbone.cluster_arn
+  vpc_id                           = module.vpc.vpc_id
+  private_subnet_ids               = module.vpc.private_subnet_ids
+  allowed_cidr_blocks              = [module.vpc.vpc_cidr_block]
+  service_discovery_namespace_id   = module.event_backbone.service_discovery_namespace_id
+  service_discovery_namespace_name = module.event_backbone.service_discovery_namespace_name
+  discovery_name                   = "notifications"
+  image                            = var.notifications_image
+  container_name                   = "notifications"
+  container_port                   = 4115
+  desired_count                    = 2
+  health_check_path                = "/health"
+  environment = {
+    NODE_ENV          = "production"
+    PORT              = "4115"
+    RESEND_FROM_EMAIL = var.resend_from_email
+    RESEND_TEST_EMAIL = var.resend_test_email
+  }
+  secrets = {
+    INTERNAL_SERVICE_TOKEN = "${aws_secretsmanager_secret.runtime.arn}:internal_service_token::"
+    RESEND_API_KEY         = "${aws_secretsmanager_secret.runtime.arn}:resend_api_key::"
+  }
+  tags = local.tags
+}
+
+module "identity_service" {
+  source                           = "../../modules/ecs-service"
+  name                             = "${local.name}-identity"
+  cluster_arn                      = module.event_backbone.cluster_arn
+  vpc_id                           = module.vpc.vpc_id
+  private_subnet_ids               = module.vpc.private_subnet_ids
+  allowed_cidr_blocks              = [module.vpc.vpc_cidr_block]
+  service_discovery_namespace_id   = module.event_backbone.service_discovery_namespace_id
+  service_discovery_namespace_name = module.event_backbone.service_discovery_namespace_name
+  discovery_name                   = "identity"
+  image                            = var.identity_image
+  container_name                   = "identity"
+  container_port                   = 4111
+  desired_count                    = 2
+  health_check_path                = "/health"
+  environment = {
+    NODE_ENV                  = "production"
+    PORT                      = "4111"
+    AUTH_CLIENT_ID            = var.auth_api_client_id
+    AUTH_REALM                = var.auth_realm
+    KEYCLOAK_ADMIN_REALM      = var.keycloak_admin_realm
+    KEYCLOAK_ADMIN_USERNAME   = var.keycloak_admin_username
+    KEYCLOAK_BASE_URL         = var.keycloak_base_url
+    KEYCLOAK_PUBLIC_CLIENT_ID = var.keycloak_public_client_id
+    KEYCLOAK_REALM            = var.auth_realm
+    NATS_URL                  = module.event_backbone.nats_url
+    SERVICE_NOTIFICATIONS_URL = "http://${module.notifications_service.service_discovery_service_name}:4115"
+  }
+  secrets = {
+    DATABASE_URL            = "${module.postgres.secret_arn}:url::"
+    INTERNAL_SERVICE_TOKEN  = "${aws_secretsmanager_secret.runtime.arn}:internal_service_token::"
+    KEYCLOAK_ADMIN_PASSWORD = "${aws_secretsmanager_secret.runtime.arn}:keycloak_admin_password::"
+  }
+  tags = local.tags
+}
+
+module "profiles_service" {
+  source                           = "../../modules/ecs-service"
+  name                             = "${local.name}-profiles"
+  cluster_arn                      = module.event_backbone.cluster_arn
+  vpc_id                           = module.vpc.vpc_id
+  private_subnet_ids               = module.vpc.private_subnet_ids
+  allowed_cidr_blocks              = [module.vpc.vpc_cidr_block]
+  service_discovery_namespace_id   = module.event_backbone.service_discovery_namespace_id
+  service_discovery_namespace_name = module.event_backbone.service_discovery_namespace_name
+  discovery_name                   = "profiles"
+  image                            = var.profiles_image
+  container_name                   = "profiles"
+  container_port                   = 4112
+  desired_count                    = 2
+  health_check_path                = "/health"
+  environment = {
+    NODE_ENV = "production"
+    PORT     = "4112"
+    NATS_URL = module.event_backbone.nats_url
+  }
+  secrets = {
+    DATABASE_URL           = "${module.postgres.secret_arn}:url::"
+    INTERNAL_SERVICE_TOKEN = "${aws_secretsmanager_secret.runtime.arn}:internal_service_token::"
+  }
+  tags = local.tags
+}
+
+module "clinics_service" {
+  source                           = "../../modules/ecs-service"
+  name                             = "${local.name}-clinics"
+  cluster_arn                      = module.event_backbone.cluster_arn
+  vpc_id                           = module.vpc.vpc_id
+  private_subnet_ids               = module.vpc.private_subnet_ids
+  allowed_cidr_blocks              = [module.vpc.vpc_cidr_block]
+  service_discovery_namespace_id   = module.event_backbone.service_discovery_namespace_id
+  service_discovery_namespace_name = module.event_backbone.service_discovery_namespace_name
+  discovery_name                   = "clinics"
+  image                            = var.clinics_image
+  container_name                   = "clinics"
+  container_port                   = 4113
+  desired_count                    = 2
+  health_check_path                = "/health"
+  environment = {
+    NODE_ENV = "production"
+    PORT     = "4113"
+    NATS_URL = module.event_backbone.nats_url
+  }
+  secrets = {
+    DATABASE_URL           = "${module.postgres.secret_arn}:url::"
+    INTERNAL_SERVICE_TOKEN = "${aws_secretsmanager_secret.runtime.arn}:internal_service_token::"
+  }
+  tags = local.tags
+}
+
+module "scheduling_service" {
+  source                           = "../../modules/ecs-service"
+  name                             = "${local.name}-scheduling"
+  cluster_arn                      = module.event_backbone.cluster_arn
+  vpc_id                           = module.vpc.vpc_id
+  private_subnet_ids               = module.vpc.private_subnet_ids
+  allowed_cidr_blocks              = [module.vpc.vpc_cidr_block]
+  service_discovery_namespace_id   = module.event_backbone.service_discovery_namespace_id
+  service_discovery_namespace_name = module.event_backbone.service_discovery_namespace_name
+  discovery_name                   = "scheduling"
+  image                            = var.scheduling_image
+  container_name                   = "scheduling"
+  container_port                   = 4114
+  desired_count                    = 2
+  health_check_path                = "/health"
+  environment = {
+    NODE_ENV = "production"
+    PORT     = "4114"
+    NATS_URL = module.event_backbone.nats_url
+  }
+  secrets = {
+    DATABASE_URL           = "${module.postgres.secret_arn}:url::"
+    INTERNAL_SERVICE_TOKEN = "${aws_secretsmanager_secret.runtime.arn}:internal_service_token::"
+  }
+  tags = local.tags
+}
+
+module "api_gateway_service" {
+  source                           = "../../modules/ecs-service"
+  name                             = "${local.name}-api-gateway"
+  cluster_arn                      = module.event_backbone.cluster_arn
+  vpc_id                           = module.vpc.vpc_id
+  private_subnet_ids               = module.vpc.private_subnet_ids
+  alb_security_group_id            = module.vpc.alb_security_group_id
+  listener_arn                     = aws_lb_listener.http.arn
+  listener_rule_priority           = 90
+  listener_path_patterns           = ["/v1", "/v1/*"]
+  service_discovery_namespace_id   = module.event_backbone.service_discovery_namespace_id
+  service_discovery_namespace_name = module.event_backbone.service_discovery_namespace_name
+  discovery_name                   = "api-gateway"
+  image                            = var.api_gateway_image
+  container_name                   = "api-gateway"
+  container_port                   = 4110
+  cpu                              = 512
+  memory                           = 1024
+  desired_count                    = 2
+  health_check_path                = "/health"
+  environment = {
+    NODE_ENV                     = "production"
+    PORT                         = "4110"
+    AUTH_AUDIENCE                = var.auth_api_client_id
+    AUTH_CLIENT_ID               = var.auth_api_client_id
+    AUTH_ISSUER_URL              = "${var.keycloak_base_url}/realms/${var.auth_realm}"
+    AUTH_MODE                    = "strict"
+    AUTH_REALM                   = var.auth_realm
+    SERVICE_CLINICS_URL          = "http://${module.clinics_service.service_discovery_service_name}:4113"
+    SERVICE_IDENTITY_URL         = "http://${module.identity_service.service_discovery_service_name}:4111"
+    SERVICE_PROFILES_URL         = "http://${module.profiles_service.service_discovery_service_name}:4112"
+    SERVICE_SCHEDULING_URL       = "http://${module.scheduling_service.service_discovery_service_name}:4114"
+    STORAGE_ENDPOINT             = ""
+    STORAGE_FORCE_PATH_STYLE     = "false"
+    STORAGE_PRIVATE_BUCKET       = var.storage_private_bucket
+    STORAGE_PUBLIC_BASE_URL      = var.storage_public_base_url
+    STORAGE_PUBLIC_BUCKET        = var.storage_public_bucket
+    STORAGE_REGION               = var.storage_region
+    STORAGE_UPLOAD_URL_TTL_SECONDS = "900"
+  }
+  secrets = {
+    INTERNAL_SERVICE_TOKEN    = "${aws_secretsmanager_secret.runtime.arn}:internal_service_token::"
+    STORAGE_ACCESS_KEY_ID     = "${aws_secretsmanager_secret.runtime.arn}:storage_access_key_id::"
+    STORAGE_SECRET_ACCESS_KEY = "${aws_secretsmanager_secret.runtime.arn}:storage_secret_access_key::"
+  }
+  tags = local.tags
 }
 
 module "platform_api_service" {
@@ -146,9 +474,10 @@ module "platform_api_service" {
   container_port                   = 4300
   cpu                              = 1024
   memory                           = 2048
-  desired_count                    = 3
+  desired_count                    = 2
   health_check_path                = "/v1/health/live"
   environment = {
+    NODE_ENV              = "production"
     HOST                  = "0.0.0.0"
     PORT                  = "4300"
     API_DOCS_PATH         = "docs"
@@ -171,10 +500,6 @@ output "platform_api_url" {
   value = "http://${aws_lb.public.dns_name}/platform-api/v1"
 }
 
-output "platform_api_docs_url" {
-  value = "http://${aws_lb.public.dns_name}/platform-api/v1/docs"
-}
-
-output "nats_url" {
-  value = module.event_backbone.nats_url
+output "api_gateway_url" {
+  value = "http://${aws_lb.public.dns_name}/v1"
 }

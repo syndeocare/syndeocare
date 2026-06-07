@@ -19,6 +19,7 @@ locals {
       valueFrom = value
     }
   ]
+  expose_via_alb = var.listener_arn != null
 }
 
 data "aws_region" "current" {}
@@ -35,12 +36,28 @@ resource "aws_security_group" "this" {
   description = "Service ingress for ${var.name}"
   vpc_id      = var.vpc_id
 
-  ingress {
-    from_port       = var.container_port
-    to_port         = var.container_port
-    protocol        = "tcp"
-    security_groups = [var.alb_security_group_id]
-    description     = "Allow traffic from the public ALB"
+  dynamic "ingress" {
+    for_each = var.alb_security_group_id == null ? [] : [var.alb_security_group_id]
+
+    content {
+      from_port       = var.container_port
+      to_port         = var.container_port
+      protocol        = "tcp"
+      security_groups = [ingress.value]
+      description     = "Allow traffic from the ALB security group"
+    }
+  }
+
+  dynamic "ingress" {
+    for_each = toset(var.allowed_cidr_blocks)
+
+    content {
+      from_port   = var.container_port
+      to_port     = var.container_port
+      protocol    = "tcp"
+      cidr_blocks = [ingress.value]
+      description = "Allow traffic from ${ingress.value}"
+    }
   }
 
   egress {
@@ -99,6 +116,7 @@ resource "aws_iam_role" "task" {
 }
 
 resource "aws_lb_target_group" "this" {
+  count       = local.expose_via_alb ? 1 : 0
   name        = substr(replace(var.name, "_", "-"), 0, 32)
   port        = var.container_port
   protocol    = "HTTP"
@@ -119,12 +137,13 @@ resource "aws_lb_target_group" "this" {
 }
 
 resource "aws_lb_listener_rule" "this" {
+  count        = local.expose_via_alb ? 1 : 0
   listener_arn = var.listener_arn
   priority     = var.listener_rule_priority
 
   action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.this.arn
+    target_group_arn = aws_lb_target_group.this[0].arn
   }
 
   condition {
@@ -210,10 +229,14 @@ resource "aws_ecs_service" "this" {
     assign_public_ip = false
   }
 
-  load_balancer {
-    target_group_arn = aws_lb_target_group.this.arn
-    container_name   = var.container_name
-    container_port   = var.container_port
+  dynamic "load_balancer" {
+    for_each = local.expose_via_alb ? [1] : []
+
+    content {
+      target_group_arn = aws_lb_target_group.this[0].arn
+      container_name   = var.container_name
+      container_port   = var.container_port
+    }
   }
 
   dynamic "service_registries" {
@@ -223,8 +246,6 @@ resource "aws_ecs_service" "this" {
       registry_arn = aws_service_discovery_service.this[0].arn
     }
   }
-
-  depends_on = [aws_lb_listener_rule.this]
 
   tags = local.common_tags
 }

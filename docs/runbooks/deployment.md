@@ -33,7 +33,7 @@ The AWS foundation now lives in reusable modules under `infra/terraform/modules/
 - `postgres` for encrypted RDS PostgreSQL, subnet groups, and Secrets Manager wiring
 - `cache` for encrypted ElastiCache Redis and Redis connection secret wiring
 - `event-backbone` for the shared ECS cluster, private DNS namespace, and NATS JetStream service
-- `ecs-service` for reusable ALB-routed Fargate services with CloudWatch logs and service discovery
+- `ecs-service` for reusable Fargate services that can be either ALB-routed public edges or private service-discovery-only internal services
 
 Each environment in `infra/terraform/environments/{dev,staging,prod}` now composes
 those modules into a concrete platform shape.
@@ -107,3 +107,47 @@ and dedicated hostname.
 - use Redis-backed caching for public profiles, clinics, and jobs reads
 - keep retry/backoff and timeout knobs configurable per environment
 - provision VPC, RDS, Redis, NATS, and ECS service infrastructure from reusable Terraform modules
+- deploy internal identity, profiles, clinics, scheduling, and notifications services on private ECS networking with Cloud Map service discovery
+- expose the API gateway and public Nest platform API independently behind the public ALB
+- keep runtime integration secrets in AWS Secrets Manager and inject them into ECS tasks instead of baking them into images
+
+## Current ECS service graph
+
+- public edge: `platform-api` on `/platform-api/*`
+- public edge: `api-gateway` on `/v1` and `/v1/*`
+- private services: `identity`, `profiles`, `clinics`, `scheduling`, `notifications`
+- shared backbone: RDS PostgreSQL, ElastiCache Redis, NATS JetStream, Cloud Map private DNS namespace
+
+## Required Terraform inputs for full rollout
+
+### Service image variables
+
+- `PLATFORM_API_IMAGE`
+- `API_GATEWAY_IMAGE`
+- `IDENTITY_IMAGE`
+- `PROFILES_IMAGE`
+- `CLINICS_IMAGE`
+- `SCHEDULING_IMAGE`
+- `NOTIFICATIONS_IMAGE`
+
+### Auth and integration variables
+
+- `KEYCLOAK_BASE_URL`
+- `KEYCLOAK_ADMIN_USERNAME`
+- `KEYCLOAK_ADMIN_PASSWORD`
+- `KEYCLOAK_ADMIN_REALM`
+- `KEYCLOAK_PUBLIC_CLIENT_ID`
+- `AUTH_API_CLIENT_ID`
+- `AUTH_REALM`
+- `RESEND_API_KEY`
+- `RESEND_FROM_EMAIL`
+- `RESEND_TEST_EMAIL`
+
+### Storage variables
+
+- `STORAGE_ACCESS_KEY_ID`
+- `STORAGE_SECRET_ACCESS_KEY`
+- `STORAGE_REGION`
+- `STORAGE_PUBLIC_BUCKET`
+- `STORAGE_PRIVATE_BUCKET`
+- `STORAGE_PUBLIC_BASE_URL`

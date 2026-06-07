@@ -11,7 +11,7 @@ output "security_group_id" {
 }
 
 output "target_group_arn" {
-  value = aws_lb_target_group.this.arn
+  value = var.listener_arn == null ? null : aws_lb_target_group.this[0].arn
 }
 
 output "service_discovery_service_name" {

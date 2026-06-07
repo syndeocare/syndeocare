@@ -42,6 +42,15 @@ function trimTrailingSlash(value: string) {
   return value.replace(/\/$/, "");
 }
 
+function readOptionalString(value: string | undefined) {
+  if (!value) {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
 function guessExtension(fileName: string, contentType: string) {
   const fileExtension = extname(fileName).toLowerCase();
 
@@ -89,13 +98,19 @@ export function buildStoredAssetUrl(bucket: string, key: string) {
 }
 
 export function getStorageConfig(): StorageConfig {
+  const endpoint =
+    readOptionalString(process.env.STORAGE_ENDPOINT) ??
+    ((process.env.NODE_ENV ?? "development") === "production"
+      ? undefined
+      : "http://127.0.0.1:9000");
+
   return {
     accessKeyId: process.env.STORAGE_ACCESS_KEY_ID ?? "minioadmin",
-    endpoint: process.env.STORAGE_ENDPOINT ?? "http://127.0.0.1:9000",
+    endpoint,
     forcePathStyle: readBoolean(process.env.STORAGE_FORCE_PATH_STYLE, true),
     privateBucket:
       process.env.STORAGE_PRIVATE_BUCKET ?? "syndeocare-private-documents",
-    publicBaseUrl: process.env.STORAGE_PUBLIC_BASE_URL,
+    publicBaseUrl: readOptionalString(process.env.STORAGE_PUBLIC_BASE_URL),
     publicBucket:
       process.env.STORAGE_PUBLIC_BUCKET ?? "syndeocare-public-assets",
     region: process.env.STORAGE_REGION ?? "us-east-1",

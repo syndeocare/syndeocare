@@ -15,19 +15,23 @@ variable "private_subnet_ids" {
 }
 
 variable "alb_security_group_id" {
-  type = string
+  type    = string
+  default = null
 }
 
 variable "listener_arn" {
-  type = string
+  type    = string
+  default = null
 }
 
 variable "listener_rule_priority" {
-  type = number
+  type    = number
+  default = null
 }
 
 variable "listener_path_patterns" {
-  type = list(string)
+  type    = list(string)
+  default = []
 }
 
 variable "service_discovery_namespace_id" {
@@ -78,7 +82,13 @@ variable "enable_execute_command" {
 }
 
 variable "health_check_path" {
-  type = string
+  type    = string
+  default = "/health"
+}
+
+variable "allowed_cidr_blocks" {
+  type    = list(string)
+  default = []
 }
 
 variable "environment" {

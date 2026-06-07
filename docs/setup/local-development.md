@@ -202,6 +202,10 @@ The expected flow is:
 3. call the matching `/complete` route so the object key is persisted onto the
    professional profile, clinic profile, or onboarding record
 
+For AWS-backed environments, leave `STORAGE_ENDPOINT` unset or blank so the
+shared storage package uses the native S3 endpoint instead of the local MinIO
+default. Keep `STORAGE_ENDPOINT` only for local object-storage development.
+
 The MinIO admin console is available at `http://127.0.0.1:9001` with
 `minioadmin / minioadmin`.
 
