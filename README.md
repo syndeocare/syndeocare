@@ -42,6 +42,7 @@ apps/
   docs/              Next.js documentation portal
   web/               Next.js web application
 packages/
+  cache/             Shared Redis cache helpers
   contracts/         Shared event and API contract types
   eslint-config/     Shared linting rules
   service-core/      Shared Fastify bootstrap/runtime helpers

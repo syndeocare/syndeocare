@@ -67,6 +67,7 @@ Recommended production shape:
 2. expose it behind a dedicated API URL or reverse-proxied path
 3. publish Swagger docs separately from the client web shell
 4. keep auth, rate limiting, and observability at this edge layer
+5. run Redis beside the public API so shared cache and future distributed rate limiting stay external to any single container
 
 ### Required API runtime variables
 
@@ -76,7 +77,19 @@ Recommended production shape:
 - `API_PUBLIC_URL`
 - `API_DOCS_PATH`
 - `API_CORS_ORIGINS`
+- `REDIS_URL`
+- `CACHE_TTL_SECONDS`
+- `REQUEST_TIMEOUT_MS`
+- `HTTP_RETRY_ATTEMPTS`
+- `HTTP_RETRY_BACKOFF_MS`
 
 For the temporary EC2-based rollout, a separate reverse-proxied API path is an
 acceptable bridge until the service moves onto its own ECS/Fargate deployment
 and dedicated hostname.
+
+### Current production-foundation additions
+
+- run a dedicated Redis instance for shared cache state
+- attach `x-correlation-id` to every Fastify/Nest request at the platform edge
+- use Redis-backed caching for public profiles, clinics, and jobs reads
+- keep retry/backoff and timeout knobs configurable per environment

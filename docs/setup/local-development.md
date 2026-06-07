@@ -46,6 +46,8 @@ PORT=4300
 API_DOCS_PATH=docs
 API_PUBLIC_URL=http://127.0.0.1:4300
 API_CORS_ORIGINS=http://127.0.0.1:3000,http://127.0.0.1:3001
+REDIS_URL=redis://127.0.0.1:6379
+CACHE_TTL_SECONDS=60
 ```
 
 Start it directly with:
@@ -60,6 +62,13 @@ Docs and health endpoints:
 - `GET /v1/health/live`
 - `GET /v1/health/ready`
 - `GET /v1/docs`
+
+The public directory and jobs endpoints now use Redis-backed response caching, so
+bring Redis up locally before exercising those routes:
+
+```sh
+docker compose -f infra/docker/docker-compose.local.yml up -d redis
+```
 
 For subject-scoped testing before auth is wired end to end, use the temporary
 header:
@@ -113,6 +122,11 @@ SERVICE_CLINICS_URL=http://127.0.0.1:4113
 SERVICE_SCHEDULING_URL=http://127.0.0.1:4114
 SERVICE_NOTIFICATIONS_URL=http://127.0.0.1:4115
 NATS_URL=nats://127.0.0.1:4222
+REDIS_URL=redis://127.0.0.1:6379
+CACHE_TTL_SECONDS=60
+REQUEST_TIMEOUT_MS=5000
+HTTP_RETRY_ATTEMPTS=3
+HTTP_RETRY_BACKOFF_MS=250
 ```
 
 `AUTH_JWKS_URI` is optional. If omitted, the gateway derives the Keycloak certs endpoint from `AUTH_ISSUER_URL`.
@@ -210,6 +224,21 @@ Identity and scheduling now publish domain events into NATS using subjects like:
 - `syndeocare.events.identity.user.authenticated`
 - `syndeocare.events.scheduling.shift.posted`
 - `syndeocare.events.scheduling.booking.requested`
+
+## Local cache backbone
+
+Redis is available locally on:
+
+- `redis://127.0.0.1:6379`
+
+Start it with:
+
+```sh
+docker compose -f infra/docker/docker-compose.local.yml up -d redis
+```
+
+The Nest platform API currently uses Redis to cache public profiles, clinics, and
+jobs responses so repeated client reads stay off the primary database.
 
 ## Local sign-up and sign-in
 

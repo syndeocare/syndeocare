@@ -9,7 +9,9 @@ import {
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
+import { registerPlatformHttpHooks } from "@repo/service-core";
 import { AppModule } from "./app.module.js";
+import { PlatformApiExceptionFilter } from "./common/platform-api-exception.filter.js";
 
 function parseCorsOrigins(rawValue?: string) {
   if (!rawValue || rawValue.trim().length === 0) {
@@ -30,6 +32,7 @@ async function bootstrap() {
     }),
   );
   const configService = app.get(ConfigService);
+  registerPlatformHttpHooks(app.getHttpAdapter().getInstance(), "platform-api");
   const docsPath = configService.get<string>("API_DOCS_PATH") ?? "docs";
   const host = configService.get<string>("HOST") ?? "0.0.0.0";
   const port = configService.get<number>("PORT") ?? 4300;
@@ -52,6 +55,7 @@ async function bootstrap() {
       },
     }),
   );
+  app.useGlobalFilters(new PlatformApiExceptionFilter());
   app.setGlobalPrefix("v1");
 
   const swaggerBuilder = new DocumentBuilder()

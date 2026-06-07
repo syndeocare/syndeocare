@@ -34,6 +34,10 @@ const DEFAULT_HOST = "0.0.0.0";
 const DEFAULT_NATS_URL = "nats://127.0.0.1:4222";
 const DEFAULT_NODE_ENV = "development";
 const DEFAULT_PORT = 4000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 5_000;
+const DEFAULT_HTTP_RETRY_ATTEMPTS = 3;
+const DEFAULT_HTTP_RETRY_BACKOFF_MS = 250;
+export const CORRELATION_ID_HEADER = "x-correlation-id";
 const INTERNAL_SERVICE_TOKEN_HEADER = "x-internal-service-token";
 const eventEnvelopeCodec = JSONCodec<EventEnvelope>();
 let natsConnectionPromise: Promise<NatsConnection> | undefined;
@@ -51,6 +55,7 @@ const DEVELOPMENT_HEADER_NAMES = [
 declare module "fastify" {
   interface FastifyRequest {
     authContext?: AuthPrincipal;
+    correlationId: string;
   }
 }
 
@@ -89,6 +94,177 @@ function readHeaderValue(
   }
 
   return undefined;
+}
+
+function toPositiveInteger(value: string | undefined, fallback: number) {
+  const parsed = Number(value);
+
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function resolveCorrelationId(request: FastifyRequest) {
+  return (
+    readHeaderValue(request.headers, CORRELATION_ID_HEADER) ??
+    crypto.randomUUID()
+  );
+}
+
+function buildErrorCode(statusCode: number) {
+  if (statusCode >= 500) {
+    return "INTERNAL_SERVER_ERROR";
+  }
+
+  if (statusCode === 404) {
+    return "NOT_FOUND";
+  }
+
+  if (statusCode === 401) {
+    return "UNAUTHORIZED";
+  }
+
+  if (statusCode === 403) {
+    return "FORBIDDEN";
+  }
+
+  if (statusCode === 400) {
+    return "BAD_REQUEST";
+  }
+
+  return "REQUEST_FAILED";
+}
+
+function buildErrorMessage(
+  error: Error & { statusCode?: number; validation?: unknown },
+) {
+  if ("validation" in error && error.validation) {
+    return error.message;
+  }
+
+  if (typeof error.statusCode === "number" && error.statusCode < 500) {
+    return error.message;
+  }
+
+  return "An unexpected error occurred.";
+}
+
+function toServiceError(error: unknown) {
+  return error instanceof Error
+    ? (error as Error & { statusCode?: number; validation?: unknown })
+    : Object.assign(new Error("Unexpected error"), { statusCode: 500 });
+}
+
+export function registerPlatformHttpHooks(
+  app: FastifyInstance,
+  serviceName: string,
+) {
+  app.addHook("onRequest", async (request, reply) => {
+    const correlationId = resolveCorrelationId(request);
+
+    request.correlationId = correlationId;
+    reply.header(CORRELATION_ID_HEADER, correlationId);
+    request.log = request.log.child({
+      correlationId,
+      requestId: request.id,
+      service: serviceName,
+    });
+  });
+
+  app.setErrorHandler((error, request, reply) => {
+    const typedError = toServiceError(error);
+    const statusCode =
+      typeof typedError.statusCode === "number" ? typedError.statusCode : 500;
+    const message = buildErrorMessage(typedError);
+
+    request.log.error(
+      {
+        err: error,
+        correlationId: request.correlationId,
+        statusCode,
+      },
+      "Request failed",
+    );
+
+    void reply.code(statusCode).send({
+      code: buildErrorCode(statusCode),
+      message,
+      correlationId: request.correlationId,
+    });
+  });
+}
+
+export async function withTimeout<T>(
+  operation: Promise<T>,
+  timeoutMs = toPositiveInteger(
+    process.env.REQUEST_TIMEOUT_MS,
+    DEFAULT_REQUEST_TIMEOUT_MS,
+  ),
+  message = "Operation timed out.",
+) {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  const timeoutPromise = new Promise<T>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(message));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([operation, timeoutPromise]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+}
+
+export async function withExponentialBackoff<T>(
+  operation: () => Promise<T>,
+  options?: {
+    attempts?: number;
+    backoffMs?: number;
+    factor?: number;
+    shouldRetry?: (error: unknown, attempt: number) => boolean;
+  },
+) {
+  const attempts =
+    options?.attempts ??
+    toPositiveInteger(
+      process.env.HTTP_RETRY_ATTEMPTS,
+      DEFAULT_HTTP_RETRY_ATTEMPTS,
+    );
+  const initialBackoffMs =
+    options?.backoffMs ??
+    toPositiveInteger(
+      process.env.HTTP_RETRY_BACKOFF_MS,
+      DEFAULT_HTTP_RETRY_BACKOFF_MS,
+    );
+  const factor = options?.factor ?? 2;
+
+  let currentAttempt = 1;
+
+  while (currentAttempt <= attempts) {
+    try {
+      return await operation();
+    } catch (error) {
+      const shouldRetry =
+        currentAttempt < attempts &&
+        (options?.shouldRetry?.(error, currentAttempt) ?? true);
+
+      if (!shouldRetry) {
+        throw error;
+      }
+
+      const delayMs = initialBackoffMs * factor ** (currentAttempt - 1);
+
+      await new Promise((resolve) => {
+        setTimeout(resolve, delayMs);
+      });
+
+      currentAttempt += 1;
+    }
+  }
+
+  throw new Error("Retry operation exhausted all attempts.");
 }
 
 function extractRealmFromIssuer(issuer: string | undefined) {
@@ -471,6 +647,7 @@ export async function createServiceApp(options: ServiceBootstrapOptions) {
   await app.register(swaggerUi, {
     routePrefix: "/docs",
   });
+  registerPlatformHttpHooks(app, options.serviceName);
 
   app.addHook("onRequest", async (request, reply) => {
     if (!request.url.startsWith("/internal/")) {
