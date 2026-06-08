@@ -19,14 +19,14 @@ import {
 } from "@repo/contracts";
 
 type StorageConfig = {
-  accessKeyId: string;
+  accessKeyId?: string;
   endpoint?: string;
   forcePathStyle: boolean;
   privateBucket: string;
   publicBaseUrl?: string;
   publicBucket: string;
   region: string;
-  secretAccessKey: string;
+  secretAccessKey?: string;
   uploadUrlTtlSeconds: number;
 };
 
@@ -105,7 +105,9 @@ export function getStorageConfig(): StorageConfig {
       : "http://127.0.0.1:9000");
 
   return {
-    accessKeyId: process.env.STORAGE_ACCESS_KEY_ID ?? "minioadmin",
+    accessKeyId:
+      readOptionalString(process.env.STORAGE_ACCESS_KEY_ID) ??
+      (endpoint ? "minioadmin" : undefined),
     endpoint,
     forcePathStyle: readBoolean(process.env.STORAGE_FORCE_PATH_STYLE, true),
     privateBucket:
@@ -114,7 +116,9 @@ export function getStorageConfig(): StorageConfig {
     publicBucket:
       process.env.STORAGE_PUBLIC_BUCKET ?? "syndeocare-public-assets",
     region: process.env.STORAGE_REGION ?? "us-east-1",
-    secretAccessKey: process.env.STORAGE_SECRET_ACCESS_KEY ?? "minioadmin",
+    secretAccessKey:
+      readOptionalString(process.env.STORAGE_SECRET_ACCESS_KEY) ??
+      (endpoint ? "minioadmin" : undefined),
     uploadUrlTtlSeconds: Number(
       process.env.STORAGE_UPLOAD_URL_TTL_SECONDS ?? "900",
     ),
@@ -122,16 +126,21 @@ export function getStorageConfig(): StorageConfig {
 }
 
 export function createStorageClient(config = getStorageConfig()) {
+  const credentials =
+    config.accessKeyId && config.secretAccessKey
+      ? {
+          accessKeyId: config.accessKeyId,
+          secretAccessKey: config.secretAccessKey,
+        }
+      : undefined;
+
   return new S3Client({
     region: config.region,
     endpoint: config.endpoint,
     forcePathStyle: config.forcePathStyle,
     requestChecksumCalculation: "WHEN_REQUIRED",
     responseChecksumValidation: "WHEN_REQUIRED",
-    credentials: {
-      accessKeyId: config.accessKeyId,
-      secretAccessKey: config.secretAccessKey,
-    },
+    credentials,
   });
 }
 

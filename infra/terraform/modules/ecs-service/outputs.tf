@@ -11,9 +11,9 @@ output "security_group_id" {
 }
 
 output "target_group_arn" {
-  value = var.listener_arn == null ? null : aws_lb_target_group.this[0].arn
+  value = var.attach_to_alb ? aws_lb_target_group.this[0].arn : null
 }
 
 output "service_discovery_service_name" {
-  value = var.service_discovery_namespace_name == null ? null : "${var.discovery_name}.${var.service_discovery_namespace_name}"
+  value = var.enable_service_discovery ? "${var.discovery_name}.${var.service_discovery_namespace_name}" : null
 }

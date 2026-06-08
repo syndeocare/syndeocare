@@ -1,0 +1,7 @@
+.git
+.github
+.husky
+.turbo
+**/.next
+infra/terraform/**/.terraform
+*.log

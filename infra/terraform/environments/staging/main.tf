@@ -142,8 +142,19 @@ variable "storage_public_base_url" {
   default = ""
 }
 
+variable "route53_zone_name" {
+  type    = string
+  default = ""
+}
+
+variable "api_domain_name" {
+  type    = string
+  default = ""
+}
+
 provider "aws" {
-  region = var.aws_region
+  region            = var.aws_region
+  s3_use_path_style = true
 }
 
 data "aws_availability_zones" "available" {
@@ -154,6 +165,30 @@ locals {
   environment    = "staging"
   name           = "syndeocare-staging"
   vpc_cidr_block = "10.20.0.0/16"
+  tls_enabled    = var.route53_zone_name != "" && var.api_domain_name != ""
+  public_base_url = var.api_public_base_url != "" ? var.api_public_base_url : (
+    local.tls_enabled ? "https://${var.api_domain_name}" : "http://${aws_lb.public.dns_name}"
+  )
+  object_storage_task_policy_json = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "AllowBucketListing"
+        Effect   = "Allow"
+        Action   = ["s3:ListBucket"]
+        Resource = ["arn:aws:s3:::${var.storage_public_bucket}", "arn:aws:s3:::${var.storage_private_bucket}"]
+      },
+      {
+        Sid    = "AllowObjectReadWrite"
+        Effect = "Allow"
+        Action = ["s3:AbortMultipartUpload", "s3:DeleteObject", "s3:GetObject", "s3:PutObject"]
+        Resource = [
+          "arn:aws:s3:::${var.storage_public_bucket}/*",
+          "arn:aws:s3:::${var.storage_private_bucket}/*",
+        ]
+      },
+    ]
+  })
   tags = {
     Project     = "syndeocare"
     Environment = local.environment
@@ -205,10 +240,91 @@ resource "aws_lb" "public" {
   tags = local.tags
 }
 
+data "aws_route53_zone" "api" {
+  count        = local.tls_enabled ? 1 : 0
+  name         = var.route53_zone_name
+  private_zone = false
+}
+
+resource "aws_acm_certificate" "api" {
+  count             = local.tls_enabled ? 1 : 0
+  domain_name       = var.api_domain_name
+  validation_method = "DNS"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  tags = local.tags
+}
+
+resource "aws_route53_record" "api_validation" {
+  for_each = local.tls_enabled ? {
+    for dvo in aws_acm_certificate.api[0].domain_validation_options :
+    dvo.domain_name => {
+      name   = dvo.resource_record_name
+      record = dvo.resource_record_value
+      type   = dvo.resource_record_type
+    }
+  } : {}
+
+  zone_id         = data.aws_route53_zone.api[0].zone_id
+  name            = each.value.name
+  records         = [each.value.record]
+  ttl             = 60
+  type            = each.value.type
+  allow_overwrite = true
+}
+
+resource "aws_acm_certificate_validation" "api" {
+  count = local.tls_enabled ? 1 : 0
+
+  certificate_arn         = aws_acm_certificate.api[0].arn
+  validation_record_fqdns = [for record in aws_route53_record.api_validation : record.fqdn]
+}
+
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.public.arn
   port              = 80
   protocol          = "HTTP"
+
+  dynamic "default_action" {
+    for_each = local.tls_enabled ? [1] : []
+
+    content {
+      type = "redirect"
+
+      redirect {
+        port        = "443"
+        protocol    = "HTTPS"
+        status_code = "HTTP_301"
+      }
+    }
+  }
+
+  dynamic "default_action" {
+    for_each = local.tls_enabled ? [] : [1]
+
+    content {
+      type = "fixed-response"
+
+      fixed_response {
+        content_type = "application/json"
+        message_body = jsonencode({ message = "No matching SyndeoCare route configured." })
+        status_code  = "404"
+      }
+    }
+  }
+}
+
+resource "aws_lb_listener" "https" {
+  count = local.tls_enabled ? 1 : 0
+
+  load_balancer_arn = aws_lb.public.arn
+  port              = 443
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+  certificate_arn   = aws_acm_certificate_validation.api[0].certificate_arn
 
   default_action {
     type = "fixed-response"
@@ -218,6 +334,20 @@ resource "aws_lb_listener" "http" {
       message_body = jsonencode({ message = "No matching SyndeoCare route configured." })
       status_code  = "404"
     }
+  }
+}
+
+resource "aws_route53_record" "api_alias" {
+  count = local.tls_enabled ? 1 : 0
+
+  zone_id = data.aws_route53_zone.api[0].zone_id
+  name    = var.api_domain_name
+  type    = "A"
+
+  alias {
+    evaluate_target_health = true
+    name                   = aws_lb.public.dns_name
+    zone_id                = aws_lb.public.zone_id
   }
 }
 
@@ -270,6 +400,7 @@ module "notifications_service" {
   vpc_id                           = module.vpc.vpc_id
   private_subnet_ids               = module.vpc.private_subnet_ids
   allowed_cidr_blocks              = [module.vpc.vpc_cidr_block]
+  enable_service_discovery         = true
   service_discovery_namespace_id   = module.event_backbone.service_discovery_namespace_id
   service_discovery_namespace_name = module.event_backbone.service_discovery_namespace_name
   discovery_name                   = "notifications"
@@ -280,6 +411,7 @@ module "notifications_service" {
   environment = {
     NODE_ENV          = "production"
     PORT              = "4115"
+    SERVICE_DIR       = "services/notifications"
     RESEND_FROM_EMAIL = var.resend_from_email
     RESEND_TEST_EMAIL = var.resend_test_email
   }
@@ -297,6 +429,7 @@ module "identity_service" {
   vpc_id                           = module.vpc.vpc_id
   private_subnet_ids               = module.vpc.private_subnet_ids
   allowed_cidr_blocks              = [module.vpc.vpc_cidr_block]
+  enable_service_discovery         = true
   service_discovery_namespace_id   = module.event_backbone.service_discovery_namespace_id
   service_discovery_namespace_name = module.event_backbone.service_discovery_namespace_name
   discovery_name                   = "identity"
@@ -307,6 +440,7 @@ module "identity_service" {
   environment = {
     NODE_ENV                  = "production"
     PORT                      = "4111"
+    SERVICE_DIR               = "services/identity"
     AUTH_CLIENT_ID            = var.auth_api_client_id
     AUTH_REALM                = var.auth_realm
     KEYCLOAK_ADMIN_REALM      = var.keycloak_admin_realm
@@ -332,6 +466,7 @@ module "profiles_service" {
   vpc_id                           = module.vpc.vpc_id
   private_subnet_ids               = module.vpc.private_subnet_ids
   allowed_cidr_blocks              = [module.vpc.vpc_cidr_block]
+  enable_service_discovery         = true
   service_discovery_namespace_id   = module.event_backbone.service_discovery_namespace_id
   service_discovery_namespace_name = module.event_backbone.service_discovery_namespace_name
   discovery_name                   = "profiles"
@@ -342,6 +477,7 @@ module "profiles_service" {
   environment = {
     NODE_ENV = "production"
     PORT     = "4112"
+    SERVICE_DIR = "services/profiles"
     NATS_URL = module.event_backbone.nats_url
   }
   secrets = {
@@ -358,6 +494,7 @@ module "clinics_service" {
   vpc_id                           = module.vpc.vpc_id
   private_subnet_ids               = module.vpc.private_subnet_ids
   allowed_cidr_blocks              = [module.vpc.vpc_cidr_block]
+  enable_service_discovery         = true
   service_discovery_namespace_id   = module.event_backbone.service_discovery_namespace_id
   service_discovery_namespace_name = module.event_backbone.service_discovery_namespace_name
   discovery_name                   = "clinics"
@@ -368,6 +505,7 @@ module "clinics_service" {
   environment = {
     NODE_ENV = "production"
     PORT     = "4113"
+    SERVICE_DIR = "services/clinics"
     NATS_URL = module.event_backbone.nats_url
   }
   secrets = {
@@ -384,6 +522,7 @@ module "scheduling_service" {
   vpc_id                           = module.vpc.vpc_id
   private_subnet_ids               = module.vpc.private_subnet_ids
   allowed_cidr_blocks              = [module.vpc.vpc_cidr_block]
+  enable_service_discovery         = true
   service_discovery_namespace_id   = module.event_backbone.service_discovery_namespace_id
   service_discovery_namespace_name = module.event_backbone.service_discovery_namespace_name
   discovery_name                   = "scheduling"
@@ -394,6 +533,7 @@ module "scheduling_service" {
   environment = {
     NODE_ENV = "production"
     PORT     = "4114"
+    SERVICE_DIR = "services/scheduling"
     NATS_URL = module.event_backbone.nats_url
   }
   secrets = {
@@ -410,9 +550,11 @@ module "api_gateway_service" {
   vpc_id                           = module.vpc.vpc_id
   private_subnet_ids               = module.vpc.private_subnet_ids
   alb_security_group_id            = module.vpc.alb_security_group_id
-  listener_arn                     = aws_lb_listener.http.arn
+  attach_to_alb                    = true
+  listener_arn                     = local.tls_enabled ? aws_lb_listener.https[0].arn : aws_lb_listener.http.arn
   listener_rule_priority           = 90
   listener_path_patterns           = ["/v1", "/v1/*"]
+  enable_service_discovery         = true
   service_discovery_namespace_id   = module.event_backbone.service_discovery_namespace_id
   service_discovery_namespace_name = module.event_backbone.service_discovery_namespace_name
   discovery_name                   = "api-gateway"
@@ -420,9 +562,12 @@ module "api_gateway_service" {
   container_name                   = "api-gateway"
   container_port                   = 4110
   health_check_path                = "/health"
+  attach_task_role_policy          = true
+  task_role_policy_json            = local.object_storage_task_policy_json
   environment = {
     NODE_ENV                     = "production"
     PORT                         = "4110"
+    SERVICE_DIR                  = "services/api-gateway"
     AUTH_AUDIENCE                = var.auth_api_client_id
     AUTH_CLIENT_ID               = var.auth_api_client_id
     AUTH_ISSUER_URL              = "${var.keycloak_base_url}/realms/${var.auth_realm}"
@@ -441,9 +586,7 @@ module "api_gateway_service" {
     STORAGE_UPLOAD_URL_TTL_SECONDS = "900"
   }
   secrets = {
-    INTERNAL_SERVICE_TOKEN    = "${aws_secretsmanager_secret.runtime.arn}:internal_service_token::"
-    STORAGE_ACCESS_KEY_ID     = "${aws_secretsmanager_secret.runtime.arn}:storage_access_key_id::"
-    STORAGE_SECRET_ACCESS_KEY = "${aws_secretsmanager_secret.runtime.arn}:storage_secret_access_key::"
+    INTERNAL_SERVICE_TOKEN = "${aws_secretsmanager_secret.runtime.arn}:internal_service_token::"
   }
   tags = local.tags
 }
@@ -455,9 +598,11 @@ module "platform_api_service" {
   vpc_id                           = module.vpc.vpc_id
   private_subnet_ids               = module.vpc.private_subnet_ids
   alb_security_group_id            = module.vpc.alb_security_group_id
-  listener_arn                     = aws_lb_listener.http.arn
+  attach_to_alb                    = true
+  listener_arn                     = local.tls_enabled ? aws_lb_listener.https[0].arn : aws_lb_listener.http.arn
   listener_rule_priority           = 100
   listener_path_patterns           = ["/platform-api/*"]
+  enable_service_discovery         = true
   service_discovery_namespace_id   = module.event_backbone.service_discovery_namespace_id
   service_discovery_namespace_name = module.event_backbone.service_discovery_namespace_name
   discovery_name                   = "platform-api"
@@ -467,14 +612,15 @@ module "platform_api_service" {
   cpu                              = 512
   memory                           = 1024
   desired_count                    = 1
-  health_check_path                = "/v1/health/live"
+  health_check_path                = "/platform-api/v1/health/live"
   environment = {
     NODE_ENV              = "production"
     HOST                  = "0.0.0.0"
     PORT                  = "4300"
+    SERVICE_DIR           = "services/platform-api"
     API_DOCS_PATH         = "docs"
-    API_PUBLIC_URL        = "${var.api_public_base_url}/platform-api/v1"
-    API_CORS_ORIGINS      = var.api_public_base_url
+    API_PUBLIC_URL        = "${local.public_base_url}/platform-api/v1"
+    API_CORS_ORIGINS      = local.public_base_url
     CACHE_TTL_SECONDS     = "60"
     NATS_URL              = module.event_backbone.nats_url
     REQUEST_TIMEOUT_MS    = "5000"
@@ -489,9 +635,9 @@ module "platform_api_service" {
 }
 
 output "platform_api_url" {
-  value = "http://${aws_lb.public.dns_name}/platform-api/v1"
+  value = "${local.public_base_url}/platform-api/v1"
 }
 
 output "api_gateway_url" {
-  value = "http://${aws_lb.public.dns_name}/v1"
+  value = "${local.public_base_url}/v1"
 }

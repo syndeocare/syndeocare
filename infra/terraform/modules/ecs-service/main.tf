@@ -19,7 +19,11 @@ locals {
       valueFrom = value
     }
   ]
-  expose_via_alb = var.listener_arn != null
+  secret_resource_arns = distinct([
+    for value in values(var.secrets) :
+    join(":", slice(split(":", value), 0, 7))
+  ])
+  expose_via_alb = var.attach_to_alb
 }
 
 data "aws_region" "current" {}
@@ -37,13 +41,13 @@ resource "aws_security_group" "this" {
   vpc_id      = var.vpc_id
 
   dynamic "ingress" {
-    for_each = var.alb_security_group_id == null ? [] : [var.alb_security_group_id]
+    for_each = var.attach_to_alb ? [1] : []
 
     content {
       from_port       = var.container_port
       to_port         = var.container_port
       protocol        = "tcp"
-      security_groups = [ingress.value]
+      security_groups = [var.alb_security_group_id]
       description     = "Allow traffic from the ALB security group"
     }
   }
@@ -96,6 +100,28 @@ resource "aws_iam_role_policy_attachment" "task_execution" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
+resource "aws_iam_role_policy" "task_execution_secrets" {
+  count = length(local.secret_resource_arns) > 0 ? 1 : 0
+
+  name = "${var.name}-execution-secrets"
+  role = aws_iam_role.task_execution.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["secretsmanager:GetSecretValue"]
+        Resource = local.secret_resource_arns
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt"]
+        Resource = "*"
+      },
+    ]
+  })
+}
+
 resource "aws_iam_role" "task" {
   name = "${var.name}-task"
 
@@ -113,6 +139,14 @@ resource "aws_iam_role" "task" {
   })
 
   tags = local.common_tags
+}
+
+resource "aws_iam_role_policy" "task_inline" {
+  count = var.attach_task_role_policy ? 1 : 0
+
+  name   = "${var.name}-task-inline"
+  role   = aws_iam_role.task.id
+  policy = var.task_role_policy_json
 }
 
 resource "aws_lb_target_group" "this" {
@@ -156,7 +190,7 @@ resource "aws_lb_listener_rule" "this" {
 }
 
 resource "aws_service_discovery_service" "this" {
-  count = var.service_discovery_namespace_id == null ? 0 : 1
+  count = var.enable_service_discovery ? 1 : 0
 
   name = var.discovery_name
 
@@ -240,7 +274,7 @@ resource "aws_ecs_service" "this" {
   }
 
   dynamic "service_registries" {
-    for_each = var.service_discovery_namespace_id == null ? [] : [1]
+    for_each = var.enable_service_discovery ? [1] : []
 
     content {
       registry_arn = aws_service_discovery_service.this[0].arn

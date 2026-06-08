@@ -24,6 +24,11 @@ variable "listener_arn" {
   default = null
 }
 
+variable "attach_to_alb" {
+  type    = bool
+  default = false
+}
+
 variable "listener_rule_priority" {
   type    = number
   default = null
@@ -37,6 +42,11 @@ variable "listener_path_patterns" {
 variable "service_discovery_namespace_id" {
   type    = string
   default = null
+}
+
+variable "enable_service_discovery" {
+  type    = bool
+  default = false
 }
 
 variable "service_discovery_namespace_name" {
@@ -104,6 +114,16 @@ variable "secrets" {
 variable "log_retention_days" {
   type    = number
   default = 30
+}
+
+variable "task_role_policy_json" {
+  type    = string
+  default = null
+}
+
+variable "attach_task_role_policy" {
+  type    = bool
+  default = false
 }
 
 variable "tags" {

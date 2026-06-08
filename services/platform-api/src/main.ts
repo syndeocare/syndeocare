@@ -24,6 +24,22 @@ function parseCorsOrigins(rawValue?: string) {
     .filter((value) => value.length > 0);
 }
 
+function resolveApiBasePath(publicUrl?: string) {
+  if (!publicUrl) {
+    return "v1";
+  }
+
+  try {
+    const pathname = new URL(publicUrl).pathname
+      .replace(/^\/+/, "")
+      .replace(/\/+$/, "");
+
+    return pathname.length > 0 ? pathname : "v1";
+  } catch {
+    return "v1";
+  }
+}
+
 async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
@@ -32,11 +48,13 @@ async function bootstrap() {
     }),
   );
   const configService = app.get(ConfigService);
-  registerPlatformHttpHooks(app.getHttpAdapter().getInstance(), "platform-api");
+  const fastify = app.getHttpAdapter().getInstance();
+  registerPlatformHttpHooks(fastify, "platform-api");
   const docsPath = configService.get<string>("API_DOCS_PATH") ?? "docs";
   const host = configService.get<string>("HOST") ?? "0.0.0.0";
   const port = configService.get<number>("PORT") ?? 4300;
   const publicUrl = configService.get<string>("API_PUBLIC_URL");
+  const apiBasePath = resolveApiBasePath(publicUrl);
 
   await app.register(helmet, {
     contentSecurityPolicy: false,
@@ -56,7 +74,7 @@ async function bootstrap() {
     }),
   );
   app.useGlobalFilters(new PlatformApiExceptionFilter());
-  app.setGlobalPrefix("v1");
+  app.setGlobalPrefix(apiBasePath);
 
   const swaggerBuilder = new DocumentBuilder()
     .setTitle("SyndeoCare Platform API")

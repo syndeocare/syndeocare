@@ -110,6 +110,8 @@ and dedicated hostname.
 - deploy internal identity, profiles, clinics, scheduling, and notifications services on private ECS networking with Cloud Map service discovery
 - expose the API gateway and public Nest platform API independently behind the public ALB
 - keep runtime integration secrets in AWS Secrets Manager and inject them into ECS tasks instead of baking them into images
+- grant ECS execution roles explicit `secretsmanager:GetSecretValue` access for every secret referenced through task-definition `secrets`
+- keep the public Nest platform API mounted on `/platform-api/v1` and align the ALB target-group health check with that same path
 
 ## Current ECS service graph
 
@@ -117,6 +119,12 @@ and dedicated hostname.
 - public edge: `api-gateway` on `/v1` and `/v1/*`
 - private services: `identity`, `profiles`, `clinics`, `scheduling`, `notifications`
 - shared backbone: RDS PostgreSQL, ElastiCache Redis, NATS JetStream, Cloud Map private DNS namespace
+
+### Current dev validation snapshot
+
+- API gateway metadata: `http://syndeocare-dev-alb-1930045459.us-east-1.elb.amazonaws.com/v1`
+- platform API metadata: `http://syndeocare-dev-alb-1930045459.us-east-1.elb.amazonaws.com/platform-api/v1`
+- platform API health: `http://syndeocare-dev-alb-1930045459.us-east-1.elb.amazonaws.com/platform-api/v1/health/live`
 
 ## Required Terraform inputs for full rollout
 

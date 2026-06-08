@@ -5,7 +5,7 @@ import {
 } from "@repo/contracts";
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { platformApiV1RouteCatalog } from "./route-catalog.js";
+import { buildPlatformApiRouteCatalog } from "./route-catalog.js";
 import { DEV_ACTOR_SUBJECT_HEADER } from "../common/current-subject.decorator.js";
 
 @Injectable()
@@ -14,6 +14,19 @@ export class PlatformService {
 
   getMetadata(): PlatformMetadata {
     const publicUrl = this.configService.get<string>("API_PUBLIC_URL");
+    const routeBasePath = (() => {
+      if (!publicUrl) {
+        return "v1";
+      }
+
+      try {
+        return new URL(publicUrl).pathname
+          .replace(/^\/+/, "")
+          .replace(/\/+$/, "");
+      } catch {
+        return "v1";
+      }
+    })();
     const auth = gatewayAuthConfigurationSchema.parse({
       mode: "development-bypass",
       configured: false,
@@ -43,7 +56,7 @@ export class PlatformService {
         "professional-mobile",
       ],
       auth,
-      routes: platformApiV1RouteCatalog,
+      routes: buildPlatformApiRouteCatalog(routeBasePath),
       publicUrl,
     });
   }
