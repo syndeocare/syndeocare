@@ -19,6 +19,6 @@ output "secret_arn" {
 }
 
 output "database_url" {
-  value     = "postgresql://${var.username}:${random_password.this.result}@${aws_db_instance.this.address}:5432/${var.db_name}"
+  value     = local.database_url
   sensitive = true
 }

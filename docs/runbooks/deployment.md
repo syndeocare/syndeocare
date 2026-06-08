@@ -126,6 +126,26 @@ and dedicated hostname.
 - platform API metadata: `http://syndeocare-dev-alb-1930045459.us-east-1.elb.amazonaws.com/platform-api/v1`
 - platform API health: `http://syndeocare-dev-alb-1930045459.us-east-1.elb.amazonaws.com/platform-api/v1/health/live`
 
+## Database bootstrap for ECS environments
+
+Fresh RDS environments do not become application-ready until the persistence
+schema and seed data are applied.
+
+Use the in-cluster bootstrap helper:
+
+```sh
+infra/scripts/run-db-bootstrap.sh dev
+```
+
+The script launches a one-off Fargate task from the live `profiles` task
+definition, reuses its private subnets, security groups, and `DATABASE_URL`
+secret, then runs the built migration and seed scripts inside the cluster where
+RDS is reachable.
+
+Use this after first-time environment creation, after replacing the database,
+or whenever live logs show missing relations such as `relation "actors" does
+not exist`.
+
 ## Required Terraform inputs for full rollout
 
 ### Service image variables

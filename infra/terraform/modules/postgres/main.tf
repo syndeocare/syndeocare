@@ -5,6 +5,8 @@ locals {
     },
     var.tags,
   )
+
+  database_url = "postgresql://${urlencode(var.username)}:${urlencode(random_password.this.result)}@${aws_db_instance.this.address}:5432/${var.db_name}"
 }
 
 resource "aws_security_group" "this" {
@@ -96,7 +98,7 @@ resource "aws_secretsmanager_secret_version" "this" {
     host         = aws_db_instance.this.address
     port         = 5432
     database     = var.db_name
-    database_url = "postgresql://${var.username}:${random_password.this.result}@${aws_db_instance.this.address}:5432/${var.db_name}"
-    url          = "postgresql://${var.username}:${random_password.this.result}@${aws_db_instance.this.address}:5432/${var.db_name}"
+    database_url = local.database_url
+    url          = local.database_url
   })
 }

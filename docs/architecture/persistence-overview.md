@@ -26,6 +26,7 @@ The first persistence slice uses PostgreSQL as the platform system of record for
 - shared schema and repository helpers live in `packages/persistence`
 - SQL migrations live in `packages/persistence/migrations`
 - local bootstrap uses `pnpm db:migrate` and `pnpm db:seed`
+- private AWS environments bootstrap the schema with `infra/scripts/run-db-bootstrap.sh <env>`
 - services now expose internal read routes backed by PostgreSQL instead of placeholder-only responses
 
 ## Next expansion
