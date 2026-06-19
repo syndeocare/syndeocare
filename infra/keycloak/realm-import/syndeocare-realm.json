@@ -38,8 +38,22 @@
       "publicClient": true,
       "directAccessGrantsEnabled": true,
       "standardFlowEnabled": true,
-      "redirectUris": ["http://localhost:3000/*", "http://127.0.0.1:3000/*"],
-      "webOrigins": ["http://localhost:3000", "http://127.0.0.1:3000"],
+      "redirectUris": [
+        "http://localhost:3000/*",
+        "http://127.0.0.1:3000/*",
+        "http://localhost:8080/*",
+        "http://127.0.0.1:8080/*",
+        "https://syndeocare.ai/*",
+        "https://www.syndeocare.ai/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+        "https://syndeocare.ai",
+        "https://www.syndeocare.ai"
+      ],
       "protocol": "openid-connect",
       "defaultClientScopes": ["profile", "email", "roles"],
       "protocolMappers": [

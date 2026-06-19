@@ -1,7 +1,25 @@
 import {
   apiErrorSchema,
+  authEmailActionResponseSchema,
+  authAccountDeletionResponseSchema,
+  authEmailOtpConfirmInputSchema,
+  authEmailOtpRequestInputSchema,
+  authEmailVerificationConfirmInputSchema,
+  authEmailVerificationConfirmResponseSchema,
+  authEmailVerificationRequestInputSchema,
+  authLogoutInputSchema,
+  authLogoutResponseSchema,
+  authOAuthCallbackInputSchema,
+  authOAuthStartInputSchema,
+  authOAuthStartResponseSchema,
+  authPasswordResetConfirmInputSchema,
+  authPasswordResetRequestInputSchema,
+  authPasswordUpdateInputSchema,
+  authPasswordUpdateResponseSchema,
+  authRefreshInputSchema,
   authSessionSchema,
   bookingRequestInputSchema,
+  bookingStatusUpdateInputSchema,
   authSignInInputSchema,
   authSignUpInputSchema,
   authPrincipalSchema,
@@ -11,7 +29,27 @@ import {
   clinicProfileSummarySchema,
   completeProfileImageUploadResponseSchema,
   completeVerificationDocumentUploadResponseSchema,
+  appNotificationListResponseSchema,
+  appNotificationSchema,
+  adminCatalogDeleteResponseSchema,
+  adminCatalogItemInputSchema,
+  adminCatalogItemSchema,
+  adminCatalogKindSchema,
+  adminCatalogListResponseSchema,
+  adminConversationStartInputSchema,
+  adminVerificationSnapshotSchema,
+  conversationListResponseSchema,
+  conversationMessageListResponseSchema,
+  conversationMessageSchema,
+  conversationMessageSendInputSchema,
+  conversationSummarySchema,
+  createAppNotificationInputSchema,
+  deleteNotificationsResponseSchema,
+  documentAccessRequestSchema,
+  documentAccessResponseSchema,
   domainEventCatalog,
+  externalUserIdSyncInputSchema,
+  externalUserIdSyncResponseSchema,
   finalizeProfileImageUploadInputSchema,
   finalizeVerificationDocumentUploadInputSchema,
   gatewayAuthConfigurationSchema,
@@ -28,14 +66,18 @@ import {
   professionalProfileUpdateInputSchema,
   uploadDescriptorSchema,
   uploadRequestSchema,
+  userPreferencesSchema,
   verificationReviewInputSchema,
   verificationStatusResponseSchema,
+  markAllNotificationsReadResponseSchema,
+  notificationCountResponseSchema,
   type AuthPrincipal,
   type PlatformMetadata,
 } from "@repo/contracts";
 import {
   assertStoredObjectExists,
   buildStoredAssetUrl,
+  createSignedDownloadUrl,
   createUploadDescriptor,
   getStorageConfig,
   isActorOwnedObjectKey,
@@ -45,11 +87,32 @@ import { zodToJsonSchema } from "zod-to-json-schema";
 import { z } from "zod";
 
 const INTERNAL_SERVICE_TOKEN_HEADER = "x-internal-service-token";
+
+function defaultDownstreamServiceUrl(serviceName: string, port: number) {
+  const host =
+    process.env.NODE_ENV === "production" ? serviceName : "127.0.0.1";
+  return `http://${host}:${port}`;
+}
+
 const downstreamServices = {
-  clinics: process.env.SERVICE_CLINICS_URL ?? "http://127.0.0.1:4113",
-  identity: process.env.SERVICE_IDENTITY_URL ?? "http://127.0.0.1:4111",
-  profiles: process.env.SERVICE_PROFILES_URL ?? "http://127.0.0.1:4112",
-  scheduling: process.env.SERVICE_SCHEDULING_URL ?? "http://127.0.0.1:4114",
+  clinics:
+    process.env.SERVICE_CLINICS_URL ??
+    defaultDownstreamServiceUrl("clinics", 4113),
+  identity:
+    process.env.SERVICE_IDENTITY_URL ??
+    defaultDownstreamServiceUrl("identity", 4111),
+  notifications:
+    process.env.SERVICE_NOTIFICATIONS_URL ??
+    defaultDownstreamServiceUrl("notifications", 4115),
+  messaging:
+    process.env.SERVICE_MESSAGING_URL ??
+    defaultDownstreamServiceUrl("messaging", 4116),
+  profiles:
+    process.env.SERVICE_PROFILES_URL ??
+    defaultDownstreamServiceUrl("profiles", 4112),
+  scheduling:
+    process.env.SERVICE_SCHEDULING_URL ??
+    defaultDownstreamServiceUrl("scheduling", 4114),
 } as const;
 const storageConfig = getStorageConfig();
 
@@ -68,6 +131,12 @@ const jobIdParamsSchema = z.object({
 
 const bookingIdParamsSchema = z.object({
   bookingId: z.string().min(1),
+});
+const notificationIdParamsSchema = z.object({
+  notificationId: z.string().uuid(),
+});
+const externalUserIdParamsSchema = z.object({
+  externalUserId: z.string().min(1),
 });
 const profileIdParamsSchema = z.object({
   profileId: z.string().min(1),
@@ -90,6 +159,16 @@ const clinicDirectoryFiltersSchema = z.object({
     .enum(["not_started", "pending_review", "approved", "rejected"])
     .optional(),
 });
+const adminCatalogQuerySchema = z.object({
+  kind: adminCatalogKindSchema.optional(),
+  includeInactive: z.enum(["true", "false"]).optional(),
+});
+const adminCatalogParamsSchema = z.object({
+  id: z.string().uuid(),
+});
+const conversationIdParamsSchema = z.object({
+  conversationId: z.string().uuid(),
+});
 
 const auth = createAccessControl();
 
@@ -101,6 +180,111 @@ function toJsonSchema(schema: z.ZodTypeAny, name: string) {
   });
 }
 
+const authSignUpCompatInputSchema = z
+  .object({
+    displayName: z.string().min(1).optional(),
+    email: z.string().email(),
+    fullName: z.string().min(1).optional(),
+    organizationName: z.string().min(1).optional(),
+    password: z.string().min(8),
+    profile: z
+      .object({
+        displayName: z.string().min(1).optional(),
+        fullName: z.string().min(1).optional(),
+        organizationName: z.string().min(1).optional(),
+        type: z.string().min(1).optional(),
+      })
+      .passthrough()
+      .optional(),
+    role: z.string().min(1).optional(),
+  })
+  .passthrough();
+
+function normalizeAuthSignUpInput(
+  input: z.infer<typeof authSignUpCompatInputSchema>,
+) {
+  return {
+    displayName:
+      input.displayName ??
+      input.profile?.displayName ??
+      input.profile?.fullName ??
+      input.profile?.organizationName ??
+      input.fullName ??
+      input.organizationName,
+    email: input.email,
+    password: input.password,
+    role: input.role ?? input.profile?.type,
+  };
+}
+
+function trimTrailingSlash(value: string) {
+  return value.replace(/\/$/, "");
+}
+
+function extractRealmFromIssuer(issuer: string | undefined) {
+  const match = issuer?.match(/\/realms\/([^/]+)\/?$/);
+  return match?.[1];
+}
+
+function extractBaseUrlFromIssuer(
+  issuer: string | undefined,
+  realm: string | undefined,
+) {
+  if (!issuer || !realm) {
+    return undefined;
+  }
+
+  return issuer.replace(new RegExp(`/realms/${realm}/?$`), "");
+}
+
+function getKeycloakOAuthConfig() {
+  const issuer = process.env.AUTH_ISSUER_URL;
+  const realm = process.env.AUTH_REALM ?? extractRealmFromIssuer(issuer);
+  const baseUrl =
+    process.env.KEYCLOAK_BASE_URL ??
+    extractBaseUrlFromIssuer(issuer, realm ?? undefined);
+  const publicClientId =
+    process.env.KEYCLOAK_PUBLIC_CLIENT_ID ?? "syndeocare-web";
+
+  if (!baseUrl || !realm || !publicClientId) {
+    return null;
+  }
+
+  return {
+    baseUrl: trimTrailingSlash(baseUrl),
+    publicClientId,
+    realm,
+  };
+}
+
+function buildOAuthAuthorizationUrl(
+  input: z.infer<typeof authOAuthStartInputSchema>,
+) {
+  const config = getKeycloakOAuthConfig();
+
+  if (!config) {
+    return null;
+  }
+
+  const authorizationUrl = new URL(
+    `${config.baseUrl}/realms/${config.realm}/protocol/openid-connect/auth`,
+  );
+  authorizationUrl.searchParams.set("client_id", config.publicClientId);
+  authorizationUrl.searchParams.set("code_challenge", input.codeChallenge);
+  authorizationUrl.searchParams.set("code_challenge_method", "S256");
+  authorizationUrl.searchParams.set("kc_idp_hint", input.provider);
+  authorizationUrl.searchParams.set("prompt", "select_account");
+  authorizationUrl.searchParams.set("redirect_uri", input.redirectUri);
+  authorizationUrl.searchParams.set("response_type", "code");
+  authorizationUrl.searchParams.set("scope", "openid profile email");
+  authorizationUrl.searchParams.set("state", input.state);
+
+  return authOAuthStartResponseSchema.parse({
+    authorizationUrl: authorizationUrl.toString(),
+    provider: input.provider,
+  });
+}
+
 function buildValidationError(issues: z.ZodIssue[]) {
   return {
     code: "VALIDATION_ERROR",
@@ -109,6 +293,24 @@ function buildValidationError(issues: z.ZodIssue[]) {
       const path = issue.path.join(".");
       return path.length > 0 ? `${path}: ${issue.message}` : issue.message;
     }),
+  };
+}
+
+function parseS3Uri(fileUrl: string) {
+  if (!fileUrl.startsWith("s3://")) {
+    return null;
+  }
+
+  const withoutScheme = fileUrl.slice("s3://".length);
+  const slashIndex = withoutScheme.indexOf("/");
+
+  if (slashIndex <= 0 || slashIndex === withoutScheme.length - 1) {
+    return null;
+  }
+
+  return {
+    bucket: withoutScheme.slice(0, slashIndex),
+    key: withoutScheme.slice(slashIndex + 1),
   };
 }
 
@@ -149,7 +351,27 @@ function mapDownstreamStatusCode(statusCode: number): 404 | 503 {
   return statusCode === 404 ? 404 : 503;
 }
 
-function mapSignInDownstreamStatusCode(statusCode: number): 400 | 401 | 503 {
+function mapSignInDownstreamStatusCode(
+  statusCode: number,
+): 400 | 401 | 403 | 503 {
+  if (statusCode === 400 || statusCode === 401 || statusCode === 403) {
+    return statusCode;
+  }
+
+  return 503;
+}
+
+function mapSignUpDownstreamStatusCode(
+  statusCode: number,
+): 400 | 403 | 409 | 503 {
+  if (statusCode === 400 || statusCode === 403 || statusCode === 409) {
+    return statusCode;
+  }
+
+  return 503;
+}
+
+function mapRefreshDownstreamStatusCode(statusCode: number): 400 | 401 | 503 {
   if (statusCode === 400 || statusCode === 401) {
     return statusCode;
   }
@@ -157,8 +379,18 @@ function mapSignInDownstreamStatusCode(statusCode: number): 400 | 401 | 503 {
   return 503;
 }
 
-function mapSignUpDownstreamStatusCode(statusCode: number): 400 | 409 | 503 {
-  if (statusCode === 400 || statusCode === 409) {
+function mapLogoutDownstreamStatusCode(statusCode: number): 400 | 401 | 503 {
+  if (statusCode === 400 || statusCode === 401) {
+    return statusCode;
+  }
+
+  return 503;
+}
+
+function mapOAuthDownstreamStatusCode(
+  statusCode: number,
+): 400 | 401 | 409 | 503 {
+  if (statusCode === 400 || statusCode === 401 || statusCode === 409) {
     return statusCode;
   }
 
@@ -170,7 +402,8 @@ async function requestDownstreamResource<T>(
   resourcePath: string,
   schema: z.ZodType<T>,
   options?: {
-    method?: "GET" | "PATCH" | "POST";
+    headers?: Record<string, string>;
+    method?: "DELETE" | "GET" | "PATCH" | "POST";
     body?: Record<string, unknown>;
   },
 ): Promise<DownstreamResult<T>> {
@@ -181,6 +414,7 @@ async function requestDownstreamResource<T>(
         method: options?.method ?? "GET",
         headers: {
           ...buildInternalServiceHeaders(),
+          ...(options?.headers ?? {}),
           ...(options?.body ? { "content-type": "application/json" } : {}),
         },
         body: options?.body ? JSON.stringify(options.body) : undefined,
@@ -304,6 +538,10 @@ void startService({
             200: toJsonSchema(authSessionSchema, "AuthSession"),
             400: toJsonSchema(apiErrorSchema, "ApiErrorValidation"),
             401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorized"),
+            403: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorEmailVerificationRequired",
+            ),
             503: toJsonSchema(apiErrorSchema, "ApiErrorServiceUnavailable"),
           },
         },
@@ -345,10 +583,17 @@ void startService({
           operationId: "signUp",
           summary: "Create a new professional or clinic account",
           tags: ["auth"],
-          body: toJsonSchema(authSignUpInputSchema, "AuthSignUpInput"),
+          body: toJsonSchema(
+            authSignUpCompatInputSchema,
+            "AuthSignUpCompatInput",
+          ),
           response: {
             200: toJsonSchema(authSessionSchema, "AuthSessionSignup"),
             400: toJsonSchema(apiErrorSchema, "ApiErrorValidationSignup"),
+            403: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorEmailVerificationRequiredSignup",
+            ),
             409: toJsonSchema(apiErrorSchema, "ApiErrorConflictSignup"),
             503: toJsonSchema(
               apiErrorSchema,
@@ -358,7 +603,19 @@ void startService({
         },
       },
       async (request, reply) => {
-        const parsedBody = authSignUpInputSchema.safeParse(request.body);
+        const compatBody = authSignUpCompatInputSchema.safeParse(request.body);
+
+        if (!compatBody.success) {
+          return reply.code(400).send({
+            code: "VALIDATION_ERROR",
+            message:
+              "A valid email, password, role, and display name are required.",
+          });
+        }
+
+        const parsedBody = authSignUpInputSchema.safeParse(
+          normalizeAuthSignUpInput(compatBody.data),
+        );
 
         if (!parsedBody.success) {
           return reply.code(400).send({
@@ -381,6 +638,776 @@ void startService({
         if (!downstream.ok) {
           return reply
             .code(mapSignUpDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.post(
+      "/v1/auth/oauth/google/start",
+      {
+        schema: {
+          operationId: "startGoogleOAuth",
+          summary: "Create a Google OAuth authorization URL",
+          tags: ["auth"],
+          body: toJsonSchema(authOAuthStartInputSchema, "AuthOAuthStartInput"),
+          response: {
+            200: toJsonSchema(
+              authOAuthStartResponseSchema,
+              "AuthOAuthStartResponse",
+            ),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorOAuthStartValidation"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorOAuthStartUnavailable"),
+          },
+        },
+      },
+      async (request, reply) => {
+        const parsedBody = authOAuthStartInputSchema.safeParse(request.body);
+
+        if (!parsedBody.success) {
+          return reply
+            .code(400)
+            .send(buildValidationError(parsedBody.error.issues));
+        }
+
+        const response = buildOAuthAuthorizationUrl(parsedBody.data);
+
+        if (!response) {
+          return reply.code(503).send({
+            code: "AUTH_OAUTH_NOT_CONFIGURED",
+            message:
+              "Google authentication is not configured. Set KEYCLOAK_BASE_URL, KEYCLOAK_PUBLIC_CLIENT_ID, and AUTH_REALM for the API gateway.",
+          });
+        }
+
+        return response;
+      },
+    );
+
+    app.post(
+      "/v1/auth/oauth/google/callback",
+      {
+        schema: {
+          operationId: "completeGoogleOAuth",
+          summary: "Exchange a Google OAuth callback for a platform session",
+          tags: ["auth"],
+          body: toJsonSchema(
+            authOAuthCallbackInputSchema,
+            "AuthOAuthCallbackInput",
+          ),
+          response: {
+            200: toJsonSchema(authSessionSchema, "AuthOAuthSession"),
+            400: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorOAuthCallbackValidation",
+            ),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorOAuthUnauthorized"),
+            409: toJsonSchema(apiErrorSchema, "ApiErrorOAuthRoleRequired"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorOAuthUnavailable"),
+          },
+        },
+      },
+      async (request, reply) => {
+        const parsedBody = authOAuthCallbackInputSchema.safeParse(request.body);
+
+        if (!parsedBody.success) {
+          return reply
+            .code(400)
+            .send(buildValidationError(parsedBody.error.issues));
+        }
+
+        const downstream = await requestDownstreamResource(
+          "identity",
+          "/internal/auth/oauth/google/callback",
+          authSessionSchema,
+          {
+            body: parsedBody.data,
+            method: "POST",
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapOAuthDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.post(
+      "/v1/auth/refresh",
+      {
+        schema: {
+          operationId: "refreshSession",
+          summary: "Refresh a session using a refresh token",
+          tags: ["auth"],
+          body: toJsonSchema(authRefreshInputSchema, "AuthRefreshInput"),
+          response: {
+            200: toJsonSchema(authSessionSchema, "AuthSessionRefresh"),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorValidationRefresh"),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorizedRefresh"),
+            503: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorServiceUnavailableRefresh",
+            ),
+          },
+        },
+      },
+      async (request, reply) => {
+        const parsedBody = authRefreshInputSchema.safeParse(request.body);
+
+        if (!parsedBody.success) {
+          return reply.code(400).send({
+            code: "VALIDATION_ERROR",
+            message: "A valid refresh token is required.",
+          });
+        }
+
+        const downstream = await requestDownstreamResource(
+          "identity",
+          "/internal/auth/refresh",
+          authSessionSchema,
+          {
+            body: parsedBody.data,
+            method: "POST",
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapRefreshDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.post(
+      "/v1/auth/logout",
+      {
+        schema: {
+          operationId: "logoutSession",
+          summary: "Revoke a refresh token and terminate the session",
+          tags: ["auth"],
+          body: toJsonSchema(authLogoutInputSchema, "AuthLogoutInput"),
+          response: {
+            200: toJsonSchema(authLogoutResponseSchema, "AuthLogoutResponse"),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorValidationLogout"),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorizedLogout"),
+            503: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorServiceUnavailableLogout",
+            ),
+          },
+        },
+      },
+      async (request, reply) => {
+        const parsedBody = authLogoutInputSchema.safeParse(request.body);
+
+        if (!parsedBody.success) {
+          return reply.code(400).send({
+            code: "VALIDATION_ERROR",
+            message: "A valid refresh token is required.",
+          });
+        }
+
+        const downstream = await requestDownstreamResource(
+          "identity",
+          "/internal/auth/logout",
+          authLogoutResponseSchema,
+          {
+            body: parsedBody.data,
+            method: "POST",
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapLogoutDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.post(
+      "/v1/auth/password-reset/request",
+      {
+        schema: {
+          operationId: "requestPasswordReset",
+          summary: "Send a password reset link to the account email",
+          tags: ["auth"],
+          body: toJsonSchema(
+            authPasswordResetRequestInputSchema,
+            "AuthPasswordResetRequestInput",
+          ),
+          response: {
+            200: toJsonSchema(
+              authEmailActionResponseSchema,
+              "AuthEmailActionResponseReset",
+            ),
+            400: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorValidationPasswordReset",
+            ),
+            503: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorServiceUnavailablePasswordReset",
+            ),
+          },
+        },
+      },
+      async (request, reply) => {
+        const parsedBody = authPasswordResetRequestInputSchema.safeParse(
+          request.body,
+        );
+
+        if (!parsedBody.success) {
+          return reply.code(400).send({
+            code: "VALIDATION_ERROR",
+            message: "A valid email address and redirect URL are required.",
+          });
+        }
+
+        const downstream = await requestDownstreamResource(
+          "identity",
+          "/internal/auth/password-reset/request",
+          authEmailActionResponseSchema,
+          {
+            body: parsedBody.data,
+            method: "POST",
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(downstream.statusCode === 400 ? 400 : 503)
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.post(
+      "/v1/auth/password-reset/confirm",
+      {
+        schema: {
+          operationId: "confirmPasswordReset",
+          summary: "Complete a password reset using a signed reset token",
+          tags: ["auth"],
+          body: toJsonSchema(
+            authPasswordResetConfirmInputSchema,
+            "AuthPasswordResetConfirmInput",
+          ),
+          response: {
+            200: toJsonSchema(
+              authPasswordUpdateResponseSchema,
+              "AuthPasswordUpdateResponseReset",
+            ),
+            400: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorValidationPasswordResetConfirm",
+            ),
+            401: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorUnauthorizedPasswordResetConfirm",
+            ),
+            503: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorServiceUnavailablePasswordResetConfirm",
+            ),
+          },
+        },
+      },
+      async (request, reply) => {
+        const parsedBody = authPasswordResetConfirmInputSchema.safeParse(
+          request.body,
+        );
+
+        if (!parsedBody.success) {
+          return reply.code(400).send({
+            code: "VALIDATION_ERROR",
+            message: "A valid reset token and password are required.",
+          });
+        }
+
+        const downstream = await requestDownstreamResource(
+          "identity",
+          "/internal/auth/password-reset/confirm",
+          authPasswordUpdateResponseSchema,
+          {
+            body: parsedBody.data,
+            method: "POST",
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapRefreshDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.post(
+      "/v1/auth/email-verification/request",
+      {
+        schema: {
+          operationId: "requestEmailVerification",
+          summary: "Send a verification link to the account email",
+          tags: ["auth"],
+          body: toJsonSchema(
+            authEmailVerificationRequestInputSchema,
+            "AuthEmailVerificationRequestInput",
+          ),
+          response: {
+            200: toJsonSchema(
+              authEmailActionResponseSchema,
+              "AuthEmailActionResponseVerification",
+            ),
+            400: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorValidationEmailVerificationRequest",
+            ),
+            503: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorServiceUnavailableEmailVerificationRequest",
+            ),
+          },
+        },
+      },
+      async (request, reply) => {
+        const parsedBody = authEmailVerificationRequestInputSchema.safeParse(
+          request.body,
+        );
+
+        if (!parsedBody.success) {
+          return reply.code(400).send({
+            code: "VALIDATION_ERROR",
+            message: "A valid email address and redirect URL are required.",
+          });
+        }
+
+        const downstream = await requestDownstreamResource(
+          "identity",
+          "/internal/auth/email-verification/request",
+          authEmailActionResponseSchema,
+          {
+            body: parsedBody.data,
+            method: "POST",
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(downstream.statusCode === 400 ? 400 : 503)
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.post(
+      "/v1/auth/email-verification/confirm",
+      {
+        schema: {
+          operationId: "confirmEmailVerification",
+          summary: "Confirm an email verification token",
+          tags: ["auth"],
+          body: toJsonSchema(
+            authEmailVerificationConfirmInputSchema,
+            "AuthEmailVerificationConfirmInput",
+          ),
+          response: {
+            200: toJsonSchema(
+              authEmailVerificationConfirmResponseSchema,
+              "AuthEmailVerificationConfirmResponse",
+            ),
+            400: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorValidationEmailVerificationConfirm",
+            ),
+            401: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorUnauthorizedEmailVerificationConfirm",
+            ),
+            503: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorServiceUnavailableEmailVerificationConfirm",
+            ),
+          },
+        },
+      },
+      async (request, reply) => {
+        const parsedBody = authEmailVerificationConfirmInputSchema.safeParse(
+          request.body,
+        );
+
+        if (!parsedBody.success) {
+          return reply.code(400).send({
+            code: "VALIDATION_ERROR",
+            message: "A valid verification token is required.",
+          });
+        }
+
+        const downstream = await requestDownstreamResource(
+          "identity",
+          "/internal/auth/email-verification/confirm",
+          authEmailVerificationConfirmResponseSchema,
+          {
+            body: parsedBody.data,
+            method: "POST",
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapRefreshDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.post(
+      "/v1/auth/email-otp/request",
+      {
+        schema: {
+          operationId: "requestEmailOtp",
+          summary: "Send a six-digit email verification code",
+          tags: ["auth"],
+          body: toJsonSchema(
+            authEmailOtpRequestInputSchema,
+            "AuthEmailOtpRequestInput",
+          ),
+          response: {
+            200: toJsonSchema(
+              authEmailActionResponseSchema,
+              "AuthEmailActionResponseOtp",
+            ),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorValidationEmailOtp"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorEmailOtpUnavailable"),
+          },
+        },
+      },
+      async (request, reply) => {
+        const parsedBody = authEmailOtpRequestInputSchema.safeParse(
+          request.body,
+        );
+
+        if (!parsedBody.success) {
+          return reply.code(400).send({
+            code: "VALIDATION_ERROR",
+            message: "A valid email address is required.",
+          });
+        }
+
+        const downstream = await requestDownstreamResource(
+          "identity",
+          "/internal/auth/email-otp/request",
+          authEmailActionResponseSchema,
+          {
+            body: parsedBody.data,
+            method: "POST",
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(downstream.statusCode === 400 ? 400 : 503)
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.post(
+      "/v1/auth/email-otp/confirm",
+      {
+        schema: {
+          operationId: "confirmEmailOtp",
+          summary: "Confirm a six-digit email verification code",
+          tags: ["auth"],
+          body: toJsonSchema(
+            authEmailOtpConfirmInputSchema,
+            "AuthEmailOtpConfirmInput",
+          ),
+          response: {
+            200: toJsonSchema(
+              authEmailVerificationConfirmResponseSchema,
+              "AuthEmailOtpConfirmResponse",
+            ),
+            400: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorValidationEmailOtpConfirm",
+            ),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorizedEmailOtp"),
+            503: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorEmailOtpConfirmDownstream",
+            ),
+          },
+        },
+      },
+      async (request, reply) => {
+        const parsedBody = authEmailOtpConfirmInputSchema.safeParse(
+          request.body,
+        );
+
+        if (!parsedBody.success) {
+          return reply.code(400).send({
+            code: "VALIDATION_ERROR",
+            message: "A valid email address and six-digit code are required.",
+          });
+        }
+
+        const downstream = await requestDownstreamResource(
+          "identity",
+          "/internal/auth/email-otp/confirm",
+          authEmailVerificationConfirmResponseSchema,
+          {
+            body: parsedBody.data,
+            method: "POST",
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapRefreshDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.post(
+      "/v1/auth/password",
+      {
+        schema: {
+          operationId: "updateAuthenticatedPassword",
+          summary: "Update the authenticated actor password",
+          tags: ["auth"],
+          security: [{ bearerAuth: [] }],
+          body: toJsonSchema(
+            authPasswordUpdateInputSchema,
+            "AuthPasswordUpdateInput",
+          ),
+          response: {
+            200: toJsonSchema(
+              authPasswordUpdateResponseSchema,
+              "AuthPasswordUpdateResponse",
+            ),
+            400: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorValidationPasswordUpdate",
+            ),
+            401: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorUnauthorizedPasswordUpdate",
+            ),
+            503: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorServiceUnavailablePasswordUpdate",
+            ),
+          },
+        },
+        preHandler: auth.requireAccess(),
+      },
+      async (request, reply) => {
+        const parsedBody = authPasswordUpdateInputSchema.safeParse(
+          request.body,
+        );
+
+        if (!parsedBody.success) {
+          return reply.code(400).send({
+            code: "VALIDATION_ERROR",
+            message: "A valid password is required.",
+          });
+        }
+
+        const actor = request.authContext as AuthPrincipal;
+        const downstream = await requestDownstreamResource(
+          "identity",
+          "/internal/auth/password",
+          authPasswordUpdateResponseSchema,
+          {
+            body: parsedBody.data,
+            headers: {
+              "x-auth-subject": actor.sub,
+            },
+            method: "POST",
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapRefreshDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.delete(
+      "/v1/auth/account",
+      {
+        schema: {
+          operationId: "deleteAuthenticatedAccount",
+          summary: "Delete the authenticated actor account",
+          tags: ["auth"],
+          security: [{ bearerAuth: [] }],
+          response: {
+            200: toJsonSchema(
+              authAccountDeletionResponseSchema,
+              "AuthAccountDeletionResponse",
+            ),
+            401: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorUnauthorizedAccountDelete",
+            ),
+            503: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorServiceUnavailableAccountDelete",
+            ),
+          },
+        },
+        preHandler: auth.requireAccess(),
+      },
+      async (request, reply) => {
+        const actor = request.authContext as AuthPrincipal;
+        const downstream = await requestDownstreamResource(
+          "identity",
+          "/internal/auth/account",
+          authAccountDeletionResponseSchema,
+          {
+            headers: {
+              "x-auth-subject": actor.sub,
+            },
+            method: "DELETE",
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(downstream.statusCode === 401 ? 401 : 503)
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.get(
+      "/v1/preferences/me",
+      {
+        schema: {
+          operationId: "getAuthenticatedPreferences",
+          summary: "Read the authenticated actor preferences",
+          tags: ["preferences"],
+          security: [{ bearerAuth: [] }],
+          response: {
+            200: toJsonSchema(userPreferencesSchema, "UserPreferences"),
+            401: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorUnauthorizedPreferences",
+            ),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorNotFoundPreferences"),
+            503: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorServiceUnavailablePreferences",
+            ),
+          },
+        },
+        preHandler: auth.requireAccess(),
+      },
+      async (request, reply) => {
+        const actor = request.authContext as AuthPrincipal;
+        const downstream = await requestDownstreamResource(
+          "identity",
+          `/internal/actors/${encodeURIComponent(actor.sub)}/preferences`,
+          userPreferencesSchema,
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.patch(
+      "/v1/preferences/me",
+      {
+        schema: {
+          operationId: "updateAuthenticatedPreferences",
+          summary: "Update the authenticated actor preferences",
+          tags: ["preferences"],
+          security: [{ bearerAuth: [] }],
+          body: toJsonSchema(userPreferencesSchema, "UserPreferencesUpdate"),
+          response: {
+            200: toJsonSchema(userPreferencesSchema, "UserPreferencesUpdated"),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorValidationPreferences"),
+            401: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorUnauthorizedPreferencesPatch",
+            ),
+            404: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorNotFoundPreferencesPatch",
+            ),
+            503: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorServiceUnavailablePreferencesPatch",
+            ),
+          },
+        },
+        preHandler: auth.requireAccess(),
+      },
+      async (request, reply) => {
+        const parsedBody = userPreferencesSchema.safeParse(request.body);
+
+        if (!parsedBody.success) {
+          return reply.code(400).send({
+            code: "VALIDATION_ERROR",
+            message: "A valid preferences payload is required.",
+          });
+        }
+
+        const actor = request.authContext as AuthPrincipal;
+        const downstream = await requestDownstreamResource(
+          "identity",
+          `/internal/actors/${encodeURIComponent(actor.sub)}/preferences`,
+          userPreferencesSchema,
+          {
+            body: parsedBody.data,
+            method: "PATCH",
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(
+              downstream.statusCode === 400
+                ? 400
+                : mapDownstreamStatusCode(downstream.statusCode),
+            )
             .send(downstream.body);
         }
 
@@ -411,6 +1438,408 @@ void startService({
           "identity",
           `/internal/actors/${encodeURIComponent(actor.sub)}`,
           authPrincipalSchema,
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.patch(
+      "/v1/me/external-id",
+      {
+        schema: {
+          operationId: "syncAuthenticatedActorExternalUserId",
+          summary: "Sync the authenticated actor external user id",
+          tags: ["auth"],
+          security: [{ bearerAuth: [] }],
+          body: toJsonSchema(
+            externalUserIdSyncInputSchema,
+            "ExternalUserIdSyncInput",
+          ),
+          response: {
+            200: toJsonSchema(
+              externalUserIdSyncResponseSchema,
+              "ExternalUserIdSyncResponse",
+            ),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorValidation"),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorized"),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorNotFound"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
+          },
+        },
+        preHandler: auth.requireAccess(),
+      },
+      async (request, reply) => {
+        const actor = request.authContext as AuthPrincipal;
+        const parsedBody = externalUserIdSyncInputSchema.safeParse(
+          request.body,
+        );
+
+        if (!parsedBody.success) {
+          return reply
+            .code(400)
+            .send(buildValidationError(parsedBody.error.issues));
+        }
+
+        const downstream = await requestDownstreamResource(
+          "identity",
+          `/internal/actors/${encodeURIComponent(actor.sub)}/external-user-id`,
+          externalUserIdSyncResponseSchema,
+          {
+            method: "PATCH",
+            body: parsedBody.data,
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.get(
+      "/v1/notifications",
+      {
+        schema: {
+          operationId: "listNotifications",
+          summary: "List notifications for the authenticated actor",
+          tags: ["notifications"],
+          security: [{ bearerAuth: [] }],
+          response: {
+            200: toJsonSchema(
+              appNotificationListResponseSchema,
+              "AppNotificationListResponse",
+            ),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorized"),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorNotFound"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
+          },
+        },
+        preHandler: auth.requireAccess(),
+      },
+      async (request, reply) => {
+        const actor = request.authContext as AuthPrincipal;
+        const downstream = await requestDownstreamResource(
+          "notifications",
+          `/internal/actors/${encodeURIComponent(actor.sub)}/notifications`,
+          appNotificationListResponseSchema,
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.post(
+      "/v1/notifications",
+      {
+        schema: {
+          operationId: "createNotification",
+          summary:
+            "Create an in-app notification for a target external user id",
+          tags: ["notifications"],
+          security: [{ bearerAuth: [] }],
+          body: toJsonSchema(
+            createAppNotificationInputSchema,
+            "CreateAppNotificationInput",
+          ),
+          response: {
+            200: toJsonSchema(appNotificationSchema, "AppNotification"),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorValidation"),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorized"),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorNotFound"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
+          },
+        },
+        preHandler: auth.requireAccess(),
+      },
+      async (request, reply) => {
+        const parsedBody = createAppNotificationInputSchema.safeParse(
+          request.body,
+        );
+
+        if (!parsedBody.success) {
+          return reply
+            .code(400)
+            .send(buildValidationError(parsedBody.error.issues));
+        }
+
+        const downstream = await requestDownstreamResource(
+          "notifications",
+          "/internal/notifications",
+          appNotificationSchema,
+          {
+            method: "POST",
+            body: parsedBody.data,
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.get(
+      "/v1/admin/notifications/:externalUserId/count",
+      {
+        schema: {
+          operationId: "getAdminNotificationCount",
+          summary: "Read notification count for a target external user id",
+          tags: ["notifications", "admin"],
+          security: [{ bearerAuth: [] }],
+          params: {
+            type: "object",
+            required: ["externalUserId"],
+            properties: {
+              externalUserId: { type: "string" },
+            },
+          },
+          response: {
+            200: toJsonSchema(
+              notificationCountResponseSchema,
+              "NotificationCountResponse",
+            ),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorValidation"),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorized"),
+            403: toJsonSchema(apiErrorSchema, "ApiErrorForbidden"),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorNotFound"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
+          },
+        },
+        preHandler: auth.requireAccess({ roles: ["admin"] }),
+      },
+      async (request, reply) => {
+        const parsedParams = externalUserIdParamsSchema.safeParse(
+          request.params,
+        );
+
+        if (!parsedParams.success) {
+          return reply
+            .code(400)
+            .send(buildValidationError(parsedParams.error.issues));
+        }
+
+        const downstream = await requestDownstreamResource(
+          "notifications",
+          `/internal/notifications/recipient/${encodeURIComponent(parsedParams.data.externalUserId)}/count`,
+          notificationCountResponseSchema,
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.patch(
+      "/v1/notifications/read-all",
+      {
+        schema: {
+          operationId: "markAllNotificationsRead",
+          summary: "Mark all notifications as read for the authenticated actor",
+          tags: ["notifications"],
+          security: [{ bearerAuth: [] }],
+          response: {
+            200: toJsonSchema(
+              markAllNotificationsReadResponseSchema,
+              "MarkAllNotificationsReadResponse",
+            ),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorized"),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorNotFound"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
+          },
+        },
+        preHandler: auth.requireAccess(),
+      },
+      async (request, reply) => {
+        const actor = request.authContext as AuthPrincipal;
+        const downstream = await requestDownstreamResource(
+          "notifications",
+          `/internal/actors/${encodeURIComponent(actor.sub)}/notifications/read-all`,
+          markAllNotificationsReadResponseSchema,
+          {
+            method: "PATCH",
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.patch(
+      "/v1/notifications/:notificationId/read",
+      {
+        schema: {
+          operationId: "markNotificationRead",
+          summary: "Mark one notification as read for the authenticated actor",
+          tags: ["notifications"],
+          security: [{ bearerAuth: [] }],
+          params: {
+            type: "object",
+            required: ["notificationId"],
+            properties: {
+              notificationId: { type: "string", format: "uuid" },
+            },
+          },
+          response: {
+            200: toJsonSchema(appNotificationSchema, "AppNotification"),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorValidation"),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorized"),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorNotFound"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
+          },
+        },
+        preHandler: auth.requireAccess(),
+      },
+      async (request, reply) => {
+        const actor = request.authContext as AuthPrincipal;
+        const parsedParams = notificationIdParamsSchema.safeParse(
+          request.params,
+        );
+
+        if (!parsedParams.success) {
+          return reply
+            .code(400)
+            .send(buildValidationError(parsedParams.error.issues));
+        }
+
+        const downstream = await requestDownstreamResource(
+          "notifications",
+          `/internal/actors/${encodeURIComponent(actor.sub)}/notifications/${encodeURIComponent(parsedParams.data.notificationId)}/read`,
+          appNotificationSchema,
+          {
+            method: "PATCH",
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.delete(
+      "/v1/notifications/:notificationId",
+      {
+        schema: {
+          operationId: "deleteNotification",
+          summary: "Delete one notification for the authenticated actor",
+          tags: ["notifications"],
+          security: [{ bearerAuth: [] }],
+          params: {
+            type: "object",
+            required: ["notificationId"],
+            properties: {
+              notificationId: { type: "string", format: "uuid" },
+            },
+          },
+          response: {
+            200: toJsonSchema(
+              deleteNotificationsResponseSchema,
+              "DeleteNotificationsResponse",
+            ),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorValidation"),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorized"),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorNotFound"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
+          },
+        },
+        preHandler: auth.requireAccess(),
+      },
+      async (request, reply) => {
+        const actor = request.authContext as AuthPrincipal;
+        const parsedParams = notificationIdParamsSchema.safeParse(
+          request.params,
+        );
+
+        if (!parsedParams.success) {
+          return reply
+            .code(400)
+            .send(buildValidationError(parsedParams.error.issues));
+        }
+
+        const downstream = await requestDownstreamResource(
+          "notifications",
+          `/internal/actors/${encodeURIComponent(actor.sub)}/notifications/${encodeURIComponent(parsedParams.data.notificationId)}`,
+          deleteNotificationsResponseSchema,
+          {
+            method: "DELETE",
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.delete(
+      "/v1/notifications",
+      {
+        schema: {
+          operationId: "deleteAllNotifications",
+          summary: "Delete all notifications for the authenticated actor",
+          tags: ["notifications"],
+          security: [{ bearerAuth: [] }],
+          response: {
+            200: toJsonSchema(
+              deleteNotificationsResponseSchema,
+              "DeleteNotificationsResponse",
+            ),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorized"),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorNotFound"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
+          },
+        },
+        preHandler: auth.requireAccess(),
+      },
+      async (request, reply) => {
+        const actor = request.authContext as AuthPrincipal;
+        const downstream = await requestDownstreamResource(
+          "notifications",
+          `/internal/actors/${encodeURIComponent(actor.sub)}/notifications`,
+          deleteNotificationsResponseSchema,
+          {
+            method: "DELETE",
+          },
         );
 
         if (!downstream.ok) {
@@ -1106,6 +2535,44 @@ void startService({
       },
     );
 
+    app.get(
+      "/v1/admin/verification",
+      {
+        schema: {
+          operationId: "listAdminVerification",
+          summary: "List verification actors and documents for admin review",
+          tags: ["verification", "admin"],
+          security: [{ bearerAuth: [] }],
+          response: {
+            200: toJsonSchema(
+              adminVerificationSnapshotSchema,
+              "AdminVerificationSnapshot",
+            ),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorized"),
+            403: toJsonSchema(apiErrorSchema, "ApiErrorForbidden"),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorNotFound"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
+          },
+        },
+        preHandler: auth.requireAccess({ roles: ["admin"] }),
+      },
+      async (request, reply) => {
+        const downstream = await requestDownstreamResource(
+          "identity",
+          "/internal/admin/verification",
+          adminVerificationSnapshotSchema,
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
     app.patch(
       "/v1/admin/verification/:subject",
       {
@@ -1161,6 +2628,455 @@ void startService({
           verificationStatusResponseSchema,
           {
             method: "PATCH",
+            body: parsedBody.data,
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.get(
+      "/v1/catalog",
+      {
+        schema: {
+          operationId: "listActiveCatalog",
+          summary: "List active platform catalog items",
+          tags: ["catalog"],
+          querystring: {
+            type: "object",
+            properties: {
+              kind: {
+                type: "string",
+                enum: [
+                  "certification",
+                  "document_type",
+                  "job_role",
+                  "legal_page",
+                  "specialty",
+                ],
+              },
+            },
+          },
+          response: {
+            200: toJsonSchema(
+              adminCatalogListResponseSchema,
+              "ActiveCatalogListResponse",
+            ),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorCatalogValidation"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
+          },
+        },
+      },
+      async (request, reply) => {
+        const parsedQuery = z
+          .object({ kind: adminCatalogKindSchema.optional() })
+          .safeParse(request.query);
+
+        if (!parsedQuery.success) {
+          return reply
+            .code(400)
+            .send(buildValidationError(parsedQuery.error.issues));
+        }
+
+        const params = new URLSearchParams();
+
+        if (parsedQuery.data.kind) {
+          params.set("kind", parsedQuery.data.kind);
+        }
+
+        const downstream = await requestDownstreamResource(
+          "identity",
+          `/internal/admin/catalog${params.size > 0 ? `?${params.toString()}` : ""}`,
+          adminCatalogListResponseSchema,
+        );
+
+        if (!downstream.ok) {
+          return reply.code(503).send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.get(
+      "/v1/admin/catalog",
+      {
+        schema: {
+          operationId: "listAdminCatalog",
+          summary: "List admin-managed platform catalog items",
+          tags: ["admin", "catalog"],
+          security: [{ bearerAuth: [] }],
+          querystring: {
+            type: "object",
+            properties: {
+              kind: {
+                type: "string",
+                enum: [
+                  "certification",
+                  "document_type",
+                  "job_role",
+                  "legal_page",
+                  "specialty",
+                ],
+              },
+              includeInactive: { type: "string", enum: ["true", "false"] },
+            },
+          },
+          response: {
+            200: toJsonSchema(
+              adminCatalogListResponseSchema,
+              "AdminCatalogListResponse",
+            ),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorCatalogValidation"),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorized"),
+            403: toJsonSchema(apiErrorSchema, "ApiErrorForbidden"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
+          },
+        },
+        preHandler: auth.requireAccess({ roles: ["admin"] }),
+      },
+      async (request, reply) => {
+        const parsedQuery = adminCatalogQuerySchema.safeParse(request.query);
+
+        if (!parsedQuery.success) {
+          return reply
+            .code(400)
+            .send(buildValidationError(parsedQuery.error.issues));
+        }
+
+        const params = new URLSearchParams();
+
+        if (parsedQuery.data.kind) {
+          params.set("kind", parsedQuery.data.kind);
+        }
+
+        if (parsedQuery.data.includeInactive) {
+          params.set("includeInactive", parsedQuery.data.includeInactive);
+        }
+
+        const downstream = await requestDownstreamResource(
+          "identity",
+          `/internal/admin/catalog${params.size > 0 ? `?${params.toString()}` : ""}`,
+          adminCatalogListResponseSchema,
+        );
+
+        if (!downstream.ok) {
+          return reply.code(503).send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.post(
+      "/v1/admin/catalog",
+      {
+        schema: {
+          operationId: "saveAdminCatalogItem",
+          summary: "Create or update an admin-managed platform catalog item",
+          tags: ["admin", "catalog"],
+          security: [{ bearerAuth: [] }],
+          body: toJsonSchema(
+            adminCatalogItemInputSchema,
+            "AdminCatalogItemInput",
+          ),
+          response: {
+            200: toJsonSchema(adminCatalogItemSchema, "AdminCatalogItem"),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorCatalogValidation"),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorized"),
+            403: toJsonSchema(apiErrorSchema, "ApiErrorForbidden"),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorNotFound"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
+          },
+        },
+        preHandler: auth.requireAccess({ roles: ["admin"] }),
+      },
+      async (request, reply) => {
+        const parsedBody = adminCatalogItemInputSchema.safeParse(request.body);
+
+        if (!parsedBody.success) {
+          return reply
+            .code(400)
+            .send(buildValidationError(parsedBody.error.issues));
+        }
+
+        const downstream = await requestDownstreamResource(
+          "identity",
+          "/internal/admin/catalog",
+          adminCatalogItemSchema,
+          {
+            method: "POST",
+            body: parsedBody.data,
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.delete(
+      "/v1/admin/catalog/:id",
+      {
+        schema: {
+          operationId: "deleteAdminCatalogItem",
+          summary: "Delete an admin-managed platform catalog item",
+          tags: ["admin", "catalog"],
+          security: [{ bearerAuth: [] }],
+          params: {
+            type: "object",
+            required: ["id"],
+            properties: { id: { type: "string" } },
+          },
+          response: {
+            200: toJsonSchema(
+              adminCatalogDeleteResponseSchema,
+              "AdminCatalogDeleteResponse",
+            ),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorCatalogValidation"),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorized"),
+            403: toJsonSchema(apiErrorSchema, "ApiErrorForbidden"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
+          },
+        },
+        preHandler: auth.requireAccess({ roles: ["admin"] }),
+      },
+      async (request, reply) => {
+        const parsedParams = adminCatalogParamsSchema.safeParse(request.params);
+
+        if (!parsedParams.success) {
+          return reply
+            .code(400)
+            .send(buildValidationError(parsedParams.error.issues));
+        }
+
+        const downstream = await requestDownstreamResource(
+          "identity",
+          `/internal/admin/catalog/${encodeURIComponent(parsedParams.data.id)}`,
+          adminCatalogDeleteResponseSchema,
+          {
+            method: "DELETE",
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply.code(503).send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.post(
+      "/v1/admin/conversations",
+      {
+        schema: {
+          operationId: "startAdminConversation",
+          summary: "Start or open an admin conversation with a platform actor",
+          tags: ["admin", "messages"],
+          security: [{ bearerAuth: [] }],
+          body: toJsonSchema(
+            adminConversationStartInputSchema,
+            "AdminConversationStartInput",
+          ),
+          response: {
+            200: toJsonSchema(conversationSummarySchema, "ConversationSummary"),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorMessageValidation"),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorized"),
+            403: toJsonSchema(apiErrorSchema, "ApiErrorForbidden"),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorNotFound"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
+          },
+        },
+        preHandler: auth.requireAccess({ roles: ["admin"] }),
+      },
+      async (request, reply) => {
+        const actor = request.authContext as AuthPrincipal;
+        const parsedBody = adminConversationStartInputSchema.safeParse(
+          request.body,
+        );
+
+        if (!parsedBody.success) {
+          return reply
+            .code(400)
+            .send(buildValidationError(parsedBody.error.issues));
+        }
+
+        const downstream = await requestDownstreamResource(
+          "messaging",
+          `/internal/admin/conversations/${encodeURIComponent(actor.sub)}`,
+          conversationSummarySchema,
+          {
+            method: "POST",
+            body: parsedBody.data,
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.get(
+      "/v1/conversations",
+      {
+        schema: {
+          operationId: "listConversations",
+          summary: "List conversations visible to the authenticated actor",
+          tags: ["messages"],
+          security: [{ bearerAuth: [] }],
+          response: {
+            200: toJsonSchema(
+              conversationListResponseSchema,
+              "ConversationListResponse",
+            ),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorized"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
+          },
+        },
+        preHandler: auth.requireAccess(),
+      },
+      async (request, reply) => {
+        const actor = request.authContext as AuthPrincipal;
+        const downstream = await requestDownstreamResource(
+          "messaging",
+          `/internal/conversations/${encodeURIComponent(actor.sub)}`,
+          conversationListResponseSchema,
+        );
+
+        if (!downstream.ok) {
+          return reply.code(503).send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.get(
+      "/v1/conversations/:conversationId/messages",
+      {
+        schema: {
+          operationId: "listConversationMessages",
+          summary: "List messages for a visible conversation",
+          tags: ["messages"],
+          security: [{ bearerAuth: [] }],
+          params: {
+            type: "object",
+            required: ["conversationId"],
+            properties: { conversationId: { type: "string" } },
+          },
+          response: {
+            200: toJsonSchema(
+              conversationMessageListResponseSchema,
+              "ConversationMessageListResponse",
+            ),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorMessageValidation"),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorized"),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorNotFound"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
+          },
+        },
+        preHandler: auth.requireAccess(),
+      },
+      async (request, reply) => {
+        const actor = request.authContext as AuthPrincipal;
+        const parsedParams = conversationIdParamsSchema.safeParse(
+          request.params,
+        );
+
+        if (!parsedParams.success) {
+          return reply
+            .code(400)
+            .send(buildValidationError(parsedParams.error.issues));
+        }
+
+        const downstream = await requestDownstreamResource(
+          "messaging",
+          `/internal/conversations/${encodeURIComponent(actor.sub)}/${encodeURIComponent(parsedParams.data.conversationId)}/messages`,
+          conversationMessageListResponseSchema,
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.post(
+      "/v1/conversations/:conversationId/messages",
+      {
+        schema: {
+          operationId: "sendConversationMessage",
+          summary: "Send a message to a visible conversation",
+          tags: ["messages"],
+          security: [{ bearerAuth: [] }],
+          params: {
+            type: "object",
+            required: ["conversationId"],
+            properties: { conversationId: { type: "string" } },
+          },
+          body: toJsonSchema(
+            conversationMessageSendInputSchema,
+            "ConversationMessageSendInput",
+          ),
+          response: {
+            200: toJsonSchema(conversationMessageSchema, "ConversationMessage"),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorMessageValidation"),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorized"),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorNotFound"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
+          },
+        },
+        preHandler: auth.requireAccess(),
+      },
+      async (request, reply) => {
+        const actor = request.authContext as AuthPrincipal;
+        const parsedParams = conversationIdParamsSchema.safeParse(
+          request.params,
+        );
+        const parsedBody = conversationMessageSendInputSchema.safeParse(
+          request.body,
+        );
+
+        if (!parsedParams.success) {
+          return reply
+            .code(400)
+            .send(buildValidationError(parsedParams.error.issues));
+        }
+
+        if (!parsedBody.success) {
+          return reply
+            .code(400)
+            .send(buildValidationError(parsedBody.error.issues));
+        }
+
+        const downstream = await requestDownstreamResource(
+          "messaging",
+          `/internal/conversations/${encodeURIComponent(actor.sub)}/${encodeURIComponent(parsedParams.data.conversationId)}/messages`,
+          conversationMessageSchema,
+          {
+            method: "POST",
             body: parsedBody.data,
           },
         );
@@ -1450,6 +3366,7 @@ void startService({
               "ApiErrorUploadDocumentUnauthorized",
             ),
             404: toJsonSchema(apiErrorSchema, "ApiErrorUploadDocumentNotFound"),
+            409: toJsonSchema(apiErrorSchema, "ApiErrorUploadDocumentLocked"),
             503: toJsonSchema(
               apiErrorSchema,
               "ApiErrorUploadDocumentUnavailable",
@@ -1494,6 +3411,35 @@ void startService({
           });
         }
 
+        const currentOnboarding = await requestDownstreamResource(
+          "identity",
+          `/internal/actors/${encodeURIComponent(actor.sub)}/onboarding`,
+          onboardingStatusSchema,
+        );
+
+        if (!currentOnboarding.ok) {
+          return reply
+            .code(mapDownstreamStatusCode(currentOnboarding.statusCode))
+            .send(currentOnboarding.body);
+        }
+
+        const existingDocument = currentOnboarding.data.uploadedDocuments.find(
+          (document) => document.documentType === parsedBody.data.documentType,
+        );
+        const canReplaceRejectedDocument =
+          currentOnboarding.data.verificationStatus === "rejected" &&
+          currentOnboarding.data.missingDocuments.includes(
+            parsedBody.data.documentType,
+          );
+
+        if (existingDocument && !canReplaceRejectedDocument) {
+          return reply.code(409).send({
+            code: "DOCUMENT_REUPLOAD_LOCKED",
+            message:
+              "This document is already uploaded and can only be replaced after an admin rejects it.",
+          });
+        }
+
         try {
           await assertStoredObjectExists(parsedBody.data);
         } catch {
@@ -1526,6 +3472,83 @@ void startService({
           documentType: parsedBody.data.documentType,
           outstandingDocuments: downstream.data.missingDocuments,
           uploadedDocuments: downstream.data.uploadedDocuments,
+        };
+      },
+    );
+
+    app.post(
+      "/v1/uploads/verification-document/access",
+      {
+        schema: {
+          operationId: "createVerificationDocumentAccessUrl",
+          summary:
+            "Create a signed access URL for a private verification document",
+          tags: ["uploads", "onboarding"],
+          security: [{ bearerAuth: [] }],
+          body: toJsonSchema(
+            documentAccessRequestSchema,
+            "DocumentAccessRequest",
+          ),
+          response: {
+            200: toJsonSchema(
+              documentAccessResponseSchema,
+              "DocumentAccessResponse",
+            ),
+            400: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorDocumentAccessValidation",
+            ),
+            401: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorDocumentAccessUnauthorized",
+            ),
+            403: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorDocumentAccessForbidden",
+            ),
+          },
+        },
+        preHandler: auth.requireAccess({
+          roles: ["admin", "clinic", "professional"],
+        }),
+      },
+      async (request, reply) => {
+        const parsedBody = documentAccessRequestSchema.safeParse(request.body);
+
+        if (!parsedBody.success) {
+          return reply
+            .code(400)
+            .send(buildValidationError(parsedBody.error.issues));
+        }
+
+        const parsedFile = parseS3Uri(parsedBody.data.fileUrl);
+
+        if (!parsedFile) {
+          return reply.code(400).send({
+            code: "DOCUMENT_URL_INVALID",
+            message: "A valid s3:// document URL is required.",
+          });
+        }
+
+        const actor = request.authContext as AuthPrincipal;
+
+        if (
+          actor.role !== "admin" &&
+          !isActorOwnedObjectKey({
+            actorRole: actor.role,
+            actorSubject: actor.sub,
+            key: parsedFile.key,
+          })
+        ) {
+          return reply.code(403).send({
+            code: "DOCUMENT_ACCESS_FORBIDDEN",
+            message:
+              "You are not allowed to access a private document that does not belong to your actor account.",
+          });
+        }
+
+        return {
+          signedUrl: await createSignedDownloadUrl(parsedFile),
         };
       },
     );
@@ -1726,6 +3749,86 @@ void startService({
                 : downstream.statusCode === 404
                   ? 404
                   : 503,
+            )
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.patch(
+      "/v1/bookings/:bookingId",
+      {
+        schema: {
+          operationId: "updateBookingStatus",
+          summary: "Update a booking status visible to the authenticated actor",
+          tags: ["bookings"],
+          security: [{ bearerAuth: [] }],
+          params: {
+            type: "object",
+            required: ["bookingId"],
+            properties: {
+              bookingId: { type: "string" },
+            },
+          },
+          body: toJsonSchema(
+            bookingStatusUpdateInputSchema,
+            "BookingStatusUpdateInput",
+          ),
+          response: {
+            200: toJsonSchema(bookingDetailSchema, "UpdatedBookingDetail"),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorValidation"),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorized"),
+            403: toJsonSchema(apiErrorSchema, "ApiErrorForbidden"),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorNotFound"),
+            409: toJsonSchema(apiErrorSchema, "ApiErrorConflict"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
+          },
+        },
+        preHandler: auth.requireAccess(),
+      },
+      async (request, reply) => {
+        const actor = request.authContext as AuthPrincipal;
+        const parsedParams = bookingIdParamsSchema.safeParse(request.params);
+        const parsedBody = bookingStatusUpdateInputSchema.safeParse(
+          request.body,
+        );
+
+        if (!parsedParams.success) {
+          return reply
+            .code(400)
+            .send(buildValidationError(parsedParams.error.issues));
+        }
+
+        if (!parsedBody.success) {
+          return reply
+            .code(400)
+            .send(buildValidationError(parsedBody.error.issues));
+        }
+
+        const downstream = await requestDownstreamResource(
+          "scheduling",
+          `/internal/bookings/${encodeURIComponent(actor.sub)}/${encodeURIComponent(parsedParams.data.bookingId)}`,
+          bookingDetailSchema,
+          {
+            body: parsedBody.data,
+            method: "PATCH",
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(
+              downstream.statusCode === 400
+                ? 400
+                : downstream.statusCode === 403
+                  ? 403
+                  : downstream.statusCode === 404
+                    ? 404
+                    : downstream.statusCode === 409
+                      ? 409
+                      : 503,
             )
             .send(downstream.body);
         }

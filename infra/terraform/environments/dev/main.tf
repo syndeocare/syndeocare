@@ -94,6 +94,17 @@ variable "auth_realm" {
   default = "syndeocare"
 }
 
+variable "google_oauth_client_id" {
+  type    = string
+  default = ""
+}
+
+variable "google_oauth_client_secret" {
+  type      = string
+  sensitive = true
+  default   = ""
+}
+
 variable "resend_api_key" {
   type      = string
   sensitive = true
@@ -169,26 +180,6 @@ locals {
   public_base_url = var.api_public_base_url != "" ? var.api_public_base_url : (
     local.tls_enabled ? "https://${var.api_domain_name}" : "http://${aws_lb.public.dns_name}"
   )
-  object_storage_task_policy_json = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid      = "AllowBucketListing"
-        Effect   = "Allow"
-        Action   = ["s3:ListBucket"]
-        Resource = ["arn:aws:s3:::${var.storage_public_bucket}", "arn:aws:s3:::${var.storage_private_bucket}"]
-      },
-      {
-        Sid    = "AllowObjectReadWrite"
-        Effect = "Allow"
-        Action = ["s3:AbortMultipartUpload", "s3:DeleteObject", "s3:GetObject", "s3:PutObject"]
-        Resource = [
-          "arn:aws:s3:::${var.storage_public_bucket}/*",
-          "arn:aws:s3:::${var.storage_private_bucket}/*",
-        ]
-      },
-    ]
-  })
   tags = {
     Project     = "syndeocare"
     Environment = local.environment
@@ -211,11 +202,12 @@ resource "aws_secretsmanager_secret" "runtime" {
 resource "aws_secretsmanager_secret_version" "runtime" {
   secret_id = aws_secretsmanager_secret.runtime.id
   secret_string = jsonencode({
-    internal_service_token = random_password.internal_service_token.result
-    keycloak_admin_password = var.keycloak_admin_password
-    resend_api_key          = var.resend_api_key
-    storage_access_key_id   = var.storage_access_key_id
-    storage_secret_access_key = var.storage_secret_access_key
+    internal_service_token     = random_password.internal_service_token.result
+    keycloak_admin_password    = var.keycloak_admin_password
+    google_oauth_client_secret = var.google_oauth_client_secret
+    resend_api_key             = var.resend_api_key
+    storage_access_key_id      = var.storage_access_key_id
+    storage_secret_access_key  = var.storage_secret_access_key
   })
 }
 
@@ -397,6 +389,17 @@ module "cache" {
   tags                = local.tags
 }
 
+module "object_storage" {
+  source              = "../../modules/object-storage"
+  public_bucket_name  = var.storage_public_bucket
+  private_bucket_name = var.storage_private_bucket
+  cors_allowed_origins = compact([
+    local.public_base_url,
+    "http://54.221.113.197",
+  ])
+  tags = local.tags
+}
+
 module "notifications_service" {
   source                           = "../../modules/ecs-service"
   name                             = "${local.name}-notifications"
@@ -413,9 +416,9 @@ module "notifications_service" {
   container_port                   = 4115
   health_check_path                = "/health"
   environment = {
-    NODE_ENV         = "production"
-    PORT             = "4115"
-    SERVICE_DIR      = "services/notifications"
+    NODE_ENV          = "production"
+    PORT              = "4115"
+    SERVICE_DIR       = "services/notifications"
     RESEND_FROM_EMAIL = var.resend_from_email
     RESEND_TEST_EMAIL = var.resend_test_email
   }
@@ -442,23 +445,25 @@ module "identity_service" {
   container_port                   = 4111
   health_check_path                = "/health"
   environment = {
-    NODE_ENV                 = "production"
-    PORT                     = "4111"
-    SERVICE_DIR              = "services/identity"
-    AUTH_CLIENT_ID           = var.auth_api_client_id
-    AUTH_REALM               = var.auth_realm
-    KEYCLOAK_ADMIN_REALM     = var.keycloak_admin_realm
-    KEYCLOAK_ADMIN_USERNAME  = var.keycloak_admin_username
-    KEYCLOAK_BASE_URL        = var.keycloak_base_url
+    NODE_ENV                  = "production"
+    PORT                      = "4111"
+    SERVICE_DIR               = "services/identity"
+    AUTH_CLIENT_ID            = var.auth_api_client_id
+    AUTH_REALM                = var.auth_realm
+    GOOGLE_OAUTH_CLIENT_ID    = var.google_oauth_client_id
+    KEYCLOAK_ADMIN_REALM      = var.keycloak_admin_realm
+    KEYCLOAK_ADMIN_USERNAME   = var.keycloak_admin_username
+    KEYCLOAK_BASE_URL         = var.keycloak_base_url
     KEYCLOAK_PUBLIC_CLIENT_ID = var.keycloak_public_client_id
-    KEYCLOAK_REALM           = var.auth_realm
-    NATS_URL                 = module.event_backbone.nats_url
+    KEYCLOAK_REALM            = var.auth_realm
+    NATS_URL                  = module.event_backbone.nats_url
     SERVICE_NOTIFICATIONS_URL = "http://${module.notifications_service.service_discovery_service_name}:4115"
   }
   secrets = {
-    DATABASE_URL            = "${module.postgres.secret_arn}:url::"
-    INTERNAL_SERVICE_TOKEN  = "${aws_secretsmanager_secret.runtime.arn}:internal_service_token::"
-    KEYCLOAK_ADMIN_PASSWORD = "${aws_secretsmanager_secret.runtime.arn}:keycloak_admin_password::"
+    DATABASE_URL               = "${module.postgres.secret_arn}:url::"
+    GOOGLE_OAUTH_CLIENT_SECRET = "${aws_secretsmanager_secret.runtime.arn}:google_oauth_client_secret::"
+    INTERNAL_SERVICE_TOKEN     = "${aws_secretsmanager_secret.runtime.arn}:internal_service_token::"
+    KEYCLOAK_ADMIN_PASSWORD    = "${aws_secretsmanager_secret.runtime.arn}:keycloak_admin_password::"
   }
   tags = local.tags
 }
@@ -479,10 +484,10 @@ module "profiles_service" {
   container_port                   = 4112
   health_check_path                = "/health"
   environment = {
-    NODE_ENV = "production"
-    PORT     = "4112"
+    NODE_ENV    = "production"
+    PORT        = "4112"
     SERVICE_DIR = "services/profiles"
-    NATS_URL = module.event_backbone.nats_url
+    NATS_URL    = module.event_backbone.nats_url
   }
   secrets = {
     DATABASE_URL           = "${module.postgres.secret_arn}:url::"
@@ -507,10 +512,10 @@ module "clinics_service" {
   container_port                   = 4113
   health_check_path                = "/health"
   environment = {
-    NODE_ENV = "production"
-    PORT     = "4113"
+    NODE_ENV    = "production"
+    PORT        = "4113"
     SERVICE_DIR = "services/clinics"
-    NATS_URL = module.event_backbone.nats_url
+    NATS_URL    = module.event_backbone.nats_url
   }
   secrets = {
     DATABASE_URL           = "${module.postgres.secret_arn}:url::"
@@ -535,10 +540,10 @@ module "scheduling_service" {
   container_port                   = 4114
   health_check_path                = "/health"
   environment = {
-    NODE_ENV = "production"
-    PORT     = "4114"
+    NODE_ENV    = "production"
+    PORT        = "4114"
     SERVICE_DIR = "services/scheduling"
-    NATS_URL = module.event_backbone.nats_url
+    NATS_URL    = module.event_backbone.nats_url
   }
   secrets = {
     DATABASE_URL           = "${module.postgres.secret_arn}:url::"
@@ -567,27 +572,29 @@ module "api_gateway_service" {
   container_port                   = 4110
   health_check_path                = "/health"
   attach_task_role_policy          = true
-  task_role_policy_json            = local.object_storage_task_policy_json
+  task_role_policy_json            = module.object_storage.task_access_policy_json
   environment = {
-    NODE_ENV                    = "development"
-    PORT                        = "4110"
-    SERVICE_DIR                 = "services/api-gateway"
-    AUTH_AUDIENCE               = var.auth_api_client_id
-    AUTH_CLIENT_ID              = var.auth_api_client_id
-    AUTH_ISSUER_URL             = "${var.keycloak_base_url}/realms/${var.auth_realm}"
-    AUTH_MODE                   = "development-bypass"
-    AUTH_REALM                  = var.auth_realm
-    ENABLE_DEV_AUTH_BYPASS      = "true"
-    SERVICE_CLINICS_URL         = "http://${module.clinics_service.service_discovery_service_name}:4113"
-    SERVICE_IDENTITY_URL        = "http://${module.identity_service.service_discovery_service_name}:4111"
-    SERVICE_PROFILES_URL        = "http://${module.profiles_service.service_discovery_service_name}:4112"
-    SERVICE_SCHEDULING_URL      = "http://${module.scheduling_service.service_discovery_service_name}:4114"
-    STORAGE_ENDPOINT            = ""
-    STORAGE_FORCE_PATH_STYLE    = "false"
-    STORAGE_PRIVATE_BUCKET      = var.storage_private_bucket
-    STORAGE_PUBLIC_BASE_URL     = var.storage_public_base_url
-    STORAGE_PUBLIC_BUCKET       = var.storage_public_bucket
-    STORAGE_REGION              = var.storage_region
+    NODE_ENV                       = "development"
+    PORT                           = "4110"
+    SERVICE_DIR                    = "services/api-gateway"
+    AUTH_AUDIENCE                  = var.auth_api_client_id
+    AUTH_CLIENT_ID                 = var.auth_api_client_id
+    AUTH_ISSUER_URL                = "${var.keycloak_base_url}/realms/${var.auth_realm}"
+    AUTH_MODE                      = "development-bypass"
+    AUTH_REALM                     = var.auth_realm
+    ENABLE_DEV_AUTH_BYPASS         = "true"
+    KEYCLOAK_BASE_URL              = var.keycloak_base_url
+    KEYCLOAK_PUBLIC_CLIENT_ID      = var.keycloak_public_client_id
+    SERVICE_CLINICS_URL            = "http://${module.clinics_service.service_discovery_service_name}:4113"
+    SERVICE_IDENTITY_URL           = "http://${module.identity_service.service_discovery_service_name}:4111"
+    SERVICE_PROFILES_URL           = "http://${module.profiles_service.service_discovery_service_name}:4112"
+    SERVICE_SCHEDULING_URL         = "http://${module.scheduling_service.service_discovery_service_name}:4114"
+    STORAGE_ENDPOINT               = ""
+    STORAGE_FORCE_PATH_STYLE       = "false"
+    STORAGE_PRIVATE_BUCKET         = module.object_storage.private_bucket_name
+    STORAGE_PUBLIC_BASE_URL        = var.storage_public_base_url
+    STORAGE_PUBLIC_BUCKET          = module.object_storage.public_bucket_name
+    STORAGE_REGION                 = var.storage_region
     STORAGE_UPLOAD_URL_TTL_SECONDS = "900"
   }
   secrets = {
@@ -619,18 +626,18 @@ module "platform_api_service" {
   desired_count                    = 1
   health_check_path                = "/platform-api/v1/health/live"
   environment = {
-    NODE_ENV                = "production"
-    HOST                    = "0.0.0.0"
-    PORT                    = "4300"
-    SERVICE_DIR             = "services/platform-api"
-    API_DOCS_PATH           = "docs"
-    API_PUBLIC_URL          = "${local.public_base_url}/platform-api/v1"
-    API_CORS_ORIGINS        = local.public_base_url
-    CACHE_TTL_SECONDS       = "60"
-    NATS_URL                = module.event_backbone.nats_url
-    REQUEST_TIMEOUT_MS      = "5000"
-    HTTP_RETRY_ATTEMPTS     = "3"
-    HTTP_RETRY_BACKOFF_MS   = "250"
+    NODE_ENV              = "production"
+    HOST                  = "0.0.0.0"
+    PORT                  = "4300"
+    SERVICE_DIR           = "services/platform-api"
+    API_DOCS_PATH         = "docs"
+    API_PUBLIC_URL        = "${local.public_base_url}/platform-api/v1"
+    API_CORS_ORIGINS      = local.public_base_url
+    CACHE_TTL_SECONDS     = "60"
+    NATS_URL              = module.event_backbone.nats_url
+    REQUEST_TIMEOUT_MS    = "5000"
+    HTTP_RETRY_ATTEMPTS   = "3"
+    HTTP_RETRY_BACKOFF_MS = "250"
   }
   secrets = {
     DATABASE_URL = "${module.postgres.secret_arn}:url::"

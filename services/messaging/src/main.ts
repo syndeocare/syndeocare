@@ -1,5 +1,28 @@
-import { domainEventCatalog } from "@repo/contracts";
+import {
+  adminConversationStartInputSchema,
+  conversationListResponseSchema,
+  conversationMessageListResponseSchema,
+  conversationMessageSchema,
+  conversationMessageSendInputSchema,
+  conversationSummarySchema,
+  domainEventCatalog,
+} from "@repo/contracts";
+import {
+  listConversationMessagesForSubject,
+  listConversationsForSubject,
+  sendConversationMessageBySubject,
+  startAdminConversationBySubject,
+} from "@repo/persistence";
 import { startService } from "@repo/service-core";
+import { z } from "zod";
+
+const subjectParamsSchema = z.object({
+  subject: z.string().min(1),
+});
+const conversationParamsSchema = z.object({
+  conversationId: z.string().uuid(),
+  subject: z.string().min(1),
+});
 
 void startService({
   serviceName: "messaging",
@@ -10,5 +33,113 @@ void startService({
       service: "messaging",
       responsibility: "Conversation, message delivery, and inbox workflows.",
     }));
+
+    app.post(
+      "/internal/admin/conversations/:subject",
+      async (request, reply) => {
+        const parsedParams = subjectParamsSchema.safeParse(request.params);
+        const parsedBody = adminConversationStartInputSchema.safeParse(
+          request.body,
+        );
+
+        if (!parsedParams.success || !parsedBody.success) {
+          return reply.code(400).send({
+            code: "VALIDATION_ERROR",
+            message: "A valid admin subject and target subject are required.",
+          });
+        }
+
+        const conversation = await startAdminConversationBySubject(
+          parsedParams.data.subject,
+          parsedBody.data.targetSubject,
+        );
+
+        if (!conversation) {
+          return reply.code(404).send({
+            code: "CONVERSATION_TARGET_NOT_FOUND",
+            message:
+              "No admin or target actor was found for this conversation.",
+          });
+        }
+
+        return conversationSummarySchema.parse(conversation);
+      },
+    );
+
+    app.get("/internal/conversations/:subject", async (request, reply) => {
+      const parsedParams = subjectParamsSchema.safeParse(request.params);
+
+      if (!parsedParams.success) {
+        return reply.code(400).send({
+          code: "VALIDATION_ERROR",
+          message: "A valid actor subject is required.",
+        });
+      }
+
+      const conversations = await listConversationsForSubject(
+        parsedParams.data.subject,
+      );
+
+      return conversationListResponseSchema.parse({
+        items: conversations,
+        total: conversations.length,
+      });
+    });
+
+    app.get(
+      "/internal/conversations/:subject/:conversationId/messages",
+      async (request, reply) => {
+        const parsedParams = conversationParamsSchema.safeParse(request.params);
+
+        if (!parsedParams.success) {
+          return reply.code(400).send({
+            code: "VALIDATION_ERROR",
+            message: "A valid actor subject and conversation id are required.",
+          });
+        }
+
+        const messages = await listConversationMessagesForSubject(
+          parsedParams.data.subject,
+          parsedParams.data.conversationId,
+        );
+
+        return conversationMessageListResponseSchema.parse({
+          items: messages,
+          total: messages.length,
+        });
+      },
+    );
+
+    app.post(
+      "/internal/conversations/:subject/:conversationId/messages",
+      async (request, reply) => {
+        const parsedParams = conversationParamsSchema.safeParse(request.params);
+        const parsedBody = conversationMessageSendInputSchema.safeParse(
+          request.body,
+        );
+
+        if (!parsedParams.success || !parsedBody.success) {
+          return reply.code(400).send({
+            code: "VALIDATION_ERROR",
+            message: "A valid message payload is required.",
+          });
+        }
+
+        const message = await sendConversationMessageBySubject({
+          subject: parsedParams.data.subject,
+          conversationId: parsedParams.data.conversationId,
+          ...parsedBody.data,
+        });
+
+        if (!message) {
+          return reply.code(404).send({
+            code: "CONVERSATION_NOT_FOUND",
+            message: "No visible conversation was found for this actor.",
+          });
+        }
+
+        return conversationMessageSchema.parse(message);
+      },
+    );
   },
 });

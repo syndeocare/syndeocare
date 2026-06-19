@@ -12,14 +12,23 @@ export function getDatabaseUrl() {
 }
 
 function shouldUseSsl(databaseUrl: string) {
+  if (process.env.DATABASE_SSL === "false") {
+    return false;
+  }
+
   try {
     const url = new URL(databaseUrl);
+    const sslMode = url.searchParams.get("sslmode");
 
-    if (url.searchParams.get("sslmode") === "require") {
+    if (sslMode === "disable") {
+      return false;
+    }
+
+    if (sslMode === "require") {
       return true;
     }
 
-    return !["127.0.0.1", "localhost"].includes(url.hostname);
+    return !["127.0.0.1", "localhost", "postgres", "db"].includes(url.hostname);
   } catch {
     return false;
   }

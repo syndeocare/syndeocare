@@ -82,7 +82,7 @@ done <<<"$BUILD_OUTPUT"
 
 if [[ -n "${WEB_FRONTEND_BUCKET:-}" ]]; then
   pnpm build:web
-  aws s3 sync apps/web/out "s3://${WEB_FRONTEND_BUCKET}" --delete
+  aws s3 sync apps/web/dist "s3://${WEB_FRONTEND_BUCKET}" --delete
 fi
 
 pushd "infra/terraform/environments/${ENVIRONMENT}" >/dev/null
@@ -114,6 +114,8 @@ append_tf_var "keycloak_admin_realm" "${KEYCLOAK_ADMIN_REALM:-}"
 append_tf_var "keycloak_public_client_id" "${KEYCLOAK_PUBLIC_CLIENT_ID:-}"
 append_tf_var "auth_api_client_id" "${AUTH_API_CLIENT_ID:-}"
 append_tf_var "auth_realm" "${AUTH_REALM:-}"
+append_tf_var "google_oauth_client_id" "${GOOGLE_OAUTH_CLIENT_ID:-}"
+append_tf_var "google_oauth_client_secret" "${GOOGLE_OAUTH_CLIENT_SECRET:-}"
 append_tf_var "resend_api_key" "${RESEND_API_KEY:-}"
 append_tf_var "resend_from_email" "${RESEND_FROM_EMAIL:-}"
 append_tf_var "resend_test_email" "${RESEND_TEST_EMAIL:-}"

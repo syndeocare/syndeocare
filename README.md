@@ -121,6 +121,28 @@ service-to-service trust within the platform boundary.
 
 Local Keycloak bootstrap assets live in `infra/keycloak/realm-import/`.
 
+The public gateway now exposes the core owned auth flow at `/v1/auth/*`,
+including sign-in, sign-up, refresh-token exchange, logout token revocation,
+email-verification links, password-reset links, and authenticated password
+updates, plus authenticated account deletion, so frontend clients can move off
+externally managed sessions and recovery flows onto the owned backend auth path.
+
+The same gateway also now exposes authenticated actor preferences on
+`/v1/preferences/me`, backed by the shared PostgreSQL persistence layer.
+
+The upload surface also now covers owned profile-image uploads, owned
+verification-document uploads, and signed access URLs for private verification
+documents through `/v1/uploads/*`, so onboarding and profile document flows can
+use owned gateway storage helpers.
+
+The owned platform now also includes in-app notification persistence and actor
+external-id syncing so frontend clients can create, list, read, and clear
+notifications through the API gateway instead of the legacy notification table.
+
+Admin tooling can also read owned notification totals for a target external user
+id through the gateway, which removes another direct legacy notification-table
+dependency from the moderation surface during the migration.
+
 ## Deployment target
 
 - **Web / docs:** static or Next runtime on AWS
