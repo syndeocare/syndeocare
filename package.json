@@ -18,6 +18,7 @@
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "changeset publish",
+    "smoke:web": "node scripts/ci-smoke-web.mjs",
     "clean": "rimraf .turbo apps/*/.next apps/*/dist packages/*/dist services/*/dist",
     "validate": "pnpm format:check && pnpm lint && pnpm check-types",
     "validate:ci": "pnpm validate && pnpm build",

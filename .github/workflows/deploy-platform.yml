@@ -1,54 +1,85 @@
 name: Deploy Platform
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       environment:
-        description: Target environment
+        description: Target deployment environment
         required: true
         type: choice
+        default: production
         options:
           - dev
           - staging
-          - prod
+          - production
+      deploy_backend:
+        description: Run backend ECS/Terraform deployment when BACKEND_DEPLOY_MODE=ecs
+        required: true
+        type: boolean
+        default: false
+
+concurrency:
+  group: deploy-${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}
+  cancel-in-progress: false
 
 jobs:
   deploy:
+    name: Deploy ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}
     runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}
     permissions:
-      id-token: write
       contents: read
-    environment: ${{ inputs.environment }}
+      id-token: write
     env:
-      TF_VAR_aws_region: ${{ vars.AWS_REGION }}
-      TF_VAR_api_public_base_url: ${{ vars.API_PUBLIC_BASE_URL }}
-      TF_VAR_platform_api_image: ${{ vars.PLATFORM_API_IMAGE }}
-      TF_VAR_api_gateway_image: ${{ vars.API_GATEWAY_IMAGE }}
-      TF_VAR_identity_image: ${{ vars.IDENTITY_IMAGE }}
-      TF_VAR_profiles_image: ${{ vars.PROFILES_IMAGE }}
-      TF_VAR_clinics_image: ${{ vars.CLINICS_IMAGE }}
-      TF_VAR_scheduling_image: ${{ vars.SCHEDULING_IMAGE }}
-      TF_VAR_notifications_image: ${{ vars.NOTIFICATIONS_IMAGE }}
-      TF_VAR_keycloak_base_url: ${{ vars.KEYCLOAK_BASE_URL }}
-      TF_VAR_keycloak_admin_username: ${{ vars.KEYCLOAK_ADMIN_USERNAME }}
-      TF_VAR_keycloak_admin_password: ${{ secrets.KEYCLOAK_ADMIN_PASSWORD }}
-      TF_VAR_keycloak_admin_realm: ${{ vars.KEYCLOAK_ADMIN_REALM }}
-      TF_VAR_keycloak_public_client_id: ${{ vars.KEYCLOAK_PUBLIC_CLIENT_ID }}
-      TF_VAR_auth_api_client_id: ${{ vars.AUTH_API_CLIENT_ID }}
-      TF_VAR_auth_realm: ${{ vars.AUTH_REALM }}
-      TF_VAR_google_oauth_client_id: ${{ vars.GOOGLE_OAUTH_CLIENT_ID }}
-      TF_VAR_google_oauth_client_secret: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
-      TF_VAR_resend_api_key: ${{ secrets.RESEND_API_KEY }}
-      TF_VAR_resend_from_email: ${{ vars.RESEND_FROM_EMAIL }}
-      TF_VAR_resend_test_email: ${{ vars.RESEND_TEST_EMAIL }}
-      TF_VAR_storage_access_key_id: ${{ secrets.STORAGE_ACCESS_KEY_ID }}
-      TF_VAR_storage_secret_access_key: ${{ secrets.STORAGE_SECRET_ACCESS_KEY }}
-      TF_VAR_storage_region: ${{ vars.STORAGE_REGION }}
-      TF_VAR_storage_public_bucket: ${{ vars.STORAGE_PUBLIC_BUCKET }}
-      TF_VAR_storage_private_bucket: ${{ vars.STORAGE_PRIVATE_BUCKET }}
-      TF_VAR_storage_public_base_url: ${{ vars.STORAGE_PUBLIC_BASE_URL }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_GITHUB_ACTIONS_ROLE_ARN: ${{ vars.AWS_GITHUB_ACTIONS_ROLE_ARN }}
+      API_PUBLIC_BASE_URL: ${{ vars.API_PUBLIC_BASE_URL }}
+      AUTH_API_CLIENT_ID: ${{ vars.AUTH_API_CLIENT_ID }}
+      AUTH_REALM: ${{ vars.AUTH_REALM }}
+      KEYCLOAK_ADMIN_REALM: ${{ vars.KEYCLOAK_ADMIN_REALM }}
+      KEYCLOAK_ADMIN_USERNAME: ${{ vars.KEYCLOAK_ADMIN_USERNAME }}
+      KEYCLOAK_BASE_URL: ${{ vars.KEYCLOAK_BASE_URL }}
+      KEYCLOAK_PUBLIC_CLIENT_ID: ${{ vars.KEYCLOAK_PUBLIC_CLIENT_ID }}
+      GOOGLE_OAUTH_CLIENT_ID: ${{ vars.GOOGLE_OAUTH_CLIENT_ID }}
+      RESEND_FROM_EMAIL: ${{ vars.RESEND_FROM_EMAIL }}
+      RESEND_TEST_EMAIL: ${{ vars.RESEND_TEST_EMAIL }}
+      STORAGE_REGION: ${{ vars.STORAGE_REGION }}
+      STORAGE_PUBLIC_BUCKET: ${{ vars.STORAGE_PUBLIC_BUCKET }}
+      STORAGE_PRIVATE_BUCKET: ${{ vars.STORAGE_PRIVATE_BUCKET }}
+      STORAGE_PUBLIC_BASE_URL: ${{ vars.STORAGE_PUBLIC_BASE_URL }}
+      VITE_API_GATEWAY_BASE_URL: ${{ vars.VITE_API_GATEWAY_BASE_URL }}
+      VITE_PLATFORM_API_BASE_URL: ${{ vars.VITE_PLATFORM_API_BASE_URL }}
+      VITE_EMAIL_VERIFICATION_REQUIRED: ${{ vars.VITE_EMAIL_VERIFICATION_REQUIRED }}
+      WEB_FRONTEND_BUCKET: ${{ vars.WEB_FRONTEND_BUCKET }}
+      WEB_FRONTEND_DISTRIBUTION_ID: ${{ vars.WEB_FRONTEND_DISTRIBUTION_ID }}
+      WEB_PUBLIC_URL: ${{ vars.WEB_PUBLIC_URL }}
+      BACKEND_DEPLOY_MODE: ${{ vars.BACKEND_DEPLOY_MODE }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Resolve deployment context
+        id: context
+        run: |
+          set -euo pipefail
+
+          target="${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}"
+          terraform_env="$target"
+          if [[ "$target" == "production" ]]; then
+            terraform_env="prod"
+          fi
+
+          deploy_backend="${{ github.event_name == 'workflow_dispatch' && inputs.deploy_backend || false }}"
+          if [[ "${BACKEND_DEPLOY_MODE:-}" == "ecs" && "${{ github.event_name }}" == "push" ]]; then
+            deploy_backend="true"
+          fi
+
+          echo "target=$target" >> "$GITHUB_OUTPUT"
+          echo "terraform_env=$terraform_env" >> "$GITHUB_OUTPUT"
+          echo "deploy_backend=$deploy_backend" >> "$GITHUB_OUTPUT"
+          echo "image_tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
 
       - uses: pnpm/action-setup@v4
         with:
@@ -62,62 +93,135 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Validate repository
+        run: pnpm validate
+
+      - name: Build repository
+        run: pnpm build
+
+      - name: Smoke test web artifact
+        run: pnpm smoke:web
+
+      - name: Verify AWS deployment settings
+        run: |
+          set -euo pipefail
+          test -n "${AWS_REGION:-}" || {
+            echo "AWS_REGION must be configured on the GitHub environment."
+            exit 1
+          }
+          test -n "${AWS_GITHUB_ACTIONS_ROLE_ARN:-}" || {
+            echo "AWS_GITHUB_ACTIONS_ROLE_ARN must be configured on the GitHub environment."
+            exit 1
+          }
+          test -n "${WEB_FRONTEND_BUCKET:-}" || {
+            echo "WEB_FRONTEND_BUCKET must be configured on the GitHub environment."
+            exit 1
+          }
+          test -n "${WEB_FRONTEND_DISTRIBUTION_ID:-}" || {
+            echo "WEB_FRONTEND_DISTRIBUTION_ID must be configured on the GitHub environment."
+            exit 1
+          }
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_GITHUB_ACTIONS_ROLE_ARN }}
-          aws-region: ${{ vars.AWS_REGION }}
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-
-      - name: Build services
-        run: pnpm build:services
+          role-to-assume: ${{ env.AWS_GITHUB_ACTIONS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Build web frontend
-        env:
-          VITE_API_GATEWAY_BASE_URL: ${{ vars.VITE_API_GATEWAY_BASE_URL }}
-          VITE_PLATFORM_API_BASE_URL: ${{ vars.VITE_PLATFORM_API_BASE_URL }}
-          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
-          VITE_SUPABASE_PROJECT_ID: ${{ vars.VITE_SUPABASE_PROJECT_ID }}
-          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
-          VITE_EMAIL_VERIFICATION_REQUIRED: ${{ vars.VITE_EMAIL_VERIFICATION_REQUIRED }}
         run: pnpm build:web
 
       - name: Upload web frontend artifact
         uses: actions/upload-artifact@v4
         with:
-          name: web-frontend-${{ inputs.environment }}
+          name: web-frontend-${{ steps.context.outputs.target }}-${{ github.sha }}
           path: apps/web/dist
           if-no-files-found: error
 
-      - name: Sync web frontend to S3
-        if: ${{ vars.WEB_FRONTEND_BUCKET != '' }}
+      - name: Sync immutable frontend assets
         run: |
-          aws s3 sync apps/web/dist "s3://${{ vars.WEB_FRONTEND_BUCKET }}" \
-            --delete \
-            --exclude "assets/*" \
-            --cache-control "no-store,no-cache,must-revalidate"
-          aws s3 sync apps/web/dist/assets "s3://${{ vars.WEB_FRONTEND_BUCKET }}/assets" \
+          aws s3 sync apps/web/dist/assets "s3://${WEB_FRONTEND_BUCKET}/assets" \
             --delete \
             --cache-control "public,max-age=31536000,immutable"
 
+      - name: Sync frontend shell
+        run: |
+          aws s3 sync apps/web/dist "s3://${WEB_FRONTEND_BUCKET}" \
+            --delete \
+            --exclude "assets/*" \
+            --cache-control "no-store,no-cache,must-revalidate"
+
+      - name: Invalidate CloudFront
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${WEB_FRONTEND_DISTRIBUTION_ID}" \
+            --paths "/*"
+
+      - name: Smoke test deployed frontend
+        run: |
+          set -euo pipefail
+          public_url="${WEB_PUBLIC_URL:-https://syndeocare.ai}"
+          curl -fsSIL --retry 5 --retry-delay 5 --max-time 20 "$public_url" >/dev/null
+
+      - name: Setup Terraform
+        if: ${{ steps.context.outputs.deploy_backend == 'true' && vars.BACKEND_DEPLOY_MODE == 'ecs' }}
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Build and push service image
+        if: ${{ steps.context.outputs.deploy_backend == 'true' && vars.BACKEND_DEPLOY_MODE == 'ecs' }}
+        id: service_images
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+        run: |
+          set -euo pipefail
+          infra/scripts/build-and-push-images.sh \
+            "${{ steps.context.outputs.terraform_env }}" \
+            "${{ steps.context.outputs.image_tag }}" | tee /tmp/syndeocare-images.env
+
+          while IFS='=' read -r key value; do
+            lower="$(printf '%s' "$key" | tr '[:upper:]' '[:lower:]')"
+            echo "TF_VAR_${lower}=$value" >> "$GITHUB_ENV"
+          done < /tmp/syndeocare-images.env
+
       - name: Terraform init
-        working-directory: infra/terraform/environments/${{ inputs.environment }}
-        run: terraform init
+        if: ${{ steps.context.outputs.deploy_backend == 'true' && vars.BACKEND_DEPLOY_MODE == 'ecs' }}
+        working-directory: infra/terraform/environments/${{ steps.context.outputs.terraform_env }}
+        run: terraform init -input=false
 
       - name: Terraform validate
-        working-directory: infra/terraform/environments/${{ inputs.environment }}
+        if: ${{ steps.context.outputs.deploy_backend == 'true' && vars.BACKEND_DEPLOY_MODE == 'ecs' }}
+        working-directory: infra/terraform/environments/${{ steps.context.outputs.terraform_env }}
         run: terraform validate
 
       - name: Terraform plan
-        working-directory: infra/terraform/environments/${{ inputs.environment }}
-        run: terraform plan -out=tfplan
+        if: ${{ steps.context.outputs.deploy_backend == 'true' && vars.BACKEND_DEPLOY_MODE == 'ecs' }}
+        working-directory: infra/terraform/environments/${{ steps.context.outputs.terraform_env }}
+        env:
+          TF_VAR_aws_region: ${{ vars.AWS_REGION }}
+          TF_VAR_api_public_base_url: ${{ vars.API_PUBLIC_BASE_URL }}
+          TF_VAR_keycloak_base_url: ${{ vars.KEYCLOAK_BASE_URL }}
+          TF_VAR_keycloak_admin_username: ${{ vars.KEYCLOAK_ADMIN_USERNAME }}
+          TF_VAR_keycloak_admin_password: ${{ secrets.KEYCLOAK_ADMIN_PASSWORD }}
+          TF_VAR_keycloak_admin_realm: ${{ vars.KEYCLOAK_ADMIN_REALM }}
+          TF_VAR_keycloak_public_client_id: ${{ vars.KEYCLOAK_PUBLIC_CLIENT_ID }}
+          TF_VAR_auth_api_client_id: ${{ vars.AUTH_API_CLIENT_ID }}
+          TF_VAR_auth_realm: ${{ vars.AUTH_REALM }}
+          TF_VAR_google_oauth_client_id: ${{ vars.GOOGLE_OAUTH_CLIENT_ID }}
+          TF_VAR_google_oauth_client_secret: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+          TF_VAR_resend_api_key: ${{ secrets.RESEND_API_KEY }}
+          TF_VAR_resend_from_email: ${{ vars.RESEND_FROM_EMAIL }}
+          TF_VAR_resend_test_email: ${{ vars.RESEND_TEST_EMAIL }}
+          TF_VAR_storage_access_key_id: ${{ secrets.STORAGE_ACCESS_KEY_ID }}
+          TF_VAR_storage_secret_access_key: ${{ secrets.STORAGE_SECRET_ACCESS_KEY }}
+          TF_VAR_storage_region: ${{ vars.STORAGE_REGION }}
+          TF_VAR_storage_public_bucket: ${{ vars.STORAGE_PUBLIC_BUCKET }}
+          TF_VAR_storage_private_bucket: ${{ vars.STORAGE_PRIVATE_BUCKET }}
+          TF_VAR_storage_public_base_url: ${{ vars.STORAGE_PUBLIC_BASE_URL }}
+          TF_VAR_route53_zone_name: ${{ vars.ROUTE53_ZONE_NAME }}
+          TF_VAR_api_domain_name: ${{ vars.API_DOMAIN_NAME }}
+        run: terraform plan -input=false -out=tfplan
 
       - name: Terraform apply
-        working-directory: infra/terraform/environments/${{ inputs.environment }}
-        run: terraform apply -auto-approve tfplan
-
-      - name: Invalidate CloudFront
-        if: ${{ vars.WEB_FRONTEND_DISTRIBUTION_ID != '' }}
-        run: aws cloudfront create-invalidation --distribution-id "${{ vars.WEB_FRONTEND_DISTRIBUTION_ID }}" --paths "/*"
+        if: ${{ steps.context.outputs.deploy_backend == 'true' && vars.BACKEND_DEPLOY_MODE == 'ecs' }}
+        working-directory: infra/terraform/environments/${{ steps.context.outputs.terraform_env }}
+        run: terraform apply -input=false -auto-approve tfplan

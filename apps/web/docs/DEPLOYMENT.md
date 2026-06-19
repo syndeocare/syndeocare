@@ -2,10 +2,15 @@
 
 ## Web Deployment
 
-The current live web app is served from the EC2-hosted nginx deployment at:
+The current live web app is served from AWS S3 and CloudFront at:
 
 - `https://syndeocare.ai`
 - `https://www.syndeocare.ai`
+
+Production frontend target:
+
+- S3 bucket: `syndeocare-prod-web-433956820920`
+- CloudFront distribution: `EWYG0R5Q8AIOE`
 
 The API gateway and platform API are exposed through the API subdomain:
 
@@ -33,9 +38,14 @@ origins:
 - `https://syndeocare.ai`
 - `https://www.syndeocare.ai`
 
-DNS for `syndeocare.ai` is managed in AWS Route 53. TLS certificates are
-managed by Certbot on the EC2 host and renew automatically through
-`certbot-renew.timer`.
+DNS for `syndeocare.ai` is managed in AWS Route 53. The frontend TLS
+certificate is managed by CloudFront/ACM. The current API and auth records point
+to `54.221.113.197`; keep backend automation guarded until that target is moved
+into managed AWS infrastructure or imported into Terraform.
+
+Production deploys are handled by GitHub Actions after changes merge to `main`.
+See `docs/runbooks/github-aws-cicd.md` for the required GitHub environment and
+AWS OIDC setup.
 
 To deploy to a custom domain:
 
