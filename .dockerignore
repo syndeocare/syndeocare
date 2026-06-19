@@ -2,6 +2,9 @@
 .github
 .husky
 .turbo
+apps
+docs
+infra
 **/.next
 infra/terraform/**/.terraform
 *.log

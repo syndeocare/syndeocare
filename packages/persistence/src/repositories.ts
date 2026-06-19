@@ -1,8 +1,11 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, ne, sql } from "drizzle-orm";
 import type {
+  AppNotification,
+  AdminVerificationSnapshot,
   AuthPrincipal,
   BookingDetail,
   BookingRequestInput,
+  BookingStatusUpdateInput,
   ClinicProfileListResponse,
   ClinicProfileSummary,
   ClinicProfileUpdateInput,
@@ -17,17 +20,23 @@ import type {
   ProfessionalProfileUpdateInput,
   ProfessionalProfileSummary,
   UploadedDocument,
+  UserPreferences,
   VerificationReviewInput,
   VerificationStatusResponse,
 } from "@repo/contracts";
 import { getDb } from "./client.js";
 import {
   actors,
+  adminCatalogItems,
   bookings,
   clinicProfiles,
+  conversationMessages,
+  conversations,
   jobListings,
   onboardingRecords,
   professionalProfiles,
+  userPreferences,
+  appNotifications,
 } from "./schema.js";
 
 function numericToNumber(value: string) {
@@ -54,6 +63,19 @@ function dedupeUploadedDocuments(documents: UploadedDocument[]) {
   );
 }
 
+function mapLegacyVerificationStatus(
+  status: "not_started" | "pending_review" | "approved" | "rejected",
+) {
+  switch (status) {
+    case "approved":
+      return "verified" as const;
+    case "rejected":
+      return "rejected" as const;
+    default:
+      return "pending" as const;
+  }
+}
+
 function mapProfessionalProfileSummary(row: {
   actor: typeof actors.$inferSelect;
   profile: typeof professionalProfiles.$inferSelect;
@@ -74,6 +96,8 @@ function mapProfessionalProfileSummary(row: {
     profileImageUrl: row.profile.profileImageUrl ?? undefined,
     city: row.profile.city,
     region: row.profile.region,
+    latitude: numericToNumber(row.profile.latitude),
+    longitude: numericToNumber(row.profile.longitude),
     availability: {
       status: row.profile.availabilityStatus,
       nextAvailableAt: row.profile.nextAvailableAt?.toISOString(),
@@ -96,6 +120,8 @@ function mapClinicProfileSummary(row: {
     services: row.clinic.services,
     city: row.clinic.city,
     region: row.clinic.region,
+    latitude: numericToNumber(row.clinic.latitude),
+    longitude: numericToNumber(row.clinic.longitude),
     verificationStatus: row.actor.verificationStatus,
     onboardingCompleted: row.actor.onboardingCompleted,
     logoUrl: row.clinic.logoUrl ?? undefined,
@@ -162,15 +188,50 @@ export async function getAuthPrincipalBySubject(
     return null;
   }
 
+  const db = getDb();
+  const [professionalRow] =
+    aggregate.actor.role === "professional"
+      ? await db
+          .select({
+            id: professionalProfiles.id,
+            profileImageUrl: professionalProfiles.profileImageUrl,
+          })
+          .from(professionalProfiles)
+          .where(eq(professionalProfiles.actorId, aggregate.actor.id))
+          .limit(1)
+      : [];
+  const [clinicRow] =
+    aggregate.actor.role === "clinic"
+      ? await db
+          .select({ id: clinicProfiles.id, logoUrl: clinicProfiles.logoUrl })
+          .from(clinicProfiles)
+          .where(eq(clinicProfiles.actorId, aggregate.actor.id))
+          .limit(1)
+      : [];
+
   return {
     sub: aggregate.actor.authSubject,
     email: aggregate.actor.email ?? undefined,
     role: aggregate.actor.role,
     permissions: [],
+    clinicId: clinicRow?.id,
+    profileId: professionalRow?.id,
     onboardingCompleted: aggregate.actor.onboardingCompleted,
     verificationStatus: aggregate.actor.verificationStatus,
     displayName: aggregate.actor.displayName ?? undefined,
+    profileImageUrl:
+      professionalRow?.profileImageUrl ?? clinicRow?.logoUrl ?? undefined,
   };
+}
+
+export async function deleteActorBySubject(subject: string): Promise<boolean> {
+  const db = getDb();
+  const deleted = await db
+    .delete(actors)
+    .where(eq(actors.authSubject, subject))
+    .returning({ id: actors.id });
+
+  return deleted.length > 0;
 }
 
 export async function getOnboardingStatusBySubject(
@@ -212,6 +273,265 @@ export async function getVerificationStatusBySubject(
     outstandingDocuments: aggregate.onboarding.missingDocuments,
     uploadedDocuments: aggregate.onboarding.uploadedDocuments,
   };
+}
+
+export async function getUserPreferencesBySubject(
+  subject: string,
+): Promise<UserPreferences | null> {
+  const aggregate = await getActorAggregateBySubject(subject);
+
+  if (!aggregate) {
+    return null;
+  }
+
+  const db = getDb();
+  const rows = await db
+    .select()
+    .from(userPreferences)
+    .where(eq(userPreferences.actorId, aggregate.actor.id))
+    .limit(1);
+  const row = rows[0];
+
+  if (!row) {
+    return {
+      language: "en",
+      theme: "system",
+      notificationsEmail: true,
+      notificationsPush: true,
+      notificationsInApp: true,
+      emailNewJobs: true,
+      emailNewMessages: true,
+      emailBookingUpdates: true,
+      emailDigest: "daily",
+    };
+  }
+
+  return {
+    language: row.language,
+    theme: row.theme,
+    notificationsEmail: row.notificationsEmail,
+    notificationsPush: row.notificationsPush,
+    notificationsInApp: row.notificationsInApp,
+    emailNewJobs: row.emailNewJobs,
+    emailNewMessages: row.emailNewMessages,
+    emailBookingUpdates: row.emailBookingUpdates,
+    emailDigest: row.emailDigest,
+  };
+}
+
+export async function updateUserPreferencesBySubject(
+  subject: string,
+  input: UserPreferences,
+): Promise<UserPreferences | null> {
+  const aggregate = await getActorAggregateBySubject(subject);
+
+  if (!aggregate) {
+    return null;
+  }
+
+  const db = getDb();
+  await db
+    .insert(userPreferences)
+    .values({
+      actorId: aggregate.actor.id,
+      emailBookingUpdates: input.emailBookingUpdates,
+      emailDigest: input.emailDigest,
+      emailNewJobs: input.emailNewJobs,
+      emailNewMessages: input.emailNewMessages,
+      language: input.language,
+      notificationsEmail: input.notificationsEmail,
+      notificationsInApp: input.notificationsInApp,
+      notificationsPush: input.notificationsPush,
+      theme: input.theme,
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: userPreferences.actorId,
+      set: {
+        emailBookingUpdates: input.emailBookingUpdates,
+        emailDigest: input.emailDigest,
+        emailNewJobs: input.emailNewJobs,
+        emailNewMessages: input.emailNewMessages,
+        language: input.language,
+        notificationsEmail: input.notificationsEmail,
+        notificationsInApp: input.notificationsInApp,
+        notificationsPush: input.notificationsPush,
+        theme: input.theme,
+        updatedAt: new Date(),
+      },
+    });
+
+  return getUserPreferencesBySubject(subject);
+}
+
+export async function syncActorExternalUserIdBySubject(
+  subject: string,
+  externalUserId: string,
+) {
+  const db = getDb();
+  const now = new Date();
+
+  await db
+    .update(actors)
+    .set({
+      externalUserId,
+      updatedAt: now,
+    })
+    .where(eq(actors.authSubject, subject));
+
+  const rows = await db
+    .select({ externalUserId: actors.externalUserId })
+    .from(actors)
+    .where(eq(actors.authSubject, subject))
+    .limit(1);
+
+  return rows[0]?.externalUserId ?? null;
+}
+
+export async function getActorExternalUserIdBySubject(subject: string) {
+  const db = getDb();
+  const rows = await db
+    .select({ externalUserId: actors.externalUserId })
+    .from(actors)
+    .where(eq(actors.authSubject, subject))
+    .limit(1);
+
+  return rows[0]?.externalUserId ?? null;
+}
+
+function mapAppNotification(
+  row: typeof appNotifications.$inferSelect,
+): AppNotification {
+  return {
+    id: row.id,
+    recipientExternalUserId: row.recipientExternalUserId,
+    type: row.type as AppNotification["type"],
+    title: row.title,
+    message: row.message,
+    data: row.data,
+    isRead: row.isRead,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+export async function listNotificationsForExternalUserId(
+  externalUserId: string,
+): Promise<AppNotification[]> {
+  const db = getDb();
+  const rows = await db
+    .select()
+    .from(appNotifications)
+    .where(eq(appNotifications.recipientExternalUserId, externalUserId))
+    .orderBy(desc(appNotifications.createdAt))
+    .limit(50);
+
+  return rows.map(mapAppNotification);
+}
+
+export async function countNotificationsForExternalUserId(
+  externalUserId: string,
+) {
+  const db = getDb();
+  const [row] = await db
+    .select({
+      count: sql<number>`count(*)::int`,
+    })
+    .from(appNotifications)
+    .where(eq(appNotifications.recipientExternalUserId, externalUserId));
+
+  return row?.count ?? 0;
+}
+
+export async function createNotificationForExternalUserId(input: {
+  recipientExternalUserId: string;
+  type: AppNotification["type"];
+  title: string;
+  message: string;
+  data: Record<string, unknown>;
+}): Promise<AppNotification> {
+  const db = getDb();
+  const rows = await db
+    .insert(appNotifications)
+    .values({
+      recipientExternalUserId: input.recipientExternalUserId,
+      type: input.type,
+      title: input.title,
+      message: input.message,
+      data: input.data,
+    })
+    .returning();
+
+  return mapAppNotification(rows[0]!);
+}
+
+export async function markNotificationReadForExternalUserId(
+  externalUserId: string,
+  notificationId: string,
+) {
+  const db = getDb();
+  const rows = await db
+    .update(appNotifications)
+    .set({
+      isRead: true,
+    })
+    .where(
+      and(
+        eq(appNotifications.id, notificationId),
+        eq(appNotifications.recipientExternalUserId, externalUserId),
+      ),
+    )
+    .returning();
+
+  return rows[0] ? mapAppNotification(rows[0]) : null;
+}
+
+export async function markAllNotificationsReadForExternalUserId(
+  externalUserId: string,
+) {
+  const db = getDb();
+  const result = await db
+    .update(appNotifications)
+    .set({
+      isRead: true,
+    })
+    .where(
+      and(
+        eq(appNotifications.recipientExternalUserId, externalUserId),
+        eq(appNotifications.isRead, false),
+      ),
+    );
+
+  return Number(result.rowCount ?? 0);
+}
+
+export async function deleteNotificationForExternalUserId(
+  externalUserId: string,
+  notificationId: string,
+) {
+  const db = getDb();
+  const rows = await db
+    .delete(appNotifications)
+    .where(
+      and(
+        eq(appNotifications.id, notificationId),
+        eq(appNotifications.recipientExternalUserId, externalUserId),
+      ),
+    )
+    .returning({ id: appNotifications.id });
+
+  return rows.length;
+}
+
+export async function deleteAllNotificationsForExternalUserId(
+  externalUserId: string,
+) {
+  const db = getDb();
+  const rows = await db
+    .delete(appNotifications)
+    .where(eq(appNotifications.recipientExternalUserId, externalUserId))
+    .returning({ id: appNotifications.id });
+
+  return rows.length;
 }
 
 export async function getProfessionalProfileBySubject(
@@ -411,10 +731,130 @@ export async function listClinicProfiles(
   };
 }
 
+export async function listAdminVerificationSnapshot(): Promise<AdminVerificationSnapshot> {
+  const db = getDb();
+
+  const professionalRows = await db
+    .select({
+      actor: actors,
+      profile: professionalProfiles,
+    })
+    .from(professionalProfiles)
+    .innerJoin(actors, eq(professionalProfiles.actorId, actors.id))
+    .orderBy(desc(actors.createdAt));
+
+  const clinicRows = await db
+    .select({
+      actor: actors,
+      clinic: clinicProfiles,
+    })
+    .from(clinicProfiles)
+    .innerJoin(actors, eq(clinicProfiles.actorId, actors.id))
+    .orderBy(desc(actors.createdAt));
+
+  const onboardingRows = await db
+    .select({
+      actor: actors,
+      onboarding: onboardingRecords,
+    })
+    .from(onboardingRecords)
+    .innerJoin(actors, eq(onboardingRecords.actorId, actors.id))
+    .where(ne(actors.role, "admin"))
+    .orderBy(desc(onboardingRecords.updatedAt));
+
+  const professionalNames = new Map(
+    professionalRows.map((row) => [
+      row.actor.authSubject,
+      row.profile.fullName,
+    ]),
+  );
+  const clinicNames = new Map(
+    clinicRows.map((row) => [
+      row.actor.authSubject,
+      row.clinic.organizationName,
+    ]),
+  );
+
+  const documents = onboardingRows.flatMap((row) => {
+    const status = mapLegacyVerificationStatus(row.actor.verificationStatus);
+    const userName =
+      row.actor.role === "professional"
+        ? professionalNames.get(row.actor.authSubject)
+        : row.actor.role === "clinic"
+          ? clinicNames.get(row.actor.authSubject)
+          : undefined;
+
+    return row.onboarding.uploadedDocuments.map((document) => {
+      const isOutstanding = row.onboarding.missingDocuments.includes(
+        document.documentType,
+      );
+      const documentStatus: "pending" | "verified" | "rejected" =
+        status === "rejected" && isOutstanding
+          ? "rejected"
+          : status === "verified"
+            ? "verified"
+            : "pending";
+
+      return {
+        id: `${row.actor.authSubject}:${document.documentType}`,
+        user_id: row.actor.authSubject,
+        document_type: document.documentType,
+        name: document.documentType,
+        file_url: `s3://${document.bucket}/${document.key}`,
+        status: documentStatus,
+        rejection_reason:
+          documentStatus === "rejected"
+            ? (row.onboarding.rejectionReason ?? null)
+            : null,
+        created_at: document.uploadedAt,
+        user_name: userName ?? row.actor.displayName ?? "Unknown",
+        user_role:
+          row.actor.role === "professional" || row.actor.role === "clinic"
+            ? row.actor.role
+            : ("unknown" as const),
+      };
+    });
+  });
+
+  return {
+    professionals: professionalRows.map((row) => ({
+      id: row.profile.id,
+      user_id: row.actor.authSubject,
+      full_name: row.profile.fullName,
+      email:
+        row.actor.email ?? `${row.actor.authSubject}@local.syndeocare.invalid`,
+      phone: row.profile.primaryPhone,
+      verification_status: mapLegacyVerificationStatus(
+        row.actor.verificationStatus,
+      ),
+      onboarding_completed: row.actor.onboardingCompleted,
+      created_at: row.actor.createdAt.toISOString(),
+      specialties: [row.profile.specialty].filter(Boolean),
+      qualifications: row.profile.languages,
+    })),
+    clinics: clinicRows.map((row) => ({
+      id: row.clinic.id,
+      user_id: row.actor.authSubject,
+      name: row.clinic.organizationName,
+      email:
+        row.actor.email ?? `${row.actor.authSubject}@local.syndeocare.invalid`,
+      phone: row.clinic.contactPhone,
+      verification_status: mapLegacyVerificationStatus(
+        row.actor.verificationStatus,
+      ),
+      onboarding_completed: row.actor.onboardingCompleted,
+      created_at: row.actor.createdAt.toISOString(),
+      address: [row.clinic.city, row.clinic.region].filter(Boolean).join(", "),
+    })),
+    documents,
+  };
+}
+
 export async function ensureActorAccount(input: {
   subject: string;
   email?: string;
   displayName?: string;
+  profileImageUrl?: string;
   role: PublicRegistrationRole | "admin";
 }): Promise<AuthPrincipal> {
   const db = getDb();
@@ -486,9 +926,20 @@ export async function ensureActorAccount(input: {
           region: "TBD",
           latitude: "0",
           longitude: "0",
+          profileImageUrl: input.profileImageUrl,
           updatedAt: now,
         })
         .onConflictDoNothing();
+
+      if (input.profileImageUrl) {
+        await tx
+          .update(professionalProfiles)
+          .set({
+            profileImageUrl: sql`coalesce(${professionalProfiles.profileImageUrl}, ${input.profileImageUrl})`,
+            updatedAt: now,
+          })
+          .where(eq(professionalProfiles.actorId, actor.id));
+      }
     }
 
     if (input.role === "clinic") {
@@ -505,9 +956,20 @@ export async function ensureActorAccount(input: {
           region: "TBD",
           latitude: "0",
           longitude: "0",
+          logoUrl: input.profileImageUrl,
           updatedAt: now,
         })
         .onConflictDoNothing();
+
+      if (input.profileImageUrl) {
+        await tx
+          .update(clinicProfiles)
+          .set({
+            logoUrl: sql`coalesce(${clinicProfiles.logoUrl}, ${input.profileImageUrl})`,
+            updatedAt: now,
+          })
+          .where(eq(clinicProfiles.actorId, actor.id));
+      }
     }
   });
 
@@ -604,8 +1066,11 @@ export async function reviewVerificationBySubject(
       .update(actors)
       .set({
         onboardingCompleted:
-          input.status === "approved" &&
-          input.outstandingDocuments.length === 0,
+          input.status === "approved" && input.outstandingDocuments.length === 0
+            ? true
+            : input.status === "rejected"
+              ? false
+              : aggregate.actor.onboardingCompleted,
         verificationStatus: input.status,
         updatedAt: now,
       })
@@ -1238,4 +1703,592 @@ export async function requestBookingBySubject(
   }
 
   return { ok: true, data: booking };
+}
+
+export async function updateBookingStatusBySubject(
+  subject: string,
+  bookingId: string,
+  input: BookingStatusUpdateInput,
+): Promise<
+  | { ok: true; data: BookingDetail }
+  | { ok: false; code: string; message: string; statusCode: 403 | 404 | 409 }
+> {
+  const aggregate = await getActorAggregateBySubject(subject);
+
+  if (!aggregate) {
+    return {
+      ok: false,
+      code: "ACTOR_NOT_FOUND",
+      message: "No actor exists for the authenticated subject.",
+      statusCode: 404,
+    };
+  }
+
+  const current = await getBookingByIdForSubject(subject, bookingId);
+
+  if (!current) {
+    return {
+      ok: false,
+      code: "BOOKING_NOT_FOUND",
+      message: "No booking was found for the requested id.",
+      statusCode: 404,
+    };
+  }
+
+  const role = aggregate.actor.role;
+  const clinicCanDecide = role === "clinic" || role === "admin";
+  const professionalCanCancel =
+    role === "professional" && input.status === "cancelled";
+
+  if (!clinicCanDecide && !professionalCanCancel) {
+    return {
+      ok: false,
+      code: "BOOKING_STATUS_FORBIDDEN",
+      message: "This actor cannot update the requested booking status.",
+      statusCode: 403,
+    };
+  }
+
+  if (current.status === "completed" || current.status === "cancelled") {
+    return {
+      ok: false,
+      code: "BOOKING_STATUS_FINAL",
+      message: "This booking status can no longer be changed.",
+      statusCode: 409,
+    };
+  }
+
+  if (input.status === "accepted" && current.status !== "requested") {
+    return {
+      ok: false,
+      code: "BOOKING_ACCEPT_INVALID_STATUS",
+      message: "Only requested bookings can be accepted.",
+      statusCode: 409,
+    };
+  }
+
+  if (
+    (input.status === "confirmed" || input.status === "completed") &&
+    current.status !== "accepted" &&
+    current.status !== "confirmed"
+  ) {
+    return {
+      ok: false,
+      code: "BOOKING_PROGRESS_INVALID_STATUS",
+      message: "Only accepted bookings can be confirmed or completed.",
+      statusCode: 409,
+    };
+  }
+
+  const now = new Date();
+  const db = getDb();
+
+  await db
+    .update(bookings)
+    .set({
+      lastUpdatedAt: now,
+      status: input.status,
+    })
+    .where(eq(bookings.id, bookingId));
+
+  if (input.status === "accepted") {
+    await db
+      .update(bookings)
+      .set({
+        lastUpdatedAt: now,
+        status: "cancelled",
+      })
+      .where(
+        and(
+          eq(bookings.jobId, current.jobId),
+          eq(bookings.status, "requested"),
+          ne(bookings.id, bookingId),
+        ),
+      );
+
+    await db
+      .update(jobListings)
+      .set({
+        status: "filled",
+        updatedAt: now,
+      })
+      .where(eq(jobListings.id, current.jobId));
+  }
+
+  if (
+    input.status === "cancelled" &&
+    (current.status === "accepted" || current.status === "confirmed")
+  ) {
+    await db
+      .update(jobListings)
+      .set({
+        status: "open",
+        updatedAt: now,
+      })
+      .where(eq(jobListings.id, current.jobId));
+  }
+
+  if (input.status === "completed") {
+    await db
+      .update(jobListings)
+      .set({
+        status: "closed",
+        updatedAt: now,
+      })
+      .where(eq(jobListings.id, current.jobId));
+  }
+
+  const updated = await getBookingByIdForSubject(subject, bookingId);
+
+  if (!updated) {
+    return {
+      ok: false,
+      code: "BOOKING_UPDATE_FAILED",
+      message: "The booking status update could not be read back.",
+      statusCode: 404,
+    };
+  }
+
+  return { ok: true, data: updated };
+}
+
+export type AdminCatalogKind =
+  | "certification"
+  | "document_type"
+  | "job_role"
+  | "legal_page"
+  | "specialty";
+
+export type AdminCatalogItem = {
+  id: string;
+  kind: AdminCatalogKind;
+  name: string;
+  nameAr: string | null;
+  abbreviation: string | null;
+  description: string | null;
+  content: string | null;
+  slug: string | null;
+  isActive: boolean;
+  isRequired: boolean;
+  appliesTo: string;
+  allowedExtensions: string[];
+  maxSizeMb: number;
+  displayOrder: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+function mapAdminCatalogItem(
+  row: typeof adminCatalogItems.$inferSelect,
+): AdminCatalogItem {
+  return {
+    id: row.id,
+    kind: row.kind,
+    name: row.name,
+    nameAr: row.nameAr,
+    abbreviation: row.abbreviation,
+    description: row.description,
+    content: row.content,
+    slug: row.slug,
+    isActive: row.isActive,
+    isRequired: row.isRequired,
+    appliesTo: row.appliesTo,
+    allowedExtensions: row.allowedExtensions,
+    maxSizeMb: row.maxSizeMb,
+    displayOrder: row.displayOrder,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+export async function listAdminCatalogItems(input: {
+  kind?: AdminCatalogKind;
+  includeInactive?: boolean;
+}): Promise<AdminCatalogItem[]> {
+  const db = getDb();
+  const rows = await db
+    .select()
+    .from(adminCatalogItems)
+    .orderBy(adminCatalogItems.displayOrder, adminCatalogItems.name);
+
+  return rows
+    .filter((row) => (input.kind ? row.kind === input.kind : true))
+    .filter((row) => (input.includeInactive ? true : row.isActive))
+    .map(mapAdminCatalogItem);
+}
+
+export async function saveAdminCatalogItem(input: {
+  id?: string;
+  kind: AdminCatalogKind;
+  name: string;
+  nameAr?: string | null;
+  abbreviation?: string | null;
+  description?: string | null;
+  content?: string | null;
+  slug?: string | null;
+  isActive?: boolean;
+  isRequired?: boolean;
+  appliesTo?: string;
+  allowedExtensions?: string[];
+  maxSizeMb?: number;
+  displayOrder?: number;
+}): Promise<AdminCatalogItem | null> {
+  const db = getDb();
+  const now = new Date();
+
+  if (input.id) {
+    const [updated] = await db
+      .update(adminCatalogItems)
+      .set({
+        abbreviation: input.abbreviation ?? null,
+        allowedExtensions: input.allowedExtensions ?? [],
+        appliesTo: input.appliesTo ?? "both",
+        content: input.content ?? null,
+        description: input.description ?? null,
+        displayOrder: input.displayOrder ?? 0,
+        isActive: input.isActive ?? true,
+        isRequired: input.isRequired ?? false,
+        kind: input.kind,
+        maxSizeMb: input.maxSizeMb ?? 10,
+        name: input.name,
+        nameAr: input.nameAr ?? null,
+        slug: input.slug ?? null,
+        updatedAt: now,
+      })
+      .where(eq(adminCatalogItems.id, input.id))
+      .returning();
+
+    if (updated) {
+      return mapAdminCatalogItem(updated);
+    }
+  }
+
+  const [inserted] = await db
+    .insert(adminCatalogItems)
+    .values({
+      abbreviation: input.abbreviation ?? null,
+      allowedExtensions: input.allowedExtensions ?? [],
+      appliesTo: input.appliesTo ?? "both",
+      content: input.content ?? null,
+      description: input.description ?? null,
+      displayOrder: input.displayOrder ?? 0,
+      isActive: input.isActive ?? true,
+      isRequired: input.isRequired ?? false,
+      kind: input.kind,
+      maxSizeMb: input.maxSizeMb ?? 10,
+      name: input.name,
+      nameAr: input.nameAr ?? null,
+      slug: input.slug ?? null,
+      updatedAt: now,
+    })
+    .returning();
+
+  return inserted ? mapAdminCatalogItem(inserted) : null;
+}
+
+export async function deleteAdminCatalogItem(id: string): Promise<boolean> {
+  const db = getDb();
+  const deleted = await db
+    .delete(adminCatalogItems)
+    .where(eq(adminCatalogItems.id, id))
+    .returning({ id: adminCatalogItems.id });
+
+  return deleted.length > 0;
+}
+
+type ConversationRow = typeof conversations.$inferSelect;
+type ActorRow = typeof actors.$inferSelect;
+
+export type ConversationSummary = {
+  id: string;
+  kind: "admin" | "standard";
+  displayName: string;
+  counterpartRole: "admin" | "clinic" | "professional";
+  lastMessageAt: string;
+};
+
+export type ConversationMessage = {
+  id: string;
+  conversationId: string;
+  senderActorId: string;
+  senderRole: "admin" | "clinic" | "professional";
+  content: string;
+  isRead: boolean;
+  fileUrl: string | null;
+  fileType: string | null;
+  fileName: string | null;
+  fileSize: number | null;
+  createdAt: string;
+};
+
+function actorDisplayName(actor: ActorRow | undefined) {
+  return actor?.displayName ?? actor?.email ?? "SyndeoCare user";
+}
+
+async function getActorByAuthSubject(subject: string) {
+  const db = getDb();
+  const [actor] = await db
+    .select()
+    .from(actors)
+    .where(eq(actors.authSubject, subject))
+    .limit(1);
+
+  return actor ?? null;
+}
+
+async function getActorBySubjectOrExternalId(subjectOrExternalId: string) {
+  const bySubject = await getActorByAuthSubject(subjectOrExternalId);
+
+  if (bySubject) {
+    return bySubject;
+  }
+
+  const db = getDb();
+  const [actor] = await db
+    .select()
+    .from(actors)
+    .where(eq(actors.externalUserId, subjectOrExternalId))
+    .limit(1);
+
+  return actor ?? null;
+}
+
+async function getActorById(id: string) {
+  const db = getDb();
+  const [actor] = await db.select().from(actors).where(eq(actors.id, id));
+  return actor ?? null;
+}
+
+async function canAccessConversation(
+  actor: ActorRow,
+  conversation: ConversationRow,
+) {
+  if (actor.role === "admin") {
+    return (
+      conversation.adminActorId === actor.id ||
+      conversation.targetActorId === actor.id
+    );
+  }
+
+  if (conversation.kind === "admin") {
+    return conversation.targetActorId === actor.id;
+  }
+
+  if (actor.role === "professional") {
+    const [profile] = await getDb()
+      .select({ id: professionalProfiles.id })
+      .from(professionalProfiles)
+      .where(eq(professionalProfiles.actorId, actor.id));
+    return profile?.id === conversation.professionalId;
+  }
+
+  const [clinic] = await getDb()
+    .select({ id: clinicProfiles.id })
+    .from(clinicProfiles)
+    .where(eq(clinicProfiles.actorId, actor.id));
+  return clinic?.id === conversation.clinicId;
+}
+
+export async function startAdminConversationBySubject(
+  adminSubject: string,
+  targetSubject: string,
+): Promise<ConversationSummary | null> {
+  const [adminActor, targetActor] = await Promise.all([
+    getActorBySubjectOrExternalId(adminSubject),
+    getActorBySubjectOrExternalId(targetSubject),
+  ]);
+
+  if (!adminActor || adminActor.role !== "admin" || !targetActor) {
+    return null;
+  }
+
+  const db = getDb();
+  const existing = await db
+    .select()
+    .from(conversations)
+    .where(
+      and(
+        eq(conversations.kind, "admin"),
+        eq(conversations.adminActorId, adminActor.id),
+        eq(conversations.targetActorId, targetActor.id),
+      ),
+    )
+    .limit(1);
+
+  const conversation =
+    existing[0] ??
+    (
+      await db
+        .insert(conversations)
+        .values({
+          adminActorId: adminActor.id,
+          kind: "admin",
+          targetActorId: targetActor.id,
+        })
+        .returning()
+    )[0];
+
+  if (!conversation) {
+    return null;
+  }
+
+  return {
+    id: conversation.id,
+    kind: conversation.kind,
+    displayName: actorDisplayName(targetActor),
+    counterpartRole: targetActor.role,
+    lastMessageAt: conversation.lastMessageAt.toISOString(),
+  };
+}
+
+export async function listConversationsForSubject(
+  subject: string,
+): Promise<ConversationSummary[]> {
+  const actor = await getActorByAuthSubject(subject);
+
+  if (!actor) {
+    return [];
+  }
+
+  const db = getDb();
+  const rows = await db
+    .select()
+    .from(conversations)
+    .orderBy(desc(conversations.lastMessageAt));
+  const summaries: ConversationSummary[] = [];
+
+  for (const conversation of rows) {
+    if (!(await canAccessConversation(actor, conversation))) {
+      continue;
+    }
+
+    const otherActorId =
+      conversation.kind === "admin"
+        ? actor.id === conversation.adminActorId
+          ? conversation.targetActorId
+          : conversation.adminActorId
+        : null;
+    const otherActor = otherActorId ? await getActorById(otherActorId) : null;
+
+    summaries.push({
+      id: conversation.id,
+      kind: conversation.kind,
+      displayName:
+        conversation.kind === "admin"
+          ? actorDisplayName(otherActor ?? undefined)
+          : "Clinic conversation",
+      counterpartRole:
+        conversation.kind === "admin"
+          ? (otherActor?.role ?? "admin")
+          : actor.role === "clinic"
+            ? "professional"
+            : "clinic",
+      lastMessageAt: conversation.lastMessageAt.toISOString(),
+    });
+  }
+
+  return summaries;
+}
+
+export async function listConversationMessagesForSubject(
+  subject: string,
+  conversationId: string,
+): Promise<ConversationMessage[]> {
+  const actor = await getActorByAuthSubject(subject);
+  const db = getDb();
+  const [conversation] = await db
+    .select()
+    .from(conversations)
+    .where(eq(conversations.id, conversationId));
+
+  if (
+    !actor ||
+    !conversation ||
+    !(await canAccessConversation(actor, conversation))
+  ) {
+    return [];
+  }
+
+  const rows = await db
+    .select()
+    .from(conversationMessages)
+    .where(eq(conversationMessages.conversationId, conversationId))
+    .orderBy(conversationMessages.createdAt);
+
+  return rows.map((row) => ({
+    id: row.id,
+    conversationId: row.conversationId,
+    senderActorId: row.senderActorId,
+    senderRole: row.senderRole,
+    content: row.content,
+    isRead: row.isRead,
+    fileUrl: row.fileUrl,
+    fileType: row.fileType,
+    fileName: row.fileName,
+    fileSize: row.fileSize,
+    createdAt: row.createdAt.toISOString(),
+  }));
+}
+
+export async function sendConversationMessageBySubject(input: {
+  subject: string;
+  conversationId: string;
+  content: string;
+  fileUrl?: string | null;
+  fileType?: string | null;
+  fileName?: string | null;
+  fileSize?: number | null;
+}): Promise<ConversationMessage | null> {
+  const actor = await getActorByAuthSubject(input.subject);
+  const db = getDb();
+  const [conversation] = await db
+    .select()
+    .from(conversations)
+    .where(eq(conversations.id, input.conversationId));
+
+  if (
+    !actor ||
+    !conversation ||
+    !(await canAccessConversation(actor, conversation))
+  ) {
+    return null;
+  }
+
+  const now = new Date();
+  const [message] = await db
+    .insert(conversationMessages)
+    .values({
+      content: input.content,
+      conversationId: input.conversationId,
+      fileName: input.fileName ?? null,
+      fileSize: input.fileSize ?? null,
+      fileType: input.fileType ?? null,
+      fileUrl: input.fileUrl ?? null,
+      senderActorId: actor.id,
+      senderRole: actor.role,
+    })
+    .returning();
+
+  if (!message) {
+    return null;
+  }
+
+  await db
+    .update(conversations)
+    .set({ lastMessageAt: now, updatedAt: now })
+    .where(eq(conversations.id, input.conversationId));
+
+  return {
+    id: message.id,
+    conversationId: message.conversationId,
+    senderActorId: message.senderActorId,
+    senderRole: message.senderRole,
+    content: message.content,
+    isRead: message.isRead,
+    fileUrl: message.fileUrl,
+    fileType: message.fileType,
+    fileName: message.fileName,
+    fileSize: message.fileSize,
+    createdAt: message.createdAt.toISOString(),
+  };
 }

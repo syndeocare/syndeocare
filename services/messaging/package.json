@@ -12,7 +12,9 @@
   },
   "dependencies": {
     "@repo/contracts": "workspace:*",
-    "@repo/service-core": "workspace:*"
+    "@repo/persistence": "workspace:*",
+    "@repo/service-core": "workspace:*",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@repo/eslint-config": "workspace:*",

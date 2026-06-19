@@ -1,5 +1,6 @@
 import {
   CreateBucketCommand,
+  GetObjectCommand,
   HeadBucketCommand,
   HeadObjectCommand,
   PutBucketCorsCommand,
@@ -220,6 +221,25 @@ export async function assertStoredObjectExists(input: {
       Bucket: input.bucket,
       Key: input.key,
     }),
+  );
+}
+
+export async function createSignedDownloadUrl(input: {
+  bucket: string;
+  key: string;
+}) {
+  const config = getStorageConfig();
+  const client = createStorageClient(config);
+
+  return getSignedUrl(
+    client,
+    new GetObjectCommand({
+      Bucket: input.bucket,
+      Key: input.key,
+    }),
+    {
+      expiresIn: config.uploadUrlTtlSeconds,
+    },
   );
 }
 

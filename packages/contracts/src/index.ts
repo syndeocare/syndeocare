@@ -96,6 +96,7 @@ export const locationSchema = z.object({
 export const authPrincipalSchema = z.object({
   sub: z.string().min(1),
   email: z.string().email().optional(),
+  emailVerified: z.boolean().optional(),
   role: userRoleSchema,
   permissions: z.array(z.string()).default([]),
   clinicId: z.string().min(1).optional(),
@@ -103,6 +104,7 @@ export const authPrincipalSchema = z.object({
   onboardingCompleted: z.boolean().default(false),
   verificationStatus: verificationStatusSchema.default("pending_review"),
   displayName: z.string().min(1).optional(),
+  profileImageUrl: z.string().url().optional(),
 });
 
 export const gatewayAuthConfigurationSchema = z.object({
@@ -118,6 +120,71 @@ export const gatewayAuthConfigurationSchema = z.object({
 
 export const authSignInInputSchema = z.object({
   email: z.string().email(),
+  password: z.string().min(8),
+});
+
+export const authOAuthProviderSchema = z.enum(["google"]);
+
+export const authOAuthStartInputSchema = z.object({
+  codeChallenge: z.string().min(43),
+  provider: authOAuthProviderSchema,
+  redirectUri: z.string().url(),
+  role: publicRegistrationRoleSchema.optional(),
+  state: z.string().min(16),
+});
+
+export const authOAuthStartResponseSchema = z.object({
+  authorizationUrl: z.string().url(),
+  provider: authOAuthProviderSchema,
+});
+
+export const authOAuthCallbackInputSchema = z.object({
+  code: z.string().min(1),
+  codeVerifier: z.string().min(43),
+  linkAccessToken: z.string().min(1).optional(),
+  linkRefreshToken: z.string().min(1).optional(),
+  provider: authOAuthProviderSchema,
+  redirectUri: z.string().url(),
+  role: publicRegistrationRoleSchema.optional(),
+});
+
+export const authRefreshInputSchema = z.object({
+  refreshToken: z.string().min(1),
+});
+
+export const authLogoutInputSchema = z.object({
+  refreshToken: z.string().min(1),
+});
+
+export const authPasswordResetRequestInputSchema = z.object({
+  email: z.string().email(),
+  redirectUrl: z.string().url(),
+});
+
+export const authPasswordResetConfirmInputSchema = z.object({
+  password: z.string().min(8),
+  token: z.string().min(1),
+});
+
+export const authEmailVerificationRequestInputSchema = z.object({
+  email: z.string().email(),
+  redirectUrl: z.string().url(),
+});
+
+export const authEmailVerificationConfirmInputSchema = z.object({
+  token: z.string().min(1),
+});
+
+export const authEmailOtpRequestInputSchema = z.object({
+  email: z.string().email(),
+});
+
+export const authEmailOtpConfirmInputSchema = z.object({
+  code: z.string().regex(/^\d{6}$/),
+  email: z.string().email(),
+});
+
+export const authPasswordUpdateInputSchema = z.object({
   password: z.string().min(8),
 });
 
@@ -143,6 +210,38 @@ export const authSessionSchema = z.object({
   isNewUser: z.boolean(),
 });
 
+export const authLogoutResponseSchema = z.object({
+  revoked: z.boolean(),
+});
+
+export const authEmailActionResponseSchema = z.object({
+  delivered: z.boolean(),
+});
+
+export const authEmailVerificationConfirmResponseSchema = z.object({
+  verified: z.boolean(),
+});
+
+export const authPasswordUpdateResponseSchema = z.object({
+  updated: z.boolean(),
+});
+
+export const authAccountDeletionResponseSchema = z.object({
+  deleted: z.boolean(),
+});
+
+export const userPreferencesSchema = z.object({
+  language: z.string().min(1),
+  theme: z.string().min(1),
+  notificationsEmail: z.boolean(),
+  notificationsPush: z.boolean(),
+  notificationsInApp: z.boolean(),
+  emailNewJobs: z.boolean(),
+  emailNewMessages: z.boolean(),
+  emailBookingUpdates: z.boolean(),
+  emailDigest: z.string().min(1),
+});
+
 export const notificationEmailRequestSchema = z.object({
   actorSubject: z.string().min(1).optional(),
   html: z.string().min(1),
@@ -154,6 +253,69 @@ export const notificationDeliveryResponseSchema = z.object({
   accepted: z.boolean(),
   deliveredTo: z.string().email(),
   providerMessageId: z.string().min(1),
+});
+
+export const appNotificationTypeSchema = z.enum([
+  "booking_request",
+  "booking_accepted",
+  "booking_declined",
+  "booking_cancelled",
+  "booking_confirmed",
+  "booking_checked_in",
+  "booking_completed",
+  "new_message",
+  "verification_update",
+  "rating_received",
+  "shift_reminder",
+  "shift_invitation",
+  "invitation_accepted",
+  "document_approved",
+  "document_rejected",
+  "profile_verified",
+  "shift_created",
+]);
+
+export const appNotificationSchema = z.object({
+  id: z.string().uuid(),
+  recipientExternalUserId: z.string().min(1),
+  type: appNotificationTypeSchema,
+  title: z.string().min(1),
+  message: z.string().min(1),
+  data: z.record(z.string(), z.unknown()).default({}),
+  isRead: z.boolean(),
+  createdAt: z.string().datetime(),
+});
+
+export const appNotificationListResponseSchema = z.object({
+  items: z.array(appNotificationSchema),
+});
+
+export const createAppNotificationInputSchema = z.object({
+  recipientExternalUserId: z.string().min(1),
+  type: appNotificationTypeSchema,
+  title: z.string().min(1),
+  message: z.string().min(1),
+  data: z.record(z.string(), z.unknown()).default({}),
+});
+
+export const markAllNotificationsReadResponseSchema = z.object({
+  updated: z.number().int().nonnegative(),
+});
+
+export const deleteNotificationsResponseSchema = z.object({
+  deleted: z.number().int().nonnegative(),
+});
+
+export const notificationCountResponseSchema = z.object({
+  count: z.number().int().nonnegative(),
+});
+
+export const externalUserIdSyncInputSchema = z.object({
+  externalUserId: z.string().min(1),
+});
+
+export const externalUserIdSyncResponseSchema = z.object({
+  externalUserId: z.string().min(1),
 });
 
 export const uploadAssetTypeSchema = z.enum([
@@ -213,6 +375,14 @@ export const completeVerificationDocumentUploadResponseSchema = z.object({
   uploadedDocuments: z.array(uploadedDocumentSchema),
 });
 
+export const documentAccessRequestSchema = z.object({
+  fileUrl: z.string().min(1),
+});
+
+export const documentAccessResponseSchema = z.object({
+  signedUrl: z.string().url(),
+});
+
 export const routeContractSchema = z.object({
   method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]),
   path: z.string().min(1),
@@ -266,6 +436,8 @@ export const professionalProfileSummarySchema = z.object({
   profileImageUrl: z.string().url().optional(),
   city: z.string().min(1),
   region: z.string().min(1),
+  latitude: z.number().min(-90).max(90).nullable().optional(),
+  longitude: z.number().min(-180).max(180).nullable().optional(),
   availability: z.object({
     status: availabilityStatusSchema,
     nextAvailableAt: z.string().datetime().optional(),
@@ -310,6 +482,8 @@ export const clinicProfileSummarySchema = z.object({
   services: z.array(z.string().min(1)),
   city: z.string().min(1),
   region: z.string().min(1),
+  latitude: z.number().min(-90).max(90).nullable().optional(),
+  longitude: z.number().min(-180).max(180).nullable().optional(),
   verificationStatus: verificationStatusSchema,
   onboardingCompleted: z.boolean(),
   logoUrl: z.string().url().optional(),
@@ -349,6 +523,155 @@ export const verificationReviewInputSchema = z.object({
   outstandingDocuments: z.array(z.string().min(1)),
   nextAction: z.string().min(1),
   rejectionReason: z.string().min(1).optional(),
+});
+
+const legacyVerificationStatusSchema = z.enum([
+  "pending",
+  "verified",
+  "rejected",
+]);
+
+export const adminVerificationProfileSchema = z.object({
+  id: z.string().min(1),
+  user_id: z.string().min(1),
+  full_name: z.string().min(1),
+  email: z.string().email(),
+  phone: z.string().nullable(),
+  verification_status: legacyVerificationStatusSchema,
+  onboarding_completed: z.boolean(),
+  created_at: z.string().datetime(),
+  specialties: z.array(z.string()).nullable().optional(),
+  qualifications: z.array(z.string()).nullable().optional(),
+});
+
+export const adminVerificationClinicSchema = z.object({
+  id: z.string().min(1),
+  user_id: z.string().min(1),
+  name: z.string().min(1),
+  email: z.string().email(),
+  phone: z.string().nullable(),
+  verification_status: legacyVerificationStatusSchema,
+  onboarding_completed: z.boolean(),
+  created_at: z.string().datetime(),
+  address: z.string().nullable(),
+});
+
+export const adminVerificationDocumentSchema = z.object({
+  id: z.string().min(1),
+  user_id: z.string().min(1),
+  document_type: z.string().min(1),
+  name: z.string().min(1),
+  file_url: z.string().min(1),
+  status: legacyVerificationStatusSchema,
+  rejection_reason: z.string().nullable(),
+  created_at: z.string().datetime(),
+  user_name: z.string().optional(),
+  user_role: z.enum(["professional", "clinic", "unknown"]).optional(),
+});
+
+export const adminVerificationSnapshotSchema = z.object({
+  professionals: z.array(adminVerificationProfileSchema),
+  clinics: z.array(adminVerificationClinicSchema),
+  documents: z.array(adminVerificationDocumentSchema),
+});
+
+export const adminCatalogKindSchema = z.enum([
+  "certification",
+  "document_type",
+  "job_role",
+  "legal_page",
+  "specialty",
+]);
+
+export const adminCatalogItemSchema = z.object({
+  id: z.string().uuid(),
+  kind: adminCatalogKindSchema,
+  name: z.string().min(1),
+  nameAr: z.string().nullable(),
+  abbreviation: z.string().nullable(),
+  description: z.string().nullable(),
+  content: z.string().nullable(),
+  slug: z.string().nullable(),
+  isActive: z.boolean(),
+  isRequired: z.boolean(),
+  appliesTo: z.string().min(1),
+  allowedExtensions: z.array(z.string()),
+  maxSizeMb: z.number().int().positive(),
+  displayOrder: z.number().int(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+
+export const adminCatalogListResponseSchema = z.object({
+  items: z.array(adminCatalogItemSchema),
+  total: z.number().int().nonnegative(),
+});
+
+export const adminCatalogItemInputSchema = z.object({
+  id: z.string().uuid().optional(),
+  kind: adminCatalogKindSchema,
+  name: z.string().min(1),
+  nameAr: z.string().nullable().optional(),
+  abbreviation: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  content: z.string().nullable().optional(),
+  slug: z.string().nullable().optional(),
+  isActive: z.boolean().optional(),
+  isRequired: z.boolean().optional(),
+  appliesTo: z.string().min(1).optional(),
+  allowedExtensions: z.array(z.string()).optional(),
+  maxSizeMb: z.number().int().positive().optional(),
+  displayOrder: z.number().int().optional(),
+});
+
+export const adminCatalogDeleteResponseSchema = z.object({
+  deleted: z.boolean(),
+});
+
+export const conversationKindSchema = z.enum(["admin", "standard"]);
+
+export const conversationSummarySchema = z.object({
+  id: z.string().uuid(),
+  kind: conversationKindSchema,
+  displayName: z.string().min(1),
+  counterpartRole: userRoleSchema,
+  lastMessageAt: z.string().datetime(),
+});
+
+export const conversationListResponseSchema = z.object({
+  items: z.array(conversationSummarySchema),
+  total: z.number().int().nonnegative(),
+});
+
+export const conversationMessageSchema = z.object({
+  id: z.string().uuid(),
+  conversationId: z.string().uuid(),
+  senderActorId: z.string().uuid(),
+  senderRole: userRoleSchema,
+  content: z.string(),
+  isRead: z.boolean(),
+  fileUrl: z.string().nullable(),
+  fileType: z.string().nullable(),
+  fileName: z.string().nullable(),
+  fileSize: z.number().int().nullable(),
+  createdAt: z.string().datetime(),
+});
+
+export const conversationMessageListResponseSchema = z.object({
+  items: z.array(conversationMessageSchema),
+  total: z.number().int().nonnegative(),
+});
+
+export const adminConversationStartInputSchema = z.object({
+  targetSubject: z.string().min(1),
+});
+
+export const conversationMessageSendInputSchema = z.object({
+  content: z.string().min(1),
+  fileUrl: z.string().nullable().optional(),
+  fileType: z.string().nullable().optional(),
+  fileName: z.string().nullable().optional(),
+  fileSize: z.number().int().nonnegative().nullable().optional(),
 });
 
 export const jobListingSchema = z.object({
@@ -426,6 +749,10 @@ export const bookingRequestInputSchema = z.object({
   notes: z.string().min(1).optional(),
 });
 
+export const bookingStatusUpdateInputSchema = z.object({
+  status: z.enum(["accepted", "cancelled", "confirmed", "completed"]),
+});
+
 export const initialV1RouteCatalog = [
   {
     method: "GET",
@@ -452,9 +779,141 @@ export const initialV1RouteCatalog = [
     protected: false,
   },
   {
+    method: "POST",
+    path: "/v1/auth/oauth/google/start",
+    summary: "Create a Google OAuth authorization URL",
+    protected: false,
+  },
+  {
+    method: "POST",
+    path: "/v1/auth/oauth/google/callback",
+    summary: "Exchange a Google OAuth callback for a platform session",
+    protected: false,
+  },
+  {
+    method: "POST",
+    path: "/v1/auth/refresh",
+    summary: "Refresh an authenticated session using a refresh token",
+    protected: false,
+  },
+  {
+    method: "POST",
+    path: "/v1/auth/logout",
+    summary: "Revoke a refresh token and terminate the session",
+    protected: false,
+  },
+  {
+    method: "POST",
+    path: "/v1/auth/password-reset/request",
+    summary: "Send a password reset link to the account email",
+    protected: false,
+  },
+  {
+    method: "POST",
+    path: "/v1/auth/password-reset/confirm",
+    summary: "Complete a password reset using a signed reset token",
+    protected: false,
+  },
+  {
+    method: "POST",
+    path: "/v1/auth/email-verification/request",
+    summary: "Send a verification link to the account email",
+    protected: false,
+  },
+  {
+    method: "POST",
+    path: "/v1/auth/email-verification/confirm",
+    summary: "Confirm an email verification token",
+    protected: false,
+  },
+  {
+    method: "POST",
+    path: "/v1/auth/email-otp/request",
+    summary: "Send a six-digit email verification code",
+    protected: false,
+  },
+  {
+    method: "POST",
+    path: "/v1/auth/email-otp/confirm",
+    summary: "Confirm a six-digit email verification code",
+    protected: false,
+  },
+  {
+    method: "POST",
+    path: "/v1/auth/password",
+    summary: "Update the authenticated actor password",
+    protected: true,
+  },
+  {
+    method: "DELETE",
+    path: "/v1/auth/account",
+    summary: "Delete the authenticated actor account",
+    protected: true,
+  },
+  {
+    method: "GET",
+    path: "/v1/preferences/me",
+    summary: "Read the authenticated actor preferences",
+    protected: true,
+  },
+  {
+    method: "PATCH",
+    path: "/v1/preferences/me",
+    summary: "Update the authenticated actor preferences",
+    protected: true,
+  },
+  {
     method: "GET",
     path: "/v1/me",
     summary: "Authenticated subject context",
+    protected: true,
+  },
+  {
+    method: "PATCH",
+    path: "/v1/me/external-id",
+    summary: "Sync the authenticated actor external user id",
+    protected: true,
+  },
+  {
+    method: "GET",
+    path: "/v1/notifications",
+    summary: "List notifications for the authenticated actor",
+    protected: true,
+  },
+  {
+    method: "POST",
+    path: "/v1/notifications",
+    summary: "Create an in-app notification for a target external user id",
+    protected: true,
+  },
+  {
+    method: "PATCH",
+    path: "/v1/notifications/read-all",
+    summary: "Mark all notifications as read for the authenticated actor",
+    protected: true,
+  },
+  {
+    method: "PATCH",
+    path: "/v1/notifications/:notificationId/read",
+    summary: "Mark one notification as read for the authenticated actor",
+    protected: true,
+  },
+  {
+    method: "DELETE",
+    path: "/v1/notifications",
+    summary: "Delete all notifications for the authenticated actor",
+    protected: true,
+  },
+  {
+    method: "DELETE",
+    path: "/v1/notifications/:notificationId",
+    summary: "Delete one notification for the authenticated actor",
+    protected: true,
+  },
+  {
+    method: "GET",
+    path: "/v1/admin/notifications/:externalUserId/count",
+    summary: "Read notification count for a target external user id",
     protected: true,
   },
   {
@@ -531,6 +990,60 @@ export const initialV1RouteCatalog = [
     protected: true,
   },
   {
+    method: "GET",
+    path: "/v1/catalog",
+    summary: "List active platform catalog items",
+    protected: false,
+  },
+  {
+    method: "GET",
+    path: "/v1/admin/verification",
+    summary: "List verification documents and actors for admin review",
+    protected: true,
+  },
+  {
+    method: "GET",
+    path: "/v1/admin/catalog",
+    summary: "List admin-managed platform catalog items",
+    protected: true,
+  },
+  {
+    method: "POST",
+    path: "/v1/admin/catalog",
+    summary: "Create or update an admin-managed platform catalog item",
+    protected: true,
+  },
+  {
+    method: "DELETE",
+    path: "/v1/admin/catalog/:id",
+    summary: "Delete an admin-managed platform catalog item",
+    protected: true,
+  },
+  {
+    method: "POST",
+    path: "/v1/admin/conversations",
+    summary: "Start or open an admin conversation with a platform actor",
+    protected: true,
+  },
+  {
+    method: "GET",
+    path: "/v1/conversations",
+    summary: "List conversations visible to the authenticated actor",
+    protected: true,
+  },
+  {
+    method: "GET",
+    path: "/v1/conversations/:conversationId/messages",
+    summary: "List messages for a visible conversation",
+    protected: true,
+  },
+  {
+    method: "POST",
+    path: "/v1/conversations/:conversationId/messages",
+    summary: "Send a message to a visible conversation",
+    protected: true,
+  },
+  {
     method: "POST",
     path: "/v1/uploads/profile-image",
     summary: "Create a presigned upload for the current actor profile image",
@@ -552,6 +1065,12 @@ export const initialV1RouteCatalog = [
     method: "POST",
     path: "/v1/uploads/verification-document/complete",
     summary: "Persist an uploaded verification document",
+    protected: true,
+  },
+  {
+    method: "POST",
+    path: "/v1/uploads/verification-document/access",
+    summary: "Create a signed access URL for a private verification document",
     protected: true,
   },
   {
@@ -588,6 +1107,12 @@ export const initialV1RouteCatalog = [
     method: "GET",
     path: "/v1/bookings/:bookingId",
     summary: "Read booking details visible to the authenticated actor",
+    protected: true,
+  },
+  {
+    method: "PATCH",
+    path: "/v1/bookings/:bookingId",
+    summary: "Update a booking status visible to the authenticated actor",
     protected: true,
   },
 ] satisfies z.infer<typeof routeContractSchema>[];
@@ -632,14 +1157,81 @@ export type PublicRegistrationRole = z.infer<
   typeof publicRegistrationRoleSchema
 >;
 export type AuthSignInInput = z.infer<typeof authSignInInputSchema>;
+export type AuthOAuthProvider = z.infer<typeof authOAuthProviderSchema>;
+export type AuthOAuthStartInput = z.infer<typeof authOAuthStartInputSchema>;
+export type AuthOAuthStartResponse = z.infer<
+  typeof authOAuthStartResponseSchema
+>;
+export type AuthOAuthCallbackInput = z.infer<
+  typeof authOAuthCallbackInputSchema
+>;
+export type AuthRefreshInput = z.infer<typeof authRefreshInputSchema>;
+export type AuthLogoutInput = z.infer<typeof authLogoutInputSchema>;
+export type AuthPasswordResetRequestInput = z.infer<
+  typeof authPasswordResetRequestInputSchema
+>;
+export type AuthPasswordResetConfirmInput = z.infer<
+  typeof authPasswordResetConfirmInputSchema
+>;
+export type AuthEmailVerificationRequestInput = z.infer<
+  typeof authEmailVerificationRequestInputSchema
+>;
+export type AuthEmailVerificationConfirmInput = z.infer<
+  typeof authEmailVerificationConfirmInputSchema
+>;
+export type AuthEmailOtpRequestInput = z.infer<
+  typeof authEmailOtpRequestInputSchema
+>;
+export type AuthEmailOtpConfirmInput = z.infer<
+  typeof authEmailOtpConfirmInputSchema
+>;
+export type AuthPasswordUpdateInput = z.infer<
+  typeof authPasswordUpdateInputSchema
+>;
 export type AuthSignUpInput = z.infer<typeof authSignUpInputSchema>;
 export type AuthTokenSet = z.infer<typeof authTokenSetSchema>;
 export type AuthSession = z.infer<typeof authSessionSchema>;
+export type AuthLogoutResponse = z.infer<typeof authLogoutResponseSchema>;
+export type AuthEmailActionResponse = z.infer<
+  typeof authEmailActionResponseSchema
+>;
+export type AuthEmailVerificationConfirmResponse = z.infer<
+  typeof authEmailVerificationConfirmResponseSchema
+>;
+export type AuthPasswordUpdateResponse = z.infer<
+  typeof authPasswordUpdateResponseSchema
+>;
+export type AuthAccountDeletionResponse = z.infer<
+  typeof authAccountDeletionResponseSchema
+>;
+export type UserPreferences = z.infer<typeof userPreferencesSchema>;
 export type NotificationEmailRequest = z.infer<
   typeof notificationEmailRequestSchema
 >;
 export type NotificationDeliveryResponse = z.infer<
   typeof notificationDeliveryResponseSchema
+>;
+export type AppNotification = z.infer<typeof appNotificationSchema>;
+export type AppNotificationListResponse = z.infer<
+  typeof appNotificationListResponseSchema
+>;
+export type CreateAppNotificationInput = z.infer<
+  typeof createAppNotificationInputSchema
+>;
+export type MarkAllNotificationsReadResponse = z.infer<
+  typeof markAllNotificationsReadResponseSchema
+>;
+export type DeleteNotificationsResponse = z.infer<
+  typeof deleteNotificationsResponseSchema
+>;
+export type NotificationCountResponse = z.infer<
+  typeof notificationCountResponseSchema
+>;
+export type ExternalUserIdSyncInput = z.infer<
+  typeof externalUserIdSyncInputSchema
+>;
+export type ExternalUserIdSyncResponse = z.infer<
+  typeof externalUserIdSyncResponseSchema
 >;
 export type UploadAssetType = z.infer<typeof uploadAssetTypeSchema>;
 export type UploadRequest = z.infer<typeof uploadRequestSchema>;
@@ -658,6 +1250,10 @@ export type CompleteProfileImageUploadResponse = z.infer<
 export type CompleteVerificationDocumentUploadResponse = z.infer<
   typeof completeVerificationDocumentUploadResponseSchema
 >;
+export type DocumentAccessRequest = z.infer<typeof documentAccessRequestSchema>;
+export type DocumentAccessResponse = z.infer<
+  typeof documentAccessResponseSchema
+>;
 export type PlatformMetadata = z.infer<typeof platformMetadataSchema>;
 export type JobListingListResponse = z.infer<
   typeof jobListingListResponseSchema
@@ -665,6 +1261,33 @@ export type JobListingListResponse = z.infer<
 export type OnboardingStatus = z.infer<typeof onboardingStatusSchema>;
 export type VerificationStatusResponse = z.infer<
   typeof verificationStatusResponseSchema
+>;
+export type AdminVerificationSnapshot = z.infer<
+  typeof adminVerificationSnapshotSchema
+>;
+export type AdminCatalogKind = z.infer<typeof adminCatalogKindSchema>;
+export type AdminCatalogItem = z.infer<typeof adminCatalogItemSchema>;
+export type AdminCatalogListResponse = z.infer<
+  typeof adminCatalogListResponseSchema
+>;
+export type AdminCatalogItemInput = z.infer<typeof adminCatalogItemInputSchema>;
+export type AdminCatalogDeleteResponse = z.infer<
+  typeof adminCatalogDeleteResponseSchema
+>;
+export type ConversationKind = z.infer<typeof conversationKindSchema>;
+export type ConversationSummary = z.infer<typeof conversationSummarySchema>;
+export type ConversationListResponse = z.infer<
+  typeof conversationListResponseSchema
+>;
+export type ConversationMessage = z.infer<typeof conversationMessageSchema>;
+export type ConversationMessageListResponse = z.infer<
+  typeof conversationMessageListResponseSchema
+>;
+export type AdminConversationStartInput = z.infer<
+  typeof adminConversationStartInputSchema
+>;
+export type ConversationMessageSendInput = z.infer<
+  typeof conversationMessageSendInputSchema
 >;
 export type ProfessionalProfileSummary = z.infer<
   typeof professionalProfileSummarySchema
@@ -694,3 +1317,6 @@ export type JobListingCreateInput = z.infer<typeof jobListingCreateInputSchema>;
 export type BookingSummary = z.infer<typeof bookingSummarySchema>;
 export type BookingDetail = z.infer<typeof bookingDetailSchema>;
 export type BookingRequestInput = z.infer<typeof bookingRequestInputSchema>;
+export type BookingStatusUpdateInput = z.infer<
+  typeof bookingStatusUpdateInputSchema
+>;

@@ -36,6 +36,8 @@ jobs:
       TF_VAR_keycloak_public_client_id: ${{ vars.KEYCLOAK_PUBLIC_CLIENT_ID }}
       TF_VAR_auth_api_client_id: ${{ vars.AUTH_API_CLIENT_ID }}
       TF_VAR_auth_realm: ${{ vars.AUTH_REALM }}
+      TF_VAR_google_oauth_client_id: ${{ vars.GOOGLE_OAUTH_CLIENT_ID }}
+      TF_VAR_google_oauth_client_secret: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
       TF_VAR_resend_api_key: ${{ secrets.RESEND_API_KEY }}
       TF_VAR_resend_from_email: ${{ vars.RESEND_FROM_EMAIL }}
       TF_VAR_resend_test_email: ${{ vars.RESEND_TEST_EMAIL }}
@@ -74,22 +76,31 @@ jobs:
 
       - name: Build web frontend
         env:
-          NEXT_PUBLIC_API_BASE_URL: ${{ vars.NEXT_PUBLIC_API_BASE_URL }}
-          NEXT_PUBLIC_DOCS_URL: ${{ vars.NEXT_PUBLIC_DOCS_URL }}
-          NEXT_PUBLIC_ANDROID_APP_URL: ${{ vars.NEXT_PUBLIC_ANDROID_APP_URL }}
-          NEXT_PUBLIC_SITE_BASE_PATH: ${{ vars.NEXT_PUBLIC_SITE_BASE_PATH }}
+          VITE_API_GATEWAY_BASE_URL: ${{ vars.VITE_API_GATEWAY_BASE_URL }}
+          VITE_PLATFORM_API_BASE_URL: ${{ vars.VITE_PLATFORM_API_BASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_SUPABASE_PROJECT_ID: ${{ vars.VITE_SUPABASE_PROJECT_ID }}
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_EMAIL_VERIFICATION_REQUIRED: ${{ vars.VITE_EMAIL_VERIFICATION_REQUIRED }}
         run: pnpm build:web
 
       - name: Upload web frontend artifact
         uses: actions/upload-artifact@v4
         with:
           name: web-frontend-${{ inputs.environment }}
-          path: apps/web/out
+          path: apps/web/dist
           if-no-files-found: error
 
       - name: Sync web frontend to S3
         if: ${{ vars.WEB_FRONTEND_BUCKET != '' }}
-        run: aws s3 sync apps/web/out "s3://${{ vars.WEB_FRONTEND_BUCKET }}" --delete
+        run: |
+          aws s3 sync apps/web/dist "s3://${{ vars.WEB_FRONTEND_BUCKET }}" \
+            --delete \
+            --exclude "assets/*" \
+            --cache-control "no-store,no-cache,must-revalidate"
+          aws s3 sync apps/web/dist/assets "s3://${{ vars.WEB_FRONTEND_BUCKET }}/assets" \
+            --delete \
+            --cache-control "public,max-age=31536000,immutable"
 
       - name: Terraform init
         working-directory: infra/terraform/environments/${{ inputs.environment }}

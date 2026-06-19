@@ -626,7 +626,22 @@ export async function createServiceApp(options: ServiceBootstrapOptions) {
     },
   });
 
-  await app.register(cors, { origin: true });
+  await app.register(cors, {
+    allowedHeaders: [
+      "authorization",
+      "content-type",
+      "x-dev-clinic-id",
+      "x-dev-display-name",
+      "x-dev-onboarding-completed",
+      "x-dev-profile-id",
+      "x-dev-user-email",
+      "x-dev-user-id",
+      "x-dev-user-role",
+      "x-dev-verification-status",
+    ],
+    methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    origin: true,
+  });
   await app.register(swagger, {
     openapi: {
       info: {

@@ -1,1 +1,17 @@
 .env*
+node_modules
+.turbo
+.next
+out
+build
+dist
+coverage
+
+# Generated package-manager artifacts
+pnpm-lock.yaml
+**/package-lock.json
+**/bun.lock
+**/bun.lockb
+
+# Generated native/mobile output
+apps/web/android/

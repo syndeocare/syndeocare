@@ -1,0 +1,628 @@
+@import url("https://fonts.googleapis.com/css2?family=Ubuntu:ital,wght@0,300;0,400;0,500;0,700;1,300;1,400;1,500;1,700&family=Cairo:wght@300;400;500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* ============================================
+       SyndeoCare Brand Color System 2025
+       Primary: Deep Purple (#663C6D) | Accent: Teal Blue (#56849A)
+       ============================================ */
+
+    --background: 200 20% 98%;
+    --foreground: 280 28% 20%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 280 28% 20%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 280 28% 20%;
+
+    /* Primary: Deep Purple #663C6D */
+    --primary: 292 29% 33%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary: Light Purple tint */
+    --secondary: 292 20% 95%;
+    --secondary-foreground: 292 29% 25%;
+
+    --muted: 200 15% 96%;
+    --muted-foreground: 200 15% 42%;
+
+    /* Accent: Teal Blue #56849A */
+    --accent: 200 30% 47%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 200 15% 88%;
+    --input: 200 15% 88%;
+    --ring: 292 29% 33%;
+
+    --radius: 0.75rem;
+
+    /* Success: Teal variant */
+    --success: 160 60% 40%;
+    --success-foreground: 0 0% 100%;
+
+    /* Warning: Warm Amber */
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    /* Sky Blue for special elements */
+    --sky: 200 60% 50%;
+    --sky-foreground: 0 0% 100%;
+
+    /* Sidebar - Dark Professional Theme with Purple */
+    --sidebar-background: 280 25% 12%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 292 29% 40%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 200 30% 50%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 280 20% 18%;
+    --sidebar-ring: 292 29% 40%;
+
+    /* Brand Gradients - Purple to Teal */
+    --gradient-primary: linear-gradient(
+      135deg,
+      hsl(292, 29%, 33%) 0%,
+      hsl(292, 29%, 25%) 100%
+    );
+    --gradient-secondary: linear-gradient(
+      135deg,
+      hsl(200, 30%, 47%) 0%,
+      hsl(200, 30%, 38%) 100%
+    );
+    --gradient-brand: linear-gradient(
+      135deg,
+      hsl(292, 29%, 33%) 0%,
+      hsl(200, 30%, 47%) 100%
+    );
+    --gradient-hero: linear-gradient(
+      155deg,
+      hsl(280, 25%, 12%) 0%,
+      hsl(260, 30%, 18%) 50%,
+      hsl(280, 25%, 12%) 100%
+    );
+    --gradient-accent: linear-gradient(
+      135deg,
+      hsl(200, 30%, 47%) 0%,
+      hsl(200, 40%, 35%) 100%
+    );
+    --gradient-sky: linear-gradient(
+      135deg,
+      hsl(200, 60%, 50%) 0%,
+      hsl(185, 55%, 45%) 100%
+    );
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 hsl(280 28% 18% / 0.05);
+    --shadow-md:
+      0 4px 6px -1px hsl(280 28% 18% / 0.08),
+      0 2px 4px -2px hsl(280 28% 18% / 0.05);
+    --shadow-lg:
+      0 10px 15px -3px hsl(280 28% 18% / 0.1),
+      0 4px 6px -4px hsl(280 28% 18% / 0.05);
+    --shadow-xl:
+      0 20px 25px -5px hsl(280 28% 18% / 0.12),
+      0 8px 10px -6px hsl(280 28% 18% / 0.06);
+    --shadow-card:
+      0 1px 3px hsl(280 28% 18% / 0.06), 0 1px 2px -1px hsl(280 28% 18% / 0.06);
+    --shadow-glow: 0 0 20px hsl(292 29% 33% / 0.25);
+    --shadow-glow-teal: 0 0 20px hsl(200 30% 47% / 0.25);
+  }
+
+  .dark {
+    --background: 280 22% 8%;
+    --foreground: 210 40% 98%;
+
+    --card: 280 20% 11%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 280 20% 11%;
+    --popover-foreground: 210 40% 98%;
+
+    /* Primary: Brighter Purple for dark mode */
+    --primary: 292 35% 45%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary: Dark Purple */
+    --secondary: 292 20% 18%;
+    --secondary-foreground: 292 30% 70%;
+
+    --muted: 280 15% 16%;
+    --muted-foreground: 280 18% 68%;
+
+    /* Accent: Brighter Teal Blue */
+    --accent: 200 35% 55%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 280 15% 18%;
+    --input: 280 15% 18%;
+    --ring: 292 35% 45%;
+
+    --success: 160 55% 45%;
+    --success-foreground: 280 22% 8%;
+
+    --warning: 38 85% 55%;
+    --warning-foreground: 280 22% 8%;
+
+    --sky: 200 65% 55%;
+    --sky-foreground: 0 0% 100%;
+
+    --sidebar-background: 280 24% 10%;
+    --sidebar-foreground: 210 40% 92%;
+    --sidebar-primary: 292 35% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 200 35% 55%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 280 20% 16%;
+    --sidebar-ring: 292 35% 50%;
+
+    --gradient-primary: linear-gradient(
+      135deg,
+      hsl(292, 35%, 45%) 0%,
+      hsl(292, 30%, 35%) 100%
+    );
+    --gradient-secondary: linear-gradient(
+      135deg,
+      hsl(200, 35%, 55%) 0%,
+      hsl(200, 30%, 45%) 100%
+    );
+    --gradient-brand: linear-gradient(
+      135deg,
+      hsl(292, 35%, 45%) 0%,
+      hsl(200, 35%, 55%) 100%
+    );
+    --gradient-hero: linear-gradient(
+      155deg,
+      hsl(280, 24%, 10%) 0%,
+      hsl(270, 28%, 16%) 50%,
+      hsl(280, 24%, 10%) 100%
+    );
+    --gradient-accent: linear-gradient(
+      135deg,
+      hsl(200, 35%, 55%) 0%,
+      hsl(200, 45%, 45%) 100%
+    );
+    --gradient-sky: linear-gradient(
+      135deg,
+      hsl(200, 65%, 55%) 0%,
+      hsl(185, 60%, 50%) 100%
+    );
+
+    --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.25);
+    --shadow-md:
+      0 4px 6px -1px hsl(0 0% 0% / 0.35), 0 2px 4px -2px hsl(0 0% 0% / 0.25);
+    --shadow-lg:
+      0 10px 15px -3px hsl(0 0% 0% / 0.45), 0 4px 6px -4px hsl(0 0% 0% / 0.25);
+    --shadow-xl:
+      0 20px 25px -5px hsl(0 0% 0% / 0.5), 0 8px 10px -6px hsl(0 0% 0% / 0.3);
+    --shadow-card:
+      0 1px 3px hsl(0 0% 0% / 0.35), 0 1px 2px -1px hsl(0 0% 0% / 0.25);
+    --shadow-glow: 0 0 20px hsl(292 35% 45% / 0.3);
+    --shadow-glow-teal: 0 0 20px hsl(200 35% 55% / 0.3);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: "Ubuntu", sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: contain;
+  }
+
+  /* Keyboard visible adjustments */
+  body.keyboard-visible {
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* RTL Support - Cairo font for Arabic */
+  html[dir="rtl"] body,
+  html.rtl body {
+    font-family: "Cairo", "Ubuntu", sans-serif;
+  }
+}
+
+@layer utilities {
+  .gradient-primary {
+    background: var(--gradient-primary);
+  }
+
+  .gradient-secondary {
+    background: var(--gradient-secondary);
+  }
+
+  .gradient-brand {
+    background: var(--gradient-brand);
+  }
+
+  .gradient-accent {
+    background: var(--gradient-accent);
+  }
+
+  .gradient-hero {
+    background: var(--gradient-hero);
+  }
+
+  .gradient-sky {
+    background: var(--gradient-sky);
+  }
+
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+
+  .shadow-card-hover {
+    box-shadow: var(--shadow-lg);
+  }
+
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+
+  .shadow-glow-teal {
+    box-shadow: var(--shadow-glow-teal);
+  }
+
+  /* Text gradient utilities */
+  .text-gradient-primary {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-brand {
+    background: var(--gradient-brand);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-accent {
+    background: var(--gradient-accent);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Glass effect */
+  .glass {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .glass-dark {
+    background: rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  /* Brand glass effect with green tint */
+  .glass-brand {
+    background: rgba(124, 181, 61, 0.05);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+}
+
+/* RTL Specific Styles */
+@layer utilities {
+  /* Flip directional icons in RTL */
+  html[dir="rtl"] .rtl-flip {
+    transform: scaleX(-1);
+  }
+
+  /* Fix spacing for RTL */
+  html[dir="rtl"] .space-x-reverse > :not([hidden]) ~ :not([hidden]) {
+    --tw-space-x-reverse: 1;
+  }
+
+  /* Margin and padding logical properties */
+  html[dir="rtl"] .ms-auto {
+    margin-inline-start: auto;
+  }
+
+  html[dir="rtl"] .me-auto {
+    margin-inline-end: auto;
+  }
+
+  /* RTL-aware flex */
+  html[dir="rtl"] .flex-row {
+    flex-direction: row-reverse;
+  }
+
+  html[dir="rtl"] .rtl\:flex-row-reverse {
+    flex-direction: row-reverse;
+  }
+}
+
+/* =============================================================================
+   GLOBAL STYLES - Smooth scrolling, focus states, mobile optimizations
+   ============================================================================= */
+
+/* Smooth scrolling with reduced motion support */
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* =============================================================================
+   FOCUS STATES - Accessible keyboard navigation
+   ============================================================================= */
+
+@layer utilities {
+  .focus-ring {
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+
+  /* Skip link visibility */
+  .skip-link {
+    @apply sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[9999];
+    @apply focus:inline-flex focus:items-center focus:justify-center;
+    @apply focus:px-6 focus:py-3;
+    @apply focus:bg-primary focus:text-primary-foreground;
+    @apply focus:rounded-xl focus:shadow-lg;
+    @apply focus:text-sm focus:font-semibold;
+  }
+}
+
+/* =============================================================================
+   MOBILE OPTIMIZATIONS - Touch targets, safe areas, scrolling
+   ============================================================================= */
+
+/* Touch manipulation for interactive elements */
+@layer utilities {
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .touch-target-lg {
+    min-height: 48px;
+    min-width: 48px;
+  }
+}
+
+/* Disable hover effects on touch devices */
+@media (hover: none) and (pointer: coarse) {
+  .touch-manipulation {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Remove hover styles on touch */
+  .hover\:scale-105:hover {
+    transform: none;
+  }
+}
+
+/* Safe area insets for notched devices */
+.safe-area-inset {
+  padding-top: env(safe-area-inset-top);
+  padding-right: max(1rem, env(safe-area-inset-right));
+  padding-left: max(1rem, env(safe-area-inset-left));
+}
+
+.safe-area-inset-bottom {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+.safe-area-inset-x {
+  padding-right: max(1rem, env(safe-area-inset-right));
+  padding-left: max(1rem, env(safe-area-inset-left));
+}
+
+/* =============================================================================
+   SCROLL BEHAVIOR - Momentum scrolling, custom scrollbars
+   ============================================================================= */
+
+@layer utilities {
+  /* Momentum scrolling for iOS */
+  .scroll-momentum {
+    -webkit-overflow-scrolling: touch;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+
+  /* Hide scrollbar but maintain functionality */
+  .scrollbar-hide {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Custom thin scrollbar */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 3px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+  }
+}
+
+/* =============================================================================
+   TYPOGRAPHY - Heading scale, text utilities
+   ============================================================================= */
+
+@layer utilities {
+  /* Responsive heading scale */
+  .heading-1 {
+    @apply text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight leading-tight;
+  }
+
+  .heading-2 {
+    @apply text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight;
+  }
+
+  .heading-3 {
+    @apply text-xl sm:text-2xl md:text-3xl font-bold tracking-tight;
+  }
+
+  .heading-4 {
+    @apply text-lg md:text-xl font-semibold;
+  }
+
+  .body-large {
+    @apply text-base md:text-lg lg:text-xl text-muted-foreground leading-relaxed;
+  }
+
+  .body-default {
+    @apply text-base text-foreground leading-relaxed;
+  }
+
+  .body-small {
+    @apply text-sm text-muted-foreground leading-relaxed;
+  }
+
+  .caption {
+    @apply text-xs text-muted-foreground;
+  }
+}
+
+/* =============================================================================
+   INTERACTIVE STATES - Hover, active, disabled
+   ============================================================================= */
+
+@layer utilities {
+  /* Prevent text selection on interactive elements */
+  .no-select {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Active press effect */
+  .active-press:active {
+    transform: scale(0.98);
+  }
+
+  /* Smooth hover lift */
+  .hover-lift {
+    @apply transition-transform duration-300;
+  }
+
+  .hover-lift:hover {
+    transform: translateY(-2px);
+  }
+
+  /* Hover glow effect - brand green */
+  .hover-glow {
+    @apply transition-shadow duration-300;
+  }
+
+  .hover-glow:hover {
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.15);
+  }
+
+  /* Hover glow effect - teal */
+  .hover-glow-teal {
+    @apply transition-shadow duration-300;
+  }
+
+  .hover-glow-teal:hover {
+    box-shadow: 0 0 20px hsl(var(--accent) / 0.15);
+  }
+}
+
+/* =============================================================================
+   LOADING STATES - Skeleton, pulse, shimmer
+   ============================================================================= */
+
+@layer utilities {
+  .skeleton {
+    @apply animate-pulse bg-muted rounded-md;
+  }
+
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 0%,
+      hsl(var(--muted-foreground) / 0.1) 50%,
+      hsl(var(--muted)) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  /* Brand shimmer with green tint */
+  .shimmer-brand {
+    background: linear-gradient(
+      90deg,
+      hsl(87 52% 47% / 0.1) 0%,
+      hsl(179 53% 50% / 0.15) 50%,
+      hsl(87 52% 47% / 0.1) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+}
+
+/* =============================================================================
+   CUSTOM HEIGHT UTILITIES - h-13 for touch-friendly inputs
+   ============================================================================= */
+
+@layer utilities {
+  .h-13 {
+    height: 3.25rem; /* 52px */
+  }
+
+  .min-h-13 {
+    min-height: 3.25rem;
+  }
+}

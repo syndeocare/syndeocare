@@ -2,6 +2,7 @@ import {
   bookingDetailSchema,
   bookingListResponseSchema,
   bookingRequestInputSchema,
+  bookingStatusUpdateInputSchema,
   domainEventCatalog,
   jobListingCreateInputSchema,
   jobListingDetailSchema,
@@ -14,6 +15,7 @@ import {
   listBookingsForSubject,
   listJobListings,
   requestBookingBySubject,
+  updateBookingStatusBySubject,
 } from "@repo/persistence";
 import { publishDomainEvent, startService } from "@repo/service-core";
 import { z } from "zod";
@@ -194,6 +196,53 @@ void startService({
         }
 
         return bookingDetailSchema.parse(booking);
+      },
+    );
+
+    app.patch(
+      "/internal/bookings/:subject/:bookingId",
+      async (request, reply) => {
+        const parsedParams = bookingParamsSchema.safeParse(request.params);
+        const parsedBody = bookingStatusUpdateInputSchema.safeParse(
+          request.body,
+        );
+
+        if (!parsedParams.success || !parsedBody.success) {
+          return reply.code(400).send({
+            code: "VALIDATION_ERROR",
+            message: "A valid booking id and status payload are required.",
+          });
+        }
+
+        const booking = await updateBookingStatusBySubject(
+          parsedParams.data.subject,
+          parsedParams.data.bookingId,
+          parsedBody.data,
+        );
+
+        if (!booking.ok) {
+          return reply.code(booking.statusCode).send({
+            code: booking.code,
+            message: booking.message,
+          });
+        }
+
+        if (booking.data.status === "accepted") {
+          await publishDomainEvent({
+            name: "scheduling.booking.confirmed",
+            payload: {
+              bookingId: booking.data.id,
+              clinicId: booking.data.clinicId,
+              jobId: booking.data.jobId,
+              professionalId: booking.data.professionalId,
+              status: booking.data.status,
+            },
+            producer: "scheduling",
+            subject: booking.data.id,
+          });
+        }
+
+        return bookingDetailSchema.parse(booking.data);
       },
     );
 
