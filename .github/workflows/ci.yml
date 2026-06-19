@@ -30,6 +30,9 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Smoke test web artifact
+        run: pnpm smoke:web
+
   changeset-status:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest

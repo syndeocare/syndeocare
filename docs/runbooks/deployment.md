@@ -20,10 +20,10 @@
 
 1. merge to `main`
 2. CI validates repo
-3. release workflow versions packages
-4. deployment workflow builds images and pushes to ECR
-5. Terraform apply and ECS rollout happen through approved environment jobs
-6. static frontend assets deploy independently through CloudFront/S3 (preferred) rather than a dedicated EC2 instance
+3. GitHub Actions assumes AWS through OIDC
+4. static frontend assets deploy to CloudFront/S3
+5. release workflow versions packages when changesets require it
+6. backend image/ECS deployment runs only when `BACKEND_DEPLOY_MODE=ecs`
 
 ## Terraform module layout
 
@@ -50,22 +50,29 @@ those modules into a concrete platform shape.
 - when running the temporary containerized gateway outside Terraform, set `SERVICE_IDENTITY_URL`, `SERVICE_PROFILES_URL`, `SERVICE_CLINICS_URL`, `SERVICE_SCHEDULING_URL`, and `SERVICE_NOTIFICATIONS_URL`; if they are omitted in `NODE_ENV=production`, the gateway falls back to Docker service DNS names such as `http://identity:4111` instead of localhost
 - manually-created temporary S3 upload buckets must have browser upload CORS enabled for the deployed app origin, including `PUT`, `GET`, `HEAD`, `content-type`, and exposed `ETag`; otherwise presigned S3 uploads fail in the browser as `Failed to fetch`
 - while running the temporary EC2 deployment outside Terraform, keep service DNS names and storage bucket CORS aligned with the deployed gateway and frontend origins
+- the production frontend is automated from GitHub Actions; see `docs/runbooks/github-aws-cicd.md`
+- keep backend production deploy guarded until the current `api.syndeocare.ai` and `auth.syndeocare.ai` IP target is moved into managed AWS infrastructure or imported into Terraform
 
 ## Frontend deployment path
 
 The `apps/web` frontend is now a real platform surface and should deploy
 independently from the backend services.
 
-1. build the web app with `pnpm build:web`
-2. publish the generated `apps/web/dist` artifact
-3. sync the artifact to the environment-specific S3 bucket
-4. invalidate the CloudFront distribution after upload
+1. merge a PR to `main`
+2. let CI run `pnpm validate`, `pnpm build`, and `pnpm smoke:web`
+3. build the web app with `pnpm build:web`
+4. publish the generated `apps/web/dist` artifact
+5. sync the artifact to the environment-specific S3 bucket
+6. invalidate the CloudFront distribution after upload
+7. smoke-check the live web URL
 
 ### Required frontend environment variables
 
 - `VITE_API_GATEWAY_BASE_URL`
 - `VITE_PLATFORM_API_BASE_URL`
 - `WEB_FRONTEND_BUCKET`
+- `WEB_FRONTEND_DISTRIBUTION_ID`
+- `WEB_PUBLIC_URL`
 
 The GitHub Actions deployment workflow now builds the web app and uploads the
 static artifact before any bucket sync step, so frontend delivery can be traced
