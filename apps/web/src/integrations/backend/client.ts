@@ -196,6 +196,7 @@ function mapJob(item: any) {
   return {
     ...item,
     id: item.id,
+    source: item.source ?? (item.clinicId ? "platform" : "legacy"),
     title: item.title,
     role_required: item.specialty ?? item.role_required ?? item.title,
     shift_date: item.shift_date ?? startsAt.date,
@@ -239,6 +240,8 @@ function mapBooking(item: any) {
     status: item.status,
     professional_id: item.professionalId ?? item.professional_id,
     clinic_id: item.clinicId ?? item.clinic_id,
+    shift_id: item.jobId ?? item.shift_id,
+    notes: item.notes ?? null,
     check_in_time: item.check_in_time ?? null,
     check_out_time: item.check_out_time ?? null,
     shift: item.shift ?? {

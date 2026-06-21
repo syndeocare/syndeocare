@@ -135,7 +135,7 @@ const ClinicDashboard = () => {
       collected.push(
         ...(shiftsData as Shift[]).map((shift) => ({
           ...shift,
-          source: "legacy" as const,
+          source: shift.source ?? ("legacy" as const),
         })),
       );
     }

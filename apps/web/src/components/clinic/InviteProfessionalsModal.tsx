@@ -26,6 +26,14 @@ import { backendDb } from "@/integrations/backend/client";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
 import { createNotification } from "@/lib/notifications";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  isGatewayBackendConfigured,
+  listLegacyBookings,
+  listLegacyProfessionals,
+  sendGatewayConversationMessage,
+  startGatewayConversation,
+} from "@/lib/platform-backend";
 
 interface Professional {
   id: string;
@@ -35,7 +43,8 @@ interface Professional {
   specialties: string[] | null;
   location_address: string | null;
   verification_status: string;
-  user_id: string;
+  user_id?: string;
+  worked_before?: boolean;
 }
 
 interface InviteProfessionalsModalProps {
@@ -56,6 +65,7 @@ const InviteProfessionalsModal = ({
   const { t, i18n } = useTranslation();
   const isRTL = i18n.language === "ar";
   const { toast } = useToast();
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [invitedIds, setInvitedIds] = useState<Set<string>>(new Set());
@@ -64,6 +74,11 @@ const InviteProfessionalsModal = ({
   const [message, setMessage] = useState("");
 
   const fetchExistingInvitations = useCallback(async () => {
+    if (isGatewayBackendConfigured()) {
+      setInvitedIds(new Set());
+      return;
+    }
+
     const { data } = await backendDb
       .from("shift_invitations")
       .select("professional_id")
@@ -77,6 +92,56 @@ const InviteProfessionalsModal = ({
   const fetchProfessionals = useCallback(async () => {
     setLoading(true);
     try {
+      if (isGatewayBackendConfigured()) {
+        const [items, bookings] = await Promise.all([
+          listLegacyProfessionals({ verificationStatus: "approved" }),
+          user
+            ? listLegacyBookings({
+                user,
+                userRole: "clinic",
+                clinicId,
+                onboardingCompleted: true,
+                verificationStatus: "verified",
+              }).catch(() => [])
+            : Promise.resolve([]),
+        ]);
+        const previouslyWorkedIds = new Set(
+          bookings
+            .filter((booking) =>
+              ["accepted", "confirmed", "completed"].includes(booking.status),
+            )
+            .map((booking) => booking.professional_id),
+        );
+
+        setProfessionals(
+          items
+            .filter(
+              (professional) =>
+                professional.verification_status === "verified" &&
+                professional.is_available !== false,
+            )
+            .map((professional) => ({
+              id: professional.id,
+              full_name: professional.full_name,
+              avatar_url: professional.avatar_url,
+              rating_avg: professional.rating_avg,
+              specialties: professional.specialties,
+              location_address: professional.location_address,
+              verification_status:
+                professional.verification_status ?? "pending",
+              worked_before: previouslyWorkedIds.has(professional.id),
+            }))
+            .sort((a, b) => {
+              if (a.worked_before !== b.worked_before) {
+                return a.worked_before ? -1 : 1;
+              }
+              return (b.rating_avg ?? 0) - (a.rating_avg ?? 0);
+            })
+            .slice(0, 75),
+        );
+        return;
+      }
+
       const { data, error } = await backendDb
         .from("profiles")
         .select(
@@ -88,13 +153,34 @@ const InviteProfessionalsModal = ({
         .limit(50);
 
       if (error) throw error;
-      setProfessionals(data || []);
+      const { data: workedBookings } = await backendDb
+        .from("bookings")
+        .select("professional_id, status")
+        .eq("clinic_id", clinicId)
+        .in("status", ["accepted", "confirmed", "completed"]);
+      const previouslyWorkedIds = new Set(
+        (workedBookings ?? []).map((booking) => booking.professional_id),
+      );
+
+      setProfessionals(
+        (data || [])
+          .map((professional) => ({
+            ...professional,
+            worked_before: previouslyWorkedIds.has(professional.id),
+          }))
+          .sort((a, b) => {
+            if (a.worked_before !== b.worked_before) {
+              return a.worked_before ? -1 : 1;
+            }
+            return (b.rating_avg ?? 0) - (a.rating_avg ?? 0);
+          }),
+      );
     } catch (error) {
       console.error("Error fetching professionals:", error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [clinicId, user]);
 
   useEffect(() => {
     if (open) {
@@ -106,6 +192,49 @@ const InviteProfessionalsModal = ({
   const handleInvite = async (professional: Professional) => {
     setInviting(professional.id);
     try {
+      if (user && isGatewayBackendConfigured()) {
+        const conversation = await startGatewayConversation(
+          {
+            user,
+            userRole: "clinic",
+            clinicId,
+            onboardingCompleted: true,
+            verificationStatus: "verified",
+          },
+          { clinicId, professionalId: professional.id },
+        );
+        const content =
+          message.trim() ||
+          t(
+            "shifts.invitations.defaultMessage",
+            "You are invited to apply for a new shift. Open the shifts page to review the details.",
+          );
+
+        await sendGatewayConversationMessage(
+          {
+            user,
+            userRole: "clinic",
+            clinicId,
+            onboardingCompleted: true,
+            verificationStatus: "verified",
+          },
+          conversation.id,
+          {
+            content: `${content}\n\nShift ID: ${shiftId}`,
+          },
+        );
+
+        setInvitedIds((prev) => new Set([...prev, professional.id]));
+        toast({
+          title: t("shifts.invitations.sent"),
+          description: t("shifts.invitations.sentDesc", {
+            name: professional.full_name,
+          }),
+        });
+        onSuccess?.();
+        return;
+      }
+
       const { error } = await backendDb.from("shift_invitations").insert({
         shift_id: shiftId,
         clinic_id: clinicId,
@@ -116,13 +245,15 @@ const InviteProfessionalsModal = ({
 
       if (error) throw error;
 
-      await createNotification({
-        userId: professional.user_id,
-        title: t("shifts.invitations.received"),
-        message: t("shifts.invitations.receivedDesc"),
-        type: "shift_invitation",
-        data: { shift_id: shiftId },
-      });
+      if (professional.user_id) {
+        await createNotification({
+          userId: professional.user_id,
+          title: t("shifts.invitations.received"),
+          message: t("shifts.invitations.receivedDesc"),
+          type: "shift_invitation",
+          data: { shift_id: shiftId },
+        });
+      }
 
       setInvitedIds((prev) => new Set([...prev, professional.id]));
       toast({
@@ -228,6 +359,14 @@ const InviteProfessionalsModal = ({
                             <Star className="w-3 h-3 fill-warning text-warning" />
                             {pro.rating_avg.toFixed(1)}
                           </span>
+                        )}
+                        {pro.worked_before && (
+                          <Badge variant="outline" className="text-xs py-0">
+                            {t(
+                              "shifts.invitations.workedBefore",
+                              "Worked before",
+                            )}
+                          </Badge>
                         )}
                       </div>
                       {pro.specialties && pro.specialties.length > 0 && (

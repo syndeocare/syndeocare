@@ -142,7 +142,6 @@ const CreateShiftModal = ({
       }
 
       let insertedShift: { id: string } | null = null;
-      let createdViaGateway = false;
 
       if (user && isGatewayBackendConfigured()) {
         try {
@@ -171,7 +170,6 @@ const CreateShiftModal = ({
             },
           );
           insertedShift = { id: createdShift.id };
-          createdViaGateway = true;
         } catch (error) {
           console.warn("Falling back to legacy shift creation", error);
         }
@@ -210,7 +208,7 @@ const CreateShiftModal = ({
         description: t("shifts.shiftPostedDesc"),
       });
 
-      if (insertedShift && !createdViaGateway) {
+      if (insertedShift) {
         setCreatedShiftId(insertedShift.id);
         setShowInviteModal(true);
       }

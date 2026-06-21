@@ -195,6 +195,7 @@ const ShiftDetailModal = ({
         professional_id: profileId,
         clinic_id: shift.clinic.id,
         status: "requested",
+        notes: proposal.trim() || null,
       });
 
       if (error) throw error;
