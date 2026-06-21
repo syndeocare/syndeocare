@@ -179,6 +179,7 @@ interface KeycloakAuthenticationExecution {
   displayName?: string;
   requirement?: string;
   index?: number;
+  level?: number;
 }
 
 async function getKeycloakAuthenticationExecutions(
@@ -615,6 +616,10 @@ async function ensureKeycloakFirstBrokerAutoLink(adminAccessToken: string) {
     userCreationFlowAlias,
   );
   for (const execution of userCreationExecutions) {
+    if (execution.level !== 0) {
+      continue;
+    }
+
     if (
       execution.id === autoLinkSubflow.id ||
       execution.providerId === "idp-create-user-if-unique"
@@ -642,6 +647,31 @@ async function ensureKeycloakFirstBrokerAutoLink(adminAccessToken: string) {
       );
     }
   }
+
+  autoLinkSubflowExecutions = await getKeycloakAuthenticationExecutions(
+    adminAccessToken,
+    autoLinkSubflowAlias,
+  );
+  detectExistingExecution =
+    autoLinkSubflowExecutions.find(
+      (execution) => execution.providerId === "idp-detect-existing-broker-user",
+    ) ?? detectExistingExecution;
+  autoLinkExecution =
+    autoLinkSubflowExecutions.find(
+      (execution) => execution.providerId === "idp-auto-link",
+    ) ?? autoLinkExecution;
+  await updateKeycloakAuthenticationExecutionRequirement(
+    adminAccessToken,
+    autoLinkSubflowAlias,
+    detectExistingExecution,
+    "REQUIRED",
+  );
+  await updateKeycloakAuthenticationExecutionRequirement(
+    adminAccessToken,
+    autoLinkSubflowAlias,
+    autoLinkExecution,
+    "REQUIRED",
+  );
 
   while ((detectExistingExecution.index ?? 0) > 0) {
     await raiseKeycloakAuthenticationExecutionPriority(
