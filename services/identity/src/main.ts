@@ -269,6 +269,61 @@ async function addKeycloakAuthenticationExecution(
   }
 }
 
+async function ensureKeycloakAuthenticationSubflow(
+  adminAccessToken: string,
+  parentFlowAlias: string,
+  subflowAlias: string,
+) {
+  let executions = await getKeycloakAuthenticationExecutions(
+    adminAccessToken,
+    parentFlowAlias,
+  );
+  let subflow = executions.find(
+    (execution) => execution.displayName === subflowAlias,
+  );
+
+  if (!subflow) {
+    const config = getKeycloakConfig();
+    const response = await fetch(
+      `${config.baseUrl}/admin/realms/${config.realm}/authentication/flows/${encodeURIComponent(parentFlowAlias)}/executions/flow`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${adminAccessToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          alias: subflowAlias,
+          provider: "basic-flow",
+          type: "basic-flow",
+        }),
+      },
+    );
+
+    if (!response.ok && response.status !== 409) {
+      throw new Error(
+        `Keycloak authentication subflow ${subflowAlias} could not be added.`,
+      );
+    }
+
+    executions = await getKeycloakAuthenticationExecutions(
+      adminAccessToken,
+      parentFlowAlias,
+    );
+    subflow = executions.find(
+      (execution) => execution.displayName === subflowAlias,
+    );
+  }
+
+  if (!subflow) {
+    throw new Error(
+      `Keycloak authentication subflow ${subflowAlias} is unavailable.`,
+    );
+  }
+
+  return subflow;
+}
+
 async function updateKeycloakAuthenticationExecutionRequirement(
   adminAccessToken: string,
   flowAlias: string,
@@ -321,16 +376,132 @@ async function raiseKeycloakAuthenticationExecutionPriority(
   }
 }
 
+async function ensureKeycloakRequiredActionDisabled(
+  adminAccessToken: string,
+  alias: string,
+) {
+  const config = getKeycloakConfig();
+  const response = await fetch(
+    `${config.baseUrl}/admin/realms/${config.realm}/authentication/required-actions/${encodeURIComponent(alias)}`,
+    {
+      headers: {
+        authorization: `Bearer ${adminAccessToken}`,
+      },
+    },
+  );
+
+  if (response.status === 404) {
+    return;
+  }
+
+  if (!response.ok) {
+    throw new Error(`Keycloak required action ${alias} lookup failed.`);
+  }
+
+  const requiredAction = (await response.json()) as {
+    defaultAction?: boolean;
+    enabled?: boolean;
+  };
+
+  if (
+    requiredAction.enabled === false &&
+    requiredAction.defaultAction === false
+  ) {
+    return;
+  }
+
+  const updateResponse = await fetch(
+    `${config.baseUrl}/admin/realms/${config.realm}/authentication/required-actions/${encodeURIComponent(alias)}`,
+    {
+      method: "PUT",
+      headers: {
+        authorization: `Bearer ${adminAccessToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        ...requiredAction,
+        defaultAction: false,
+        enabled: false,
+      }),
+    },
+  );
+
+  if (!updateResponse.ok) {
+    throw new Error(`Keycloak required action ${alias} could not be disabled.`);
+  }
+}
+
+async function ensureKeycloakProfileNamesOptional(adminAccessToken: string) {
+  const config = getKeycloakConfig();
+  const response = await fetch(
+    `${config.baseUrl}/admin/realms/${config.realm}/users/profile`,
+    {
+      headers: {
+        authorization: `Bearer ${adminAccessToken}`,
+      },
+    },
+  );
+
+  if (response.status === 404) {
+    return;
+  }
+
+  if (!response.ok) {
+    throw new Error("Keycloak user profile lookup failed.");
+  }
+
+  const userProfile = (await response.json()) as {
+    attributes?: Array<{ name?: string; required?: unknown }>;
+  };
+  let changed = false;
+
+  for (const attribute of userProfile.attributes ?? []) {
+    if (
+      (attribute.name === "firstName" || attribute.name === "lastName") &&
+      attribute.required !== undefined
+    ) {
+      delete attribute.required;
+      changed = true;
+    }
+  }
+
+  if (!changed) {
+    return;
+  }
+
+  const updateResponse = await fetch(
+    `${config.baseUrl}/admin/realms/${config.realm}/users/profile`,
+    {
+      method: "PUT",
+      headers: {
+        authorization: `Bearer ${adminAccessToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(userProfile),
+    },
+  );
+
+  if (!updateResponse.ok) {
+    throw new Error("Keycloak user profile could not be updated.");
+  }
+}
+
 async function ensureKeycloakFirstBrokerAutoLink(adminAccessToken: string) {
   const builtInFirstBrokerFlowAlias = "first broker login";
   const firstBrokerFlowAlias = "syndeocare first broker login";
   const userCreationFlowAlias = `${firstBrokerFlowAlias} User creation or linking`;
+  const autoLinkSubflowAlias = `${firstBrokerFlowAlias} Existing account auto link`;
 
   await ensureKeycloakAuthenticationFlowCopy(
     adminAccessToken,
     builtInFirstBrokerFlowAlias,
     firstBrokerFlowAlias,
   );
+  await ensureKeycloakRequiredActionDisabled(
+    adminAccessToken,
+    "VERIFY_PROFILE",
+  );
+  await ensureKeycloakProfileNamesOptional(adminAccessToken);
 
   const firstBrokerExecutions = await getKeycloakAuthenticationExecutions(
     adminAccessToken,
@@ -343,7 +514,10 @@ async function ensureKeycloakFirstBrokerAutoLink(adminAccessToken: string) {
       execution.providerId === "idp-email-verification" ||
       execution.displayName?.toLowerCase().includes("review profile") ||
       execution.displayName?.toLowerCase().includes("confirm link") ||
-      execution.displayName?.toLowerCase().includes("verify existing"),
+      execution.displayName?.toLowerCase().includes("verify existing") ||
+      execution.displayName
+        ?.toLowerCase()
+        .includes("update account information"),
   );
 
   for (const execution of firstBrokerExecutionsToDisable) {
@@ -359,22 +533,63 @@ async function ensureKeycloakFirstBrokerAutoLink(adminAccessToken: string) {
     adminAccessToken,
     userCreationFlowAlias,
   );
-  let autoLinkExecution = userCreationExecutions.find(
+  let autoLinkSubflow = await ensureKeycloakAuthenticationSubflow(
+    adminAccessToken,
+    userCreationFlowAlias,
+    autoLinkSubflowAlias,
+  );
+  await updateKeycloakAuthenticationExecutionRequirement(
+    adminAccessToken,
+    userCreationFlowAlias,
+    autoLinkSubflow,
+    "ALTERNATIVE",
+  );
+
+  let autoLinkSubflowExecutions = await getKeycloakAuthenticationExecutions(
+    adminAccessToken,
+    autoLinkSubflowAlias,
+  );
+  let detectExistingExecution = autoLinkSubflowExecutions.find(
+    (execution) => execution.providerId === "idp-detect-existing-broker-user",
+  );
+
+  if (!detectExistingExecution) {
+    await addKeycloakAuthenticationExecution(
+      adminAccessToken,
+      autoLinkSubflowAlias,
+      "idp-detect-existing-broker-user",
+    );
+    autoLinkSubflowExecutions = await getKeycloakAuthenticationExecutions(
+      adminAccessToken,
+      autoLinkSubflowAlias,
+    );
+    detectExistingExecution = autoLinkSubflowExecutions.find(
+      (execution) => execution.providerId === "idp-detect-existing-broker-user",
+    );
+  }
+
+  let autoLinkExecution = autoLinkSubflowExecutions.find(
     (execution) => execution.providerId === "idp-auto-link",
   );
 
   if (!autoLinkExecution) {
     await addKeycloakAuthenticationExecution(
       adminAccessToken,
-      userCreationFlowAlias,
+      autoLinkSubflowAlias,
       "idp-auto-link",
     );
-    userCreationExecutions = await getKeycloakAuthenticationExecutions(
+    autoLinkSubflowExecutions = await getKeycloakAuthenticationExecutions(
       adminAccessToken,
-      userCreationFlowAlias,
+      autoLinkSubflowAlias,
     );
-    autoLinkExecution = userCreationExecutions.find(
+    autoLinkExecution = autoLinkSubflowExecutions.find(
       (execution) => execution.providerId === "idp-auto-link",
+    );
+  }
+
+  if (!detectExistingExecution) {
+    throw new Error(
+      "Keycloak idp-detect-existing-broker-user execution is unavailable.",
     );
   }
 
@@ -384,20 +599,32 @@ async function ensureKeycloakFirstBrokerAutoLink(adminAccessToken: string) {
 
   await updateKeycloakAuthenticationExecutionRequirement(
     adminAccessToken,
-    userCreationFlowAlias,
+    autoLinkSubflowAlias,
+    detectExistingExecution,
+    "REQUIRED",
+  );
+  await updateKeycloakAuthenticationExecutionRequirement(
+    adminAccessToken,
+    autoLinkSubflowAlias,
     autoLinkExecution,
-    "ALTERNATIVE",
+    "REQUIRED",
   );
 
+  userCreationExecutions = await getKeycloakAuthenticationExecutions(
+    adminAccessToken,
+    userCreationFlowAlias,
+  );
   for (const execution of userCreationExecutions) {
     if (
-      execution.id === autoLinkExecution.id ||
+      execution.id === autoLinkSubflow.id ||
       execution.providerId === "idp-create-user-if-unique"
     ) {
       continue;
     }
 
     if (
+      execution.providerId === "idp-detect-existing-broker-user" ||
+      execution.providerId === "idp-auto-link" ||
       execution.providerId === "idp-confirm-link" ||
       execution.providerId === "idp-email-verification" ||
       execution.displayName
@@ -416,19 +643,43 @@ async function ensureKeycloakFirstBrokerAutoLink(adminAccessToken: string) {
     }
   }
 
-  while ((autoLinkExecution.index ?? 0) > 0) {
+  while ((detectExistingExecution.index ?? 0) > 0) {
     await raiseKeycloakAuthenticationExecutionPriority(
       adminAccessToken,
-      autoLinkExecution,
+      detectExistingExecution,
+    );
+    autoLinkSubflowExecutions = await getKeycloakAuthenticationExecutions(
+      adminAccessToken,
+      autoLinkSubflowAlias,
+    );
+    detectExistingExecution =
+      autoLinkSubflowExecutions.find(
+        (execution) =>
+          execution.providerId === "idp-detect-existing-broker-user",
+      ) ?? detectExistingExecution;
+  }
+
+  userCreationExecutions = await getKeycloakAuthenticationExecutions(
+    adminAccessToken,
+    userCreationFlowAlias,
+  );
+  autoLinkSubflow =
+    userCreationExecutions.find(
+      (execution) => execution.displayName === autoLinkSubflowAlias,
+    ) ?? autoLinkSubflow;
+  while ((autoLinkSubflow.index ?? 0) > 0) {
+    await raiseKeycloakAuthenticationExecutionPriority(
+      adminAccessToken,
+      autoLinkSubflow,
     );
     userCreationExecutions = await getKeycloakAuthenticationExecutions(
       adminAccessToken,
       userCreationFlowAlias,
     );
-    autoLinkExecution =
+    autoLinkSubflow =
       userCreationExecutions.find(
-        (execution) => execution.providerId === "idp-auto-link",
-      ) ?? autoLinkExecution;
+        (execution) => execution.displayName === autoLinkSubflowAlias,
+      ) ?? autoLinkSubflow;
   }
 }
 
