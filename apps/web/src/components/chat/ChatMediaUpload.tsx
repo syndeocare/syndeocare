@@ -1,9 +1,9 @@
 import { useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { backendDb } from "@/integrations/backend/client";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { Paperclip, Image, File, Loader2, X, Video, Music } from "lucide-react";
+import { Paperclip, Image, File, Loader2, Video } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +19,7 @@ interface ChatMediaUploadProps {
     fileName: string,
     fileType: string,
     fileSize: number,
+    previewUrl?: string,
   ) => void;
   disabled?: boolean;
 }
@@ -33,6 +34,7 @@ export const ChatMediaUpload = ({
   const { t } = useTranslation();
   const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
@@ -60,6 +62,7 @@ export const ChatMediaUpload = ({
 
   const uploadFile = async (file: File) => {
     setUploading(true);
+    setUploadProgress(15);
     try {
       // Auto-optimize image uploads for chat
       let toUpload: File = file;
@@ -71,8 +74,19 @@ export const ChatMediaUpload = ({
           quality: 0.82,
         });
       }
+      setUploadProgress(45);
+      const previewUrl = toUpload.type.startsWith("image/")
+        ? URL.createObjectURL(toUpload)
+        : undefined;
       const fileUrl = await uploadChatMediaToStorage(toUpload, conversationId);
-      onUploadComplete(fileUrl, toUpload.name, toUpload.type, toUpload.size);
+      setUploadProgress(100);
+      onUploadComplete(
+        fileUrl,
+        toUpload.name,
+        toUpload.type,
+        toUpload.size,
+        previewUrl,
+      );
     } catch (error) {
       console.error("Upload error:", error);
       toast({
@@ -81,7 +95,10 @@ export const ChatMediaUpload = ({
         description: error instanceof Error ? error.message : t("common.error"),
       });
     } finally {
-      setUploading(false);
+      window.setTimeout(() => {
+        setUploading(false);
+        setUploadProgress(0);
+      }, 250);
     }
   };
 
@@ -139,6 +156,15 @@ export const ChatMediaUpload = ({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      {uploading && (
+        <div className="fixed inset-x-3 bottom-24 z-50 mx-auto max-w-md rounded-lg border bg-background/95 p-2 shadow-lg md:absolute md:bottom-20">
+          <div className="mb-1 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+            <span>{t("chat.uploadingFile", "Uploading file")}</span>
+            <span>{uploadProgress}%</span>
+          </div>
+          <Progress value={uploadProgress} className="h-2" />
+        </div>
+      )}
     </>
   );
 };

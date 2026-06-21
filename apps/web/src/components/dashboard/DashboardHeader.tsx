@@ -5,9 +5,11 @@ import { useTranslation } from "react-i18next";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { UserProfileMenu } from "@/components/layout/UserProfileMenu";
 import BrandLogo from "@/components/brand/BrandLogo";
+import { useUnreadMessagesCount } from "@/hooks/useUnreadMessagesCount";
 
 const DashboardHeader = () => {
   const { t } = useTranslation();
+  const unreadMessagesCount = useUnreadMessagesCount();
 
   return (
     <header className="bg-card/95 backdrop-blur-xl border-b border-border/50 sticky top-0 z-50 safe-area-inset">
@@ -31,10 +33,15 @@ const DashboardHeader = () => {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-10 w-10 sm:h-10 sm:w-10 rounded-xl"
+                className="relative h-10 w-10 sm:h-10 sm:w-10 rounded-xl"
                 aria-label={t("chat.messages")}
               >
                 <MessageCircle className="h-5 w-5" />
+                {unreadMessagesCount > 0 && (
+                  <span className="absolute -top-1 -end-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-xs font-bold text-destructive-foreground">
+                    {unreadMessagesCount > 99 ? "99+" : unreadMessagesCount}
+                  </span>
+                )}
               </Button>
             </Link>
 

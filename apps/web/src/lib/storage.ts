@@ -45,6 +45,10 @@ interface CompleteProfileImageUploadResponse {
   assetUrl: string;
 }
 
+interface CompleteChatMediaUploadResponse {
+  fileUrl: string;
+}
+
 const S3_URI_PREFIX = "s3://";
 const S3_PUBLIC_URL_PATTERN =
   /^https:\/\/[^/]+\.s3(?:[.-][a-z0-9-]+)?\.amazonaws\.com\/.+$/i;
@@ -275,9 +279,39 @@ export const uploadChatMediaToStorage = async (
   file: File,
   conversationId: string,
 ) => {
-  void file;
   void conversationId;
-  throw new Error("Chat media upload is not available in the gateway yet.");
+
+  if (canUseGatewayStorage()) {
+    const descriptor = await invokeGatewayJson<GatewayUploadDescriptor>(
+      "/uploads/chat-media",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          fileName: file.name,
+          contentType: file.type || "application/octet-stream",
+        }),
+      },
+    );
+
+    await uploadWithGatewayDescriptor(descriptor, file);
+
+    const completed = await invokeGatewayJson<CompleteChatMediaUploadResponse>(
+      "/uploads/chat-media/complete",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          bucket: descriptor.bucket,
+          key: descriptor.key,
+        }),
+      },
+    );
+
+    return completed.fileUrl;
+  }
+
+  throw new Error("Chat media upload requires an active API gateway session.");
 };
 
 export const isS3StorageUri = (
@@ -300,6 +334,35 @@ export const resolveMediaUrl = (fileUrl: string | null | undefined) => {
   }
 
   return fileUrl;
+};
+
+export const getChatMediaAccessUrl = async (
+  conversationId: string,
+  fileUrl: string,
+) => {
+  if (!isS3StorageUri(fileUrl)) {
+    return fileUrl;
+  }
+
+  if (!canUseGatewayStorage()) {
+    throw new Error(
+      "Chat media access requires an active API gateway session.",
+    );
+  }
+
+  const { signedUrl } = await invokeGatewayJson<DocumentAccessResponse>(
+    "/uploads/chat-media/access",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        conversationId,
+        fileUrl,
+      }),
+    },
+  );
+
+  return signedUrl;
 };
 
 export const getDocumentAccessUrl = async (fileUrl: string) => {

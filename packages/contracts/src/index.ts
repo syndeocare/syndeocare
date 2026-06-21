@@ -321,6 +321,7 @@ export const externalUserIdSyncResponseSchema = z.object({
 export const uploadAssetTypeSchema = z.enum([
   "profile-image",
   "verification-document",
+  "chat-media",
 ]);
 
 export const uploadRequestSchema = z.object({
@@ -359,6 +360,11 @@ export const finalizeVerificationDocumentUploadInputSchema = z.object({
   documentType: z.string().min(1),
 });
 
+export const finalizeChatMediaUploadInputSchema = z.object({
+  bucket: z.string().min(1),
+  key: z.string().min(1),
+});
+
 export const completeProfileImageUploadResponseSchema = z.object({
   persisted: z.literal(true),
   assetType: z.literal("profile-image"),
@@ -375,7 +381,19 @@ export const completeVerificationDocumentUploadResponseSchema = z.object({
   uploadedDocuments: z.array(uploadedDocumentSchema),
 });
 
+export const completeChatMediaUploadResponseSchema = z.object({
+  persisted: z.literal(true),
+  assetType: z.literal("chat-media"),
+  resource: z.literal("conversation-message"),
+  fileUrl: z.string().min(1),
+});
+
 export const documentAccessRequestSchema = z.object({
+  fileUrl: z.string().min(1),
+});
+
+export const chatMediaAccessRequestSchema = z.object({
+  conversationId: z.string().uuid(),
   fileUrl: z.string().min(1),
 });
 
@@ -1079,6 +1097,24 @@ export const initialV1RouteCatalog = [
     protected: true,
   },
   {
+    method: "POST",
+    path: "/v1/uploads/chat-media",
+    summary: "Create a presigned upload for conversation media",
+    protected: true,
+  },
+  {
+    method: "POST",
+    path: "/v1/uploads/chat-media/complete",
+    summary: "Finalize uploaded conversation media",
+    protected: true,
+  },
+  {
+    method: "POST",
+    path: "/v1/uploads/chat-media/access",
+    summary: "Create a signed access URL for private conversation media",
+    protected: true,
+  },
+  {
     method: "GET",
     path: "/v1/jobs",
     summary: "Browse open jobs and shifts",
@@ -1249,13 +1285,22 @@ export type FinalizeProfileImageUploadInput = z.infer<
 export type FinalizeVerificationDocumentUploadInput = z.infer<
   typeof finalizeVerificationDocumentUploadInputSchema
 >;
+export type FinalizeChatMediaUploadInput = z.infer<
+  typeof finalizeChatMediaUploadInputSchema
+>;
 export type CompleteProfileImageUploadResponse = z.infer<
   typeof completeProfileImageUploadResponseSchema
 >;
 export type CompleteVerificationDocumentUploadResponse = z.infer<
   typeof completeVerificationDocumentUploadResponseSchema
 >;
+export type CompleteChatMediaUploadResponse = z.infer<
+  typeof completeChatMediaUploadResponseSchema
+>;
 export type DocumentAccessRequest = z.infer<typeof documentAccessRequestSchema>;
+export type ChatMediaAccessRequest = z.infer<
+  typeof chatMediaAccessRequestSchema
+>;
 export type DocumentAccessResponse = z.infer<
   typeof documentAccessResponseSchema
 >;

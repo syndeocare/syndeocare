@@ -68,6 +68,18 @@ export const ChatList = ({
     });
   };
 
+  const formatAbsoluteTime = (value?: string | null) => {
+    if (!value) return "";
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+
+    return new Intl.DateTimeFormat(isRTL ? "ar" : "en", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(date);
+  };
+
   const fetchConversations = useCallback(async () => {
     if (!user || !profileId) {
       setConversations([]);
@@ -200,7 +212,7 @@ export const ChatList = ({
             .select("*", { count: "exact", head: true })
             .eq("admin_conversation_id", conv.id)
             .eq("is_read", false)
-            .neq("sender_user_id", currentUserId);
+            .neq("sender_type", userType);
           const { data: lastMsg } = await backendDb
             .from("admin_messages")
             .select("content, file_type")
@@ -473,7 +485,12 @@ export const ChatList = ({
                     )}
                   </div>
                   <span className="text-[11px] text-muted-foreground whitespace-nowrap">
-                    {formatRelativeTime(conv.last_message_at)}
+                    <time
+                      dateTime={conv.last_message_at}
+                      title={formatAbsoluteTime(conv.last_message_at)}
+                    >
+                      {formatRelativeTime(conv.last_message_at)}
+                    </time>
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-2 mt-0.5">

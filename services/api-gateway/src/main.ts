@@ -27,6 +27,8 @@ import {
   bookingListResponseSchema,
   clinicProfileListResponseSchema,
   clinicProfileSummarySchema,
+  chatMediaAccessRequestSchema,
+  completeChatMediaUploadResponseSchema,
   completeProfileImageUploadResponseSchema,
   completeVerificationDocumentUploadResponseSchema,
   appNotificationListResponseSchema,
@@ -51,6 +53,7 @@ import {
   externalUserIdSyncInputSchema,
   externalUserIdSyncResponseSchema,
   finalizeProfileImageUploadInputSchema,
+  finalizeChatMediaUploadInputSchema,
   finalizeVerificationDocumentUploadInputSchema,
   gatewayAuthConfigurationSchema,
   initialV1RouteCatalog,
@@ -3616,6 +3619,210 @@ void startService({
         return {
           signedUrl: await createSignedDownloadUrl(parsedFile),
         };
+      },
+    );
+
+    app.post(
+      "/v1/uploads/chat-media",
+      {
+        schema: {
+          operationId: "createChatMediaUpload",
+          summary: "Create a presigned upload URL for conversation media",
+          tags: ["uploads", "messages"],
+          security: [{ bearerAuth: [] }],
+          body: toJsonSchema(uploadRequestSchema, "UploadRequestChatMedia"),
+          response: {
+            200: toJsonSchema(uploadDescriptorSchema, "UploadDescriptorChat"),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorUploadChatValidation"),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorUploadChatUnauthorized"),
+          },
+        },
+        preHandler: auth.requireAccess({
+          roles: ["admin", "clinic", "professional"],
+        }),
+      },
+      async (request, reply) => {
+        const parsedBody = uploadRequestSchema.safeParse(request.body);
+
+        if (!parsedBody.success) {
+          return reply.code(400).send({
+            code: "VALIDATION_ERROR",
+            message: "A valid file name and content type are required.",
+          });
+        }
+
+        const actor = request.authContext as AuthPrincipal;
+        return createUploadDescriptor({
+          actorRole: actor.role,
+          actorSubject: actor.sub,
+          assetType: "chat-media",
+          contentType: parsedBody.data.contentType,
+          fileName: parsedBody.data.fileName,
+        });
+      },
+    );
+
+    app.post(
+      "/v1/uploads/chat-media/complete",
+      {
+        schema: {
+          operationId: "completeChatMediaUpload",
+          summary: "Verify an uploaded conversation attachment",
+          tags: ["uploads", "messages"],
+          security: [{ bearerAuth: [] }],
+          body: toJsonSchema(
+            finalizeChatMediaUploadInputSchema,
+            "FinalizeChatMediaUploadInput",
+          ),
+          response: {
+            200: toJsonSchema(
+              completeChatMediaUploadResponseSchema,
+              "CompleteChatMediaUploadResponse",
+            ),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorUploadChatFinalize"),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorUploadChatUnauthorized"),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorUploadChatNotFound"),
+          },
+        },
+        preHandler: auth.requireAccess({
+          roles: ["admin", "clinic", "professional"],
+        }),
+      },
+      async (request, reply) => {
+        const parsedBody = finalizeChatMediaUploadInputSchema.safeParse(
+          request.body,
+        );
+
+        if (!parsedBody.success) {
+          return reply.code(400).send({
+            code: "VALIDATION_ERROR",
+            message: "A valid uploaded chat media payload is required.",
+          });
+        }
+
+        const actor = request.authContext as AuthPrincipal;
+
+        if (parsedBody.data.bucket !== storageConfig.privateBucket) {
+          return reply.code(400).send({
+            code: "UPLOAD_BUCKET_INVALID",
+            message:
+              "Chat attachments must be stored in the private document bucket.",
+          });
+        }
+
+        if (
+          !isActorOwnedObjectKey({
+            actorRole: actor.role,
+            actorSubject: actor.sub,
+            key: parsedBody.data.key,
+          })
+        ) {
+          return reply.code(400).send({
+            code: "UPLOAD_KEY_INVALID",
+            message:
+              "Uploaded asset key does not belong to the authenticated actor.",
+          });
+        }
+
+        try {
+          await assertStoredObjectExists(parsedBody.data);
+        } catch {
+          return reply.code(404).send({
+            code: "UPLOAD_OBJECT_NOT_FOUND",
+            message: "The uploaded chat attachment could not be found.",
+          });
+        }
+
+        return {
+          persisted: true,
+          assetType: "chat-media",
+          resource: "conversation-message",
+          fileUrl: `s3://${parsedBody.data.bucket}/${parsedBody.data.key}`,
+        };
+      },
+    );
+
+    app.post(
+      "/v1/uploads/chat-media/access",
+      {
+        schema: {
+          operationId: "createChatMediaAccessUrl",
+          summary: "Create a signed access URL for private conversation media",
+          tags: ["uploads", "messages"],
+          security: [{ bearerAuth: [] }],
+          body: toJsonSchema(
+            chatMediaAccessRequestSchema,
+            "ChatMediaAccessRequest",
+          ),
+          response: {
+            200: toJsonSchema(
+              documentAccessResponseSchema,
+              "ChatMediaAccessResponse",
+            ),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorChatMediaAccess"),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorChatMediaUnauthorized"),
+            403: toJsonSchema(apiErrorSchema, "ApiErrorChatMediaForbidden"),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorChatMediaNotFound"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorChatMediaUnavailable"),
+          },
+        },
+        preHandler: auth.requireAccess({
+          roles: ["admin", "clinic", "professional"],
+        }),
+      },
+      async (request, reply) => {
+        const parsedBody = chatMediaAccessRequestSchema.safeParse(request.body);
+
+        if (!parsedBody.success) {
+          return reply
+            .code(400)
+            .send(buildValidationError(parsedBody.error.issues));
+        }
+
+        const parsedFile = parseS3Uri(parsedBody.data.fileUrl);
+
+        if (!parsedFile) {
+          return reply.code(400).send({
+            code: "CHAT_MEDIA_URL_INVALID",
+            message: "A valid s3:// chat media URL is required.",
+          });
+        }
+
+        const actor = request.authContext as AuthPrincipal;
+        const downstream = await requestDownstreamResource(
+          "messaging",
+          `/internal/conversations/${encodeURIComponent(actor.sub)}/${encodeURIComponent(parsedBody.data.conversationId)}/messages`,
+          conversationMessageListResponseSchema,
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        const canAccessFile = downstream.data.items.some(
+          (message) => message.fileUrl === parsedBody.data.fileUrl,
+        );
+
+        if (!canAccessFile) {
+          return reply.code(403).send({
+            code: "CHAT_MEDIA_ACCESS_FORBIDDEN",
+            message:
+              "You are not allowed to access this conversation attachment.",
+          });
+        }
+
+        try {
+          return {
+            signedUrl: await createSignedDownloadUrl(parsedFile),
+          };
+        } catch {
+          return reply.code(404).send({
+            code: "CHAT_MEDIA_OBJECT_NOT_FOUND",
+            message: "The requested chat attachment could not be found.",
+          });
+        }
       },
     );
 

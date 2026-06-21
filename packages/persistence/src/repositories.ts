@@ -2150,6 +2150,67 @@ async function getActorById(id: string) {
   return actor ?? null;
 }
 
+async function getStandardConversationRecipient(
+  actor: ActorRow,
+  conversation: ConversationRow,
+) {
+  const db = getDb();
+
+  if (actor.role === "professional" && conversation.clinicId) {
+    const [recipient] = await db
+      .select({
+        actor: actors,
+        displayName: clinicProfiles.organizationName,
+      })
+      .from(clinicProfiles)
+      .innerJoin(actors, eq(clinicProfiles.actorId, actors.id))
+      .where(eq(clinicProfiles.id, conversation.clinicId))
+      .limit(1);
+
+    return recipient ?? null;
+  }
+
+  if (actor.role === "clinic" && conversation.professionalId) {
+    const [recipient] = await db
+      .select({
+        actor: actors,
+        displayName: professionalProfiles.fullName,
+      })
+      .from(professionalProfiles)
+      .innerJoin(actors, eq(professionalProfiles.actorId, actors.id))
+      .where(eq(professionalProfiles.id, conversation.professionalId))
+      .limit(1);
+
+    return recipient ?? null;
+  }
+
+  return null;
+}
+
+async function getConversationMessageRecipient(
+  actor: ActorRow,
+  conversation: ConversationRow,
+) {
+  if (conversation.kind === "admin") {
+    const recipientActorId =
+      actor.id === conversation.adminActorId
+        ? conversation.targetActorId
+        : conversation.adminActorId;
+    const recipient = recipientActorId
+      ? await getActorById(recipientActorId)
+      : null;
+
+    return recipient
+      ? {
+          actor: recipient,
+          displayName: actorDisplayName(recipient),
+        }
+      : null;
+  }
+
+  return getStandardConversationRecipient(actor, conversation);
+}
+
 async function canAccessConversation(
   actor: ActorRow,
   conversation: ConversationRow,
@@ -2401,6 +2462,17 @@ export async function listConversationMessagesForSubject(
     return [];
   }
 
+  await db
+    .update(conversationMessages)
+    .set({ isRead: true })
+    .where(
+      and(
+        eq(conversationMessages.conversationId, conversationId),
+        ne(conversationMessages.senderActorId, actor.id),
+        eq(conversationMessages.isRead, false),
+      ),
+    );
+
   const rows = await db
     .select()
     .from(conversationMessages)
@@ -2469,6 +2541,23 @@ export async function sendConversationMessageBySubject(input: {
     .update(conversations)
     .set({ lastMessageAt: now, updatedAt: now })
     .where(eq(conversations.id, input.conversationId));
+
+  const recipient = await getConversationMessageRecipient(actor, conversation);
+
+  if (recipient?.actor.externalUserId) {
+    await createNotificationForExternalUserId({
+      recipientExternalUserId: recipient.actor.externalUserId,
+      type: "new_message",
+      title: "New message",
+      message: `${actorDisplayName(actor)} sent you a message.`,
+      data: {
+        conversationId: conversation.id,
+        conversationKind: conversation.kind,
+        messageId: message.id,
+        senderRole: actor.role,
+      },
+    });
+  }
 
   return {
     id: message.id,

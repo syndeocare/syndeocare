@@ -16,7 +16,11 @@ import {
 } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { format } from "date-fns";
-import { resolveMediaUrl } from "@/lib/storage";
+import {
+  getChatMediaAccessUrl,
+  isS3StorageUri,
+  resolveMediaUrl,
+} from "@/lib/storage";
 
 interface MediaItem {
   id: string;
@@ -30,12 +34,14 @@ interface MediaItem {
 
 interface ChatMediaGalleryProps {
   conversationId: string;
+  conversationKind: "standard" | "admin";
   isOpen: boolean;
   onClose: () => void;
 }
 
 export const ChatMediaGallery = ({
   conversationId,
+  conversationKind,
   isOpen,
   onClose,
 }: ChatMediaGalleryProps) => {
@@ -44,20 +50,75 @@ export const ChatMediaGallery = ({
   const [loading, setLoading] = useState(true);
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [resolvedMediaUrls, setResolvedMediaUrls] = useState<
+    Record<string, string>
+  >({});
 
   useEffect(() => {
-    if (isOpen) fetchMedia();
-  }, [isOpen, conversationId]);
+    if (isOpen) void fetchMedia();
+  }, [isOpen, conversationId, conversationKind]);
+
+  useEffect(() => {
+    const s3Urls = Array.from(
+      new Set(
+        mediaItems
+          .map((item) => item.file_url)
+          .filter((value) => isS3StorageUri(value))
+          .filter((value) => !resolvedMediaUrls[value]),
+      ),
+    );
+
+    if (!isOpen || s3Urls.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const resolveUrls = async () => {
+      const entries = await Promise.all(
+        s3Urls.map(async (fileUrl) => {
+          try {
+            return [
+              fileUrl,
+              await getChatMediaAccessUrl(conversationId, fileUrl),
+            ] as const;
+          } catch (error) {
+            console.warn("Unable to resolve chat media gallery URL", error);
+            return [fileUrl, fileUrl] as const;
+          }
+        }),
+      );
+
+      if (!cancelled) {
+        setResolvedMediaUrls((current) => ({
+          ...current,
+          ...Object.fromEntries(entries),
+        }));
+      }
+    };
+
+    void resolveUrls();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [conversationId, isOpen, mediaItems, resolvedMediaUrls]);
 
   const fetchMedia = async () => {
     setLoading(true);
     try {
+      const table =
+        conversationKind === "admin" ? "admin_messages" : "messages";
+      const conversationColumn =
+        conversationKind === "admin"
+          ? "admin_conversation_id"
+          : "conversation_id";
       const { data, error } = await backendDb
-        .from("messages")
+        .from(table)
         .select(
           "id, file_url, file_name, file_type, file_size, created_at, content",
         )
-        .eq("conversation_id", conversationId)
+        .eq(conversationColumn, conversationId)
         .not("file_url", "is", null)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -106,6 +167,9 @@ export const ChatMediaGallery = ({
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
+
+  const getResolvedMediaUrl = (fileUrl: string) =>
+    resolvedMediaUrls[fileUrl] ?? resolveMediaUrl(fileUrl) ?? fileUrl;
 
   return (
     <>
@@ -168,14 +232,12 @@ export const ChatMediaGallery = ({
                       <button
                         key={img.id}
                         onClick={() =>
-                          setSelectedImage(
-                            resolveMediaUrl(img.file_url) ?? img.file_url,
-                          )
+                          setSelectedImage(getResolvedMediaUrl(img.file_url))
                         }
                         className="aspect-square rounded-lg overflow-hidden hover:opacity-80 transition-opacity"
                       >
                         <img
-                          src={resolveMediaUrl(img.file_url) ?? img.file_url}
+                          src={getResolvedMediaUrl(img.file_url)}
                           alt={img.file_name || ""}
                           className="w-full h-full object-cover"
                           loading="lazy"
@@ -211,7 +273,7 @@ export const ChatMediaGallery = ({
                           className="w-full max-h-48 rounded-lg"
                         >
                           <source
-                            src={resolveMediaUrl(v.file_url) ?? v.file_url}
+                            src={getResolvedMediaUrl(v.file_url)}
                             type={v.file_type}
                           />
                         </video>
@@ -219,7 +281,7 @@ export const ChatMediaGallery = ({
                         <div className="p-3">
                           <audio controls preload="metadata" className="w-full">
                             <source
-                              src={resolveMediaUrl(v.file_url) ?? v.file_url}
+                              src={getResolvedMediaUrl(v.file_url)}
                               type={v.file_type}
                             />
                           </audio>
@@ -262,7 +324,7 @@ export const ChatMediaGallery = ({
                       </div>
                       <Button variant="ghost" size="icon" asChild>
                         <a
-                          href={resolveMediaUrl(file.file_url) ?? file.file_url}
+                          href={getResolvedMediaUrl(file.file_url)}
                           download={file.file_name}
                           target="_blank"
                           rel="noopener noreferrer"

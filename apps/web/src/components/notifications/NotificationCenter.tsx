@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   type AppNotification,
@@ -81,6 +82,7 @@ export const NotificationCenter = () => {
   const { t, i18n } = useTranslation();
   const isRTL = i18n.language === "ar";
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -132,6 +134,28 @@ export const NotificationCenter = () => {
   const clearAll = async () => {
     await clearNotifications();
     setNotifications([]);
+  };
+
+  const handleNotificationClick = async (notification: AppNotification) => {
+    if (!notification.isRead) {
+      await markAsRead(notification.id);
+    }
+
+    if (notification.type === "new_message") {
+      const conversationId =
+        typeof notification.data.conversationId === "string"
+          ? notification.data.conversationId
+          : null;
+      const conversationKind =
+        notification.data.conversationKind === "admin" ? "admin" : "standard";
+
+      if (conversationId) {
+        setOpen(false);
+        navigate(
+          `/messages?conversation=${conversationKind}:${conversationId}`,
+        );
+      }
+    }
   };
 
   return (
@@ -200,8 +224,17 @@ export const NotificationCenter = () => {
 
                 return (
                   <div
+                    role="button"
+                    tabIndex={0}
                     key={notif.id}
-                    className={`p-4 hover:bg-secondary/50 transition-colors relative group ${
+                    onClick={() => void handleNotificationClick(notif)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        void handleNotificationClick(notif);
+                      }
+                    }}
+                    className={`w-full p-4 text-start hover:bg-secondary/50 transition-colors relative group ${
                       !notif.isRead ? "bg-primary/5" : ""
                     }`}
                   >
@@ -235,7 +268,10 @@ export const NotificationCenter = () => {
                           variant="ghost"
                           size="icon"
                           className="h-6 w-6"
-                          onClick={() => markAsRead(notif.id)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void markAsRead(notif.id);
+                          }}
                         >
                           <Check className="h-3 w-3" />
                         </Button>
@@ -244,7 +280,10 @@ export const NotificationCenter = () => {
                         variant="ghost"
                         size="icon"
                         className="h-6 w-6 text-destructive hover:text-destructive"
-                        onClick={() => deleteNotification(notif.id)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void deleteNotification(notif.id);
+                        }}
                       >
                         <X className="h-3 w-3" />
                       </Button>

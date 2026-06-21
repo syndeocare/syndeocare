@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
+import { useUnreadMessagesCount } from "@/hooks/useUnreadMessagesCount";
 
 // Pages that should show the mobile navigation
 const SHOW_NAV_ROUTES = [
@@ -30,6 +31,7 @@ export const MobileBottomNav = () => {
   const { t } = useTranslation();
   const location = useLocation();
   const { user, userRole, isOnboardingComplete } = useAuth();
+  const unreadMessagesCount = useUnreadMessagesCount();
 
   // Only show for authenticated users on specific routes
   const shouldShow =
@@ -103,6 +105,7 @@ export const MobileBottomNav = () => {
             icon={MessageCircle}
             label={t("mobile.messages")}
             isActive={isActive("/messages")}
+            badge={unreadMessagesCount}
           />
 
           {/* Profile */}

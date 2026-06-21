@@ -51,7 +51,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { resolveMediaUrl } from "@/lib/storage";
+import {
+  getChatMediaAccessUrl,
+  isS3StorageUri,
+  resolveMediaUrl,
+} from "@/lib/storage";
 import { VerificationBadge } from "@/components/ui/verification-badge";
 import type { Database } from "@/integrations/backend/types";
 
@@ -156,10 +160,14 @@ export const ChatMessages = ({
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [pendingMedia, setPendingMedia] = useState<{
     url: string;
+    previewUrl?: string;
     name: string;
     type: string;
     size: number;
   } | null>(null);
+  const [resolvedMediaUrls, setResolvedMediaUrls] = useState<
+    Record<string, string>
+  >({});
   const [loadError, setLoadError] = useState<string | null>(null);
   const [deleteMessageId, setDeleteMessageId] = useState<string | null>(null);
   const [deleteConversationOpen, setDeleteConversationOpen] = useState(false);
@@ -172,8 +180,13 @@ export const ChatMessages = ({
     () =>
       messages
         .filter((m) => m.file_type?.startsWith("image/") && m.file_url)
-        .map((m) => resolveMediaUrl(m.file_url!) ?? m.file_url!),
-    [messages],
+        .map(
+          (m) =>
+            resolvedMediaUrls[m.file_url!] ??
+            resolveMediaUrl(m.file_url!) ??
+            m.file_url!,
+        ),
+    [messages, resolvedMediaUrls],
   );
   const currentImageIndex = previewImage ? allImages.indexOf(previewImage) : -1;
 
@@ -187,6 +200,56 @@ export const ChatMessages = ({
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? null : date;
   };
+
+  const getResolvedMediaUrl = (fileUrl: string) =>
+    resolvedMediaUrls[fileUrl] ?? resolveMediaUrl(fileUrl) ?? fileUrl;
+
+  useEffect(() => {
+    const s3Urls = Array.from(
+      new Set(
+        messages
+          .map((message) => message.file_url)
+          .filter((value): value is string => Boolean(value))
+          .filter((value) => isS3StorageUri(value))
+          .filter((value) => !resolvedMediaUrls[value]),
+      ),
+    );
+
+    if (s3Urls.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const resolveUrls = async () => {
+      const entries = await Promise.all(
+        s3Urls.map(async (fileUrl) => {
+          try {
+            return [
+              fileUrl,
+              await getChatMediaAccessUrl(rawConversationId, fileUrl),
+            ] as const;
+          } catch (error) {
+            console.warn("Unable to resolve chat media URL", error);
+            return [fileUrl, fileUrl] as const;
+          }
+        }),
+      );
+
+      if (!cancelled) {
+        setResolvedMediaUrls((current) => ({
+          ...current,
+          ...Object.fromEntries(entries),
+        }));
+      }
+    };
+
+    void resolveUrls();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [messages, rawConversationId, resolvedMediaUrls]);
 
   const fetchMessages = useCallback(async () => {
     try {
@@ -551,9 +614,11 @@ export const ChatMessages = ({
     fileName: string,
     fileType: string,
     fileSize: number,
+    previewUrl?: string,
   ) => {
     setPendingMedia({
       url: fileUrl,
+      previewUrl,
       name: fileName,
       type: fileType,
       size: fileSize,
@@ -578,6 +643,12 @@ export const ChatMessages = ({
     if (isYesterday(date)) return t("chat.yesterday");
     return format(date, "MMM d, yyyy", { locale: isRTL ? ar : enUS });
   };
+
+  const getMessageTimeLabel = (date: Date) =>
+    format(date, "HH:mm", { locale: isRTL ? ar : enUS });
+
+  const getMessageFullDateLabel = (date: Date) =>
+    format(date, "PPpp", { locale: isRTL ? ar : enUS });
 
   const otherName = conversation?.otherName;
   const otherAvatar = conversation?.otherAvatar;
@@ -770,16 +841,12 @@ export const ChatMessages = ({
                       {hasImage && msg.file_url && (
                         <button
                           onClick={() =>
-                            setPreviewImage(
-                              resolveMediaUrl(msg.file_url!) ?? msg.file_url!,
-                            )
+                            setPreviewImage(getResolvedMediaUrl(msg.file_url!))
                           }
                           className="block mb-2 rounded-xl overflow-hidden hover:opacity-90 transition-opacity shadow-sm"
                         >
                           <img
-                            src={
-                              resolveMediaUrl(msg.file_url!) ?? msg.file_url!
-                            }
+                            src={getResolvedMediaUrl(msg.file_url!)}
                             alt={msg.file_name || "Image"}
                             className="max-w-full max-h-64 object-cover rounded-xl"
                             loading="lazy"
@@ -795,9 +862,7 @@ export const ChatMessages = ({
                             className="max-w-full max-h-64 rounded-xl w-full"
                           >
                             <source
-                              src={
-                                resolveMediaUrl(msg.file_url!) ?? msg.file_url!
-                              }
+                              src={getResolvedMediaUrl(msg.file_url!)}
                               type={msg.file_type || "video/mp4"}
                             />
                           </video>
@@ -813,9 +878,7 @@ export const ChatMessages = ({
                             className="w-full h-8 [&::-webkit-media-controls-panel]:bg-transparent"
                           >
                             <source
-                              src={
-                                resolveMediaUrl(msg.file_url!) ?? msg.file_url!
-                              }
+                              src={getResolvedMediaUrl(msg.file_url!)}
                               type={msg.file_type || "audio/mpeg"}
                             />
                           </audio>
@@ -824,7 +887,7 @@ export const ChatMessages = ({
 
                       {hasFile && (
                         <a
-                          href={resolveMediaUrl(msg.file_url!) ?? msg.file_url!}
+                          href={getResolvedMediaUrl(msg.file_url!)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className={`flex items-center gap-2 p-2.5 rounded-lg mb-2 ${isOwn ? "bg-primary-foreground/10 hover:bg-primary-foreground/20" : "bg-muted hover:bg-muted/80"} transition-colors`}
@@ -853,12 +916,11 @@ export const ChatMessages = ({
                       <div className="flex items-center justify-end gap-1 mt-1">
                         <p
                           className={`text-[11px] ${isOwn ? "text-primary-foreground/60" : "text-muted-foreground"}`}
+                          title={
+                            msgDate ? getMessageFullDateLabel(msgDate) : ""
+                          }
                         >
-                          {msgDate
-                            ? format(msgDate, "HH:mm", {
-                                locale: isRTL ? ar : enUS,
-                              })
-                            : ""}
+                          {msgDate ? getMessageTimeLabel(msgDate) : ""}
                         </p>
                         {isOwn &&
                           (msg.is_read ? (
@@ -884,7 +946,7 @@ export const ChatMessages = ({
           <div className="flex items-center gap-2 mb-2 p-2 bg-muted rounded-lg">
             {pendingMedia.type.startsWith("image/") ? (
               <img
-                src={pendingMedia.url}
+                src={pendingMedia.previewUrl ?? pendingMedia.url}
                 alt={pendingMedia.name}
                 className="h-12 w-12 object-cover rounded"
               />
@@ -1011,7 +1073,8 @@ export const ChatMessages = ({
 
       {/* Media Gallery */}
       <ChatMediaGallery
-        conversationId={conversationId}
+        conversationId={rawConversationId}
+        conversationKind={conversationKind}
         isOpen={galleryOpen}
         onClose={() => setGalleryOpen(false)}
       />
