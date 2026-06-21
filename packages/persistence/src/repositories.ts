@@ -90,6 +90,13 @@ function resolveOnboardingCompleted(input: {
     return true;
   }
 
+  if (
+    input.actor.verificationStatus === "pending_review" ||
+    input.actor.verificationStatus === "approved"
+  ) {
+    return true;
+  }
+
   return (
     input.actor.verificationStatus !== "rejected" &&
     Boolean(input.onboarding?.submittedAt)

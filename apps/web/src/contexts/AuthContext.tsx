@@ -78,6 +78,8 @@ async function checkOnboardingStatus(
 
       return (
         status.onboardingCompleted ||
+        status.verificationStatus === "pending_review" ||
+        status.verificationStatus === "approved" ||
         (status.verificationStatus !== "rejected" &&
           Boolean(status.submittedAt))
       );
@@ -88,6 +90,19 @@ async function checkOnboardingStatus(
 
   void userId;
   return false;
+}
+
+function isPrincipalOnboardingComplete(
+  principal: NonNullable<
+    ReturnType<typeof readStoredGatewaySession>
+  >["principal"],
+) {
+  return (
+    principal.role === "admin" ||
+    principal.onboardingCompleted ||
+    principal.verificationStatus === "pending_review" ||
+    principal.verificationStatus === "approved"
+  );
 }
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -126,11 +141,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(clientSession.user);
       setUserRole(resolvedRole);
       setIsOnboardingComplete(
-        await checkOnboardingStatus(
-          clientSession.user.id,
-          resolvedRole,
-          clientSession.user,
-        ),
+        isPrincipalOnboardingComplete(stored.principal) ||
+          (await checkOnboardingStatus(
+            clientSession.user.id,
+            resolvedRole,
+            clientSession.user,
+          )),
       );
     },
     [],
