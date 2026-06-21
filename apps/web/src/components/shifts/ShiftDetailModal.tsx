@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import {
   Calendar,
@@ -75,6 +76,7 @@ const ShiftDetailModal = ({
   const [isApplying, setIsApplying] = useState(false);
   const [hasApplied, setHasApplied] = useState(false);
   const [hasConflict, setHasConflict] = useState(false);
+  const [proposal, setProposal] = useState("");
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -103,6 +105,11 @@ const ShiftDetailModal = ({
     };
     checkOverlap();
   }, [profileId, shift]);
+
+  useEffect(() => {
+    setProposal("");
+    setHasApplied(false);
+  }, [shift?.id]);
 
   // Early return AFTER all hooks
   if (!shift) return null;
@@ -142,6 +149,7 @@ const ShiftDetailModal = ({
                   : "pending",
           },
           shift.id,
+          proposal.trim() || undefined,
         );
 
         toast({
@@ -190,11 +198,25 @@ const ShiftDetailModal = ({
       setHasApplied(true);
       onApplicationSuccess?.();
     } catch (error) {
+      const message =
+        error instanceof Error ? error.message : t("shifts.applyError");
+      if (
+        message.toLowerCase().includes("already exists") ||
+        message.toLowerCase().includes("already applied")
+      ) {
+        setHasApplied(true);
+        toast({
+          variant: "destructive",
+          title: t("shifts.modal.alreadyApplied"),
+          description: t("shifts.modal.alreadyAppliedDesc"),
+        });
+        return;
+      }
+
       toast({
         variant: "destructive",
         title: t("shifts.applyError"),
-        description:
-          error instanceof Error ? error.message : t("shifts.applyError"),
+        description: message,
       });
     } finally {
       setIsApplying(false);
@@ -415,6 +437,34 @@ const ShiftDetailModal = ({
                 </p>
               </div>
             </div>
+          )}
+
+          {isVerified && !hasApplied && !hasConflict && (
+            <>
+              <Separator />
+              <div className="space-y-2">
+                <label
+                  htmlFor="shift-proposal"
+                  className="text-sm font-medium text-foreground"
+                >
+                  {t("shifts.modal.proposalLabel", "Short proposal")}
+                </label>
+                <Textarea
+                  id="shift-proposal"
+                  value={proposal}
+                  onChange={(event) => setProposal(event.target.value)}
+                  maxLength={500}
+                  rows={4}
+                  placeholder={t(
+                    "shifts.modal.proposalPlaceholder",
+                    "Tell the clinic why you are a good fit for this shift.",
+                  )}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {proposal.length}/500
+                </p>
+              </div>
+            </>
           )}
 
           {/* Action Button */}

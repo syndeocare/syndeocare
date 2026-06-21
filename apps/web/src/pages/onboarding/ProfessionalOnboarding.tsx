@@ -43,6 +43,11 @@ import {
   gatewayDocumentTypeMatches,
   getGatewayDocumentTypeKey,
 } from "@/lib/document-types";
+import {
+  formatYemeniPhone,
+  isValidYemeniMobile,
+  normalizeYemeniPhoneInput,
+} from "@/lib/yemen-phone";
 
 type Step = "profile" | "qualifications" | "documents" | "complete";
 
@@ -561,6 +566,20 @@ const ProfessionalOnboarding = () => {
       return;
     }
 
+    if (!isValidYemeniMobile(profileData.phone)) {
+      toast({
+        variant: "destructive",
+        title: t("onboarding.fields.phone"),
+        description: t(
+          "onboarding.fields.yemenPhoneInvalid",
+          "Enter a valid Yemeni mobile number starting with 71, 73, 77, or 78.",
+        ),
+      });
+      return;
+    }
+
+    const formattedPhone = formatYemeniPhone(profileData.phone);
+
     setIsSubmitting(true);
     try {
       if (isGatewayBackendConfigured()) {
@@ -572,7 +591,7 @@ const ProfessionalOnboarding = () => {
           {
             fullName: profileData.full_name.trim(),
             bio: profileData.bio.trim() || null,
-            primaryPhone: profileData.phone.trim() || null,
+            primaryPhone: formattedPhone,
             specialties: qualifications.specialties,
             qualifications: qualifications.qualifications,
             locationAddress: profileData.location_address.trim(),
@@ -586,7 +605,7 @@ const ProfessionalOnboarding = () => {
         .from("profiles")
         .update({
           full_name: profileData.full_name.trim(),
-          phone: profileData.phone.trim(),
+          phone: formattedPhone,
           bio: profileData.bio.trim(),
           location_address: profileData.location_address.trim(),
           location_lat: profileData.location_lat,
@@ -625,7 +644,7 @@ const ProfessionalOnboarding = () => {
           {
             fullName: profileData.full_name.trim(),
             bio: profileData.bio.trim() || null,
-            primaryPhone: profileData.phone.trim() || null,
+            primaryPhone: formatYemeniPhone(profileData.phone),
             specialties: qualifications.specialties,
             qualifications: qualifications.qualifications,
             locationAddress: profileData.location_address.trim(),
@@ -838,19 +857,32 @@ const ProfessionalOnboarding = () => {
                   <Label htmlFor="phone">{t("onboarding.fields.phone")}</Label>
                   <div className="relative">
                     <Phone className="absolute start-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <span className="absolute start-10 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground">
+                      +967
+                    </span>
                     <Input
                       id="phone"
-                      placeholder={t("onboarding.fields.phonePlaceholder")}
-                      value={profileData.phone}
+                      inputMode="numeric"
+                      placeholder="77XXXXXXX"
+                      value={normalizeYemeniPhoneInput(profileData.phone)}
                       onChange={(e) =>
                         setProfileData({
                           ...profileData,
-                          phone: e.target.value,
+                          phone: normalizeYemeniPhoneInput(e.target.value),
                         })
                       }
-                      className="ps-10"
+                      className="ps-24"
                     />
                   </div>
+                  {profileData.phone &&
+                    !isValidYemeniMobile(profileData.phone) && (
+                      <p className="text-xs text-destructive">
+                        {t(
+                          "onboarding.fields.yemenPhoneInvalid",
+                          "Enter a valid Yemeni mobile number starting with 71, 73, 77, or 78.",
+                        )}
+                      </p>
+                    )}
                 </div>
 
                 <div className="space-y-2">

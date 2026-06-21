@@ -315,6 +315,60 @@ const Auth = () => {
     return Object.keys(newErrors).length === 0;
   };
 
+  const validateField = (
+    field: keyof typeof formData,
+    value: string,
+    nextFormData = formData,
+  ) => {
+    let error: string | null = null;
+    const nextValue = value.trim();
+
+    if (field === "email") {
+      const parsed = emailSchema.safeParse(normalizeEmail(value));
+      error = parsed.success ? null : parsed.error.errors[0]?.message;
+    }
+
+    if (field === "password") {
+      const parsed = (
+        mode === "signup" ? signupPasswordSchema : passwordSchema
+      ).safeParse(value);
+      error = parsed.success ? null : parsed.error.errors[0]?.message;
+    }
+
+    if (mode === "signup" && field === "name") {
+      error = nextValue ? null : t("auth.errors.nameRequired");
+    }
+
+    if (mode === "signup" && field === "organizationName") {
+      error =
+        role === "clinic" && !nextValue
+          ? t("auth.errors.orgNameRequired")
+          : null;
+    }
+
+    setErrors((current) => {
+      const updated = { ...current };
+      if (error) {
+        updated[field] = error;
+      } else {
+        delete updated[field];
+      }
+
+      if (field === "name" && nextFormData.name.trim()) {
+        delete updated.name;
+      }
+
+      return updated;
+    });
+  };
+
+  const updateField = (field: keyof typeof formData, value: string) => {
+    const nextFormData = { ...formData, [field]: value };
+    setFormData(nextFormData);
+    setFormError(null);
+    validateField(field, value, nextFormData);
+  };
+
   const getLoginErrorMessage = (message: string) => {
     const normalizedError = message.toLowerCase();
 
@@ -586,10 +640,7 @@ const Auth = () => {
                           type="email"
                           placeholder={t("auth.emailPlaceholder")}
                           value={formData.email}
-                          onChange={(e) => {
-                            setFormData({ ...formData, email: e.target.value });
-                            setFormError(null);
-                          }}
+                          onChange={(e) => updateField("email", e.target.value)}
                           className="h-13 text-base"
                           autoComplete="email"
                         />
@@ -606,13 +657,9 @@ const Auth = () => {
                         id="password"
                         placeholder={t("auth.passwordPlaceholder")}
                         value={formData.password}
-                        onChange={(e) => {
-                          setFormData({
-                            ...formData,
-                            password: e.target.value,
-                          });
-                          setFormError(null);
-                        }}
+                        onChange={(e) =>
+                          updateField("password", e.target.value)
+                        }
                         className="h-13 text-base"
                       />
                     </FormField>
@@ -814,10 +861,7 @@ const Auth = () => {
                         placeholder={t("auth.clinicNamePlaceholder")}
                         value={formData.organizationName}
                         onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            organizationName: e.target.value,
-                          })
+                          updateField("organizationName", e.target.value)
                         }
                         className="h-13 text-base"
                       />
@@ -841,9 +885,7 @@ const Auth = () => {
                       type="text"
                       placeholder={t("auth.namePlaceholder")}
                       value={formData.name}
-                      onChange={(e) =>
-                        setFormData({ ...formData, name: e.target.value })
-                      }
+                      onChange={(e) => updateField("name", e.target.value)}
                       className="h-13 text-base"
                     />
                   </InputWithIcon>
@@ -861,10 +903,7 @@ const Auth = () => {
                       type="email"
                       placeholder={t("auth.emailPlaceholder")}
                       value={formData.email}
-                      onChange={(e) => {
-                        setFormData({ ...formData, email: e.target.value });
-                        setFormError(null);
-                      }}
+                      onChange={(e) => updateField("email", e.target.value)}
                       className="h-13 text-base"
                     />
                   </InputWithIcon>
@@ -880,10 +919,7 @@ const Auth = () => {
                     id="password"
                     placeholder={t("auth.createPasswordPlaceholder")}
                     value={formData.password}
-                    onChange={(e) => {
-                      setFormData({ ...formData, password: e.target.value });
-                      setFormError(null);
-                    }}
+                    onChange={(e) => updateField("password", e.target.value)}
                     className="h-13 text-base"
                     showStrength
                   />

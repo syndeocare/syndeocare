@@ -666,6 +666,11 @@ export const adminConversationStartInputSchema = z.object({
   targetSubject: z.string().min(1),
 });
 
+export const standardConversationStartInputSchema = z.object({
+  professionalId: z.string().uuid(),
+  clinicId: z.string().uuid(),
+});
+
 export const conversationMessageSendInputSchema = z.object({
   content: z.string().min(1),
   fileUrl: z.string().nullable().optional(),
@@ -731,12 +736,12 @@ export const bookingSummarySchema = z.object({
   endsAt: z.string().datetime().optional(),
   location: locationSchema,
   compensation: moneySchema,
+  notes: z.string().min(1).optional(),
 });
 
 export const bookingDetailSchema = bookingSummarySchema.extend({
   requestedAt: z.string().datetime(),
   lastUpdatedAt: z.string().datetime(),
-  notes: z.string().min(1).optional(),
 });
 
 export const bookingListResponseSchema = z.object({
@@ -1285,6 +1290,9 @@ export type ConversationMessageListResponse = z.infer<
 >;
 export type AdminConversationStartInput = z.infer<
   typeof adminConversationStartInputSchema
+>;
+export type StandardConversationStartInput = z.infer<
+  typeof standardConversationStartInputSchema
 >;
 export type ConversationMessageSendInput = z.infer<
   typeof conversationMessageSendInputSchema

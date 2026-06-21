@@ -57,6 +57,7 @@ interface Applicant {
   id: string;
   status: string;
   created_at: string;
+  notes?: string | null;
   professional: {
     id: string;
     full_name: string;
@@ -149,6 +150,7 @@ const ShiftManageModal = ({
               id: booking.id,
               status:
                 booking.status === "cancelled" ? "declined" : booking.status,
+              notes: booking.notes,
               created_at: "",
               professional: {
                 id: booking.professional_id,

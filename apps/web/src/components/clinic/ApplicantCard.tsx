@@ -18,6 +18,7 @@ interface Applicant {
   id: string;
   status: string;
   created_at: string;
+  notes?: string | null;
   professional: {
     id: string;
     full_name: string;
@@ -156,6 +157,17 @@ const ApplicantCard = ({
                   +{professional.specialties.length - 3}
                 </Badge>
               )}
+            </div>
+          )}
+
+          {applicant.notes && (
+            <div className="mt-3 rounded-md border border-border bg-secondary/30 px-3 py-2 text-sm text-foreground">
+              <p className="text-xs font-medium text-muted-foreground mb-1">
+                {t("applicant.proposal", "Proposal")}
+              </p>
+              <p className="whitespace-pre-wrap break-words">
+                {applicant.notes}
+              </p>
             </div>
           )}
         </div>

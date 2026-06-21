@@ -228,8 +228,7 @@ const ProfessionalProfile = () => {
           mergedProfile = profileData
             ? {
                 ...profileData,
-                avatar_url:
-                  gatewayProfile.profileImageUrl ?? profileData.avatar_url,
+                avatar_url: gatewayProfile.avatar_url ?? profileData.avatar_url,
                 full_name: gatewayProfile.full_name,
                 bio: gatewayProfile.bio,
                 phone: gatewayProfile.phone ?? profileData.phone,
@@ -257,7 +256,7 @@ const ProfessionalProfile = () => {
                 specialties: gatewayProfile.specialties ?? [],
                 qualifications: gatewayProfile.qualifications ?? [],
                 verification_status: gatewayProfile.verification_status,
-                avatar_url: gatewayProfile.profileImageUrl ?? null,
+                avatar_url: gatewayProfile.avatar_url ?? null,
                 onboarding_completed:
                   gatewayProfile.onboarding_completed ?? false,
                 location_lat: null,

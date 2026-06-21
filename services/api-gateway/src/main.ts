@@ -71,6 +71,7 @@ import {
   verificationStatusResponseSchema,
   markAllNotificationsReadResponseSchema,
   notificationCountResponseSchema,
+  standardConversationStartInputSchema,
   type AuthPrincipal,
   type PlatformMetadata,
 } from "@repo/contracts";
@@ -1623,6 +1624,7 @@ void startService({
             401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorized"),
             403: toJsonSchema(apiErrorSchema, "ApiErrorForbidden"),
             404: toJsonSchema(apiErrorSchema, "ApiErrorNotFound"),
+            409: toJsonSchema(apiErrorSchema, "ApiErrorConflict"),
             503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
           },
         },
@@ -1647,7 +1649,11 @@ void startService({
 
         if (!downstream.ok) {
           return reply
-            .code(mapDownstreamStatusCode(downstream.statusCode))
+            .code(
+              downstream.statusCode === 409
+                ? 409
+                : mapDownstreamStatusCode(downstream.statusCode),
+            )
             .send(downstream.body);
         }
 
@@ -2057,6 +2063,7 @@ void startService({
             401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorized"),
             403: toJsonSchema(apiErrorSchema, "ApiErrorForbidden"),
             404: toJsonSchema(apiErrorSchema, "ApiErrorNotFound"),
+            409: toJsonSchema(apiErrorSchema, "ApiErrorConflictClinic"),
             503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
           },
         },
@@ -2072,7 +2079,11 @@ void startService({
 
         if (!downstream.ok) {
           return reply
-            .code(mapDownstreamStatusCode(downstream.statusCode))
+            .code(
+              downstream.statusCode === 409
+                ? 409
+                : mapDownstreamStatusCode(downstream.statusCode),
+            )
             .send(downstream.body);
         }
 
@@ -2963,6 +2974,61 @@ void startService({
 
         if (!downstream.ok) {
           return reply.code(503).send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.post(
+      "/v1/conversations",
+      {
+        schema: {
+          operationId: "startStandardConversation",
+          summary:
+            "Start or open a clinic-professional conversation for the authenticated actor",
+          tags: ["messages"],
+          security: [{ bearerAuth: [] }],
+          body: toJsonSchema(
+            standardConversationStartInputSchema,
+            "StandardConversationStartInput",
+          ),
+          response: {
+            200: toJsonSchema(conversationSummarySchema, "ConversationSummary"),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorMessageValidation"),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorized"),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorNotFound"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
+          },
+        },
+        preHandler: auth.requireAccess({ roles: ["professional", "clinic"] }),
+      },
+      async (request, reply) => {
+        const actor = request.authContext as AuthPrincipal;
+        const parsedBody = standardConversationStartInputSchema.safeParse(
+          request.body,
+        );
+
+        if (!parsedBody.success) {
+          return reply
+            .code(400)
+            .send(buildValidationError(parsedBody.error.issues));
+        }
+
+        const downstream = await requestDownstreamResource(
+          "messaging",
+          `/internal/conversations/${encodeURIComponent(actor.sub)}`,
+          conversationSummarySchema,
+          {
+            method: "POST",
+            body: parsedBody.data,
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
         }
 
         return downstream.data;

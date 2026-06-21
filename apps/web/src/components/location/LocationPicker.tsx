@@ -42,6 +42,14 @@ interface SearchResult {
   display_name: string;
   lat: string;
   lon: string;
+  address?: {
+    city?: string;
+    town?: string;
+    village?: string;
+    municipality?: string;
+    state?: string;
+    country?: string;
+  };
 }
 
 const FALLBACK_LOCATION_SUGGESTIONS: SearchResult[] = [
@@ -67,6 +75,23 @@ const dedupeSuggestions = (items: SearchResult[]): SearchResult[] => {
   });
 };
 
+const cleanCityLabel = (value: string) =>
+  value
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean)[0] ?? value.trim();
+
+const normalizeStoredAddress = (result: SearchResult) => {
+  const city =
+    result.address?.city ??
+    result.address?.town ??
+    result.address?.village ??
+    result.address?.municipality ??
+    cleanCityLabel(result.display_name);
+  const region = result.address?.state ?? "Yemen";
+  return [city, region].filter(Boolean).join(", ");
+};
+
 const searchWithOpenMeteo = async (query: string): Promise<SearchResult[]> => {
   const response = await fetch(
     `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=5&language=en&format=json`,
@@ -77,13 +102,22 @@ const searchWithOpenMeteo = async (query: string): Promise<SearchResult[]> => {
   const data = await response.json();
   if (!Array.isArray(data?.results)) return [];
 
-  return data.results.map((item: any) => ({
-    display_name: [item.name, item.admin1, item.country]
+  return data.results.map((item: any) => {
+    const displayName = [item.name, item.admin1, item.country]
       .filter(Boolean)
-      .join(", "),
-    lat: String(item.latitude),
-    lon: String(item.longitude),
-  }));
+      .join(", ");
+
+    return {
+      display_name: displayName,
+      lat: String(item.latitude),
+      lon: String(item.longitude),
+      address: {
+        city: item.name,
+        state: item.admin1,
+        country: item.country,
+      },
+    };
+  });
 };
 
 const LocationPicker = ({
@@ -104,7 +138,9 @@ const LocationPicker = ({
     error: userLocationError,
   } = useUserLocation();
 
-  const [inputValue, setInputValue] = useState(value?.address || "");
+  const [inputValue, setInputValue] = useState(
+    value?.address ? cleanCityLabel(value.address) : "",
+  );
   const [suggestions, setSuggestions] = useState<SearchResult[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
@@ -117,7 +153,7 @@ const LocationPicker = ({
   const debouncedInput = useDebounceValue(inputValue, 500);
 
   useEffect(() => {
-    setInputValue(value?.address || "");
+    setInputValue(value?.address ? cleanCityLabel(value.address) : "");
   }, [value?.address]);
 
   const buildFallbackSuggestions = (query: string): SearchResult[] => {
@@ -218,10 +254,12 @@ const LocationPicker = ({
   }, [debouncedInput]);
 
   const handleSelectSuggestion = (suggestion: SearchResult) => {
-    setInputValue(suggestion.display_name);
+    const storedAddress = normalizeStoredAddress(suggestion);
+
+    setInputValue(cleanCityLabel(storedAddress));
     setLocationErrorMessage(null);
     onChange({
-      address: suggestion.display_name,
+      address: storedAddress,
       lat: parseFloat(suggestion.lat),
       lng: parseFloat(suggestion.lon),
     });
@@ -278,7 +316,7 @@ const LocationPicker = ({
       const detectedAddress =
         address || `${location.lat.toFixed(5)}, ${location.lng.toFixed(5)}`;
 
-      setInputValue(detectedAddress);
+      setInputValue(cleanCityLabel(detectedAddress));
       onChange({
         address: detectedAddress,
         lat: location.lat,
@@ -425,7 +463,7 @@ const LocationPicker = ({
       {/* Location coordinates display */}
       {value?.lat && value?.lng && (
         <p className="text-xs text-muted-foreground mt-1">
-          📍 {value.lat.toFixed(4)}, {value.lng.toFixed(4)}
+          {value.lat.toFixed(4)}, {value.lng.toFixed(4)}
         </p>
       )}
     </div>

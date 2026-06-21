@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
-import { backendDb } from "@/integrations/backend/client";
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  getGatewayOnboardingStatus,
+  isGatewayBackendConfigured,
+} from "@/lib/platform-backend";
 
 type ProfileAccessState =
   | "checking"
@@ -34,26 +37,22 @@ export function useVerifiedProfileAccess() {
         return;
       }
 
-      const table = userRole === "professional" ? "profiles" : "clinics";
-
       try {
-        const { data, error } = await backendDb
-          .from(table)
-          .select("verification_status")
-          .eq("user_id", user.id)
-          .maybeSingle();
+        if (isGatewayBackendConfigured()) {
+          const status = await getGatewayOnboardingStatus({
+            user,
+            userRole,
+          });
 
-        if (!isMounted) return;
+          if (!isMounted) return;
 
-        if (error) {
-          console.error("Error resolving profile access:", error);
-          setAccessState("unverified");
+          setAccessState(
+            status.verificationStatus === "approved" ? "allowed" : "unverified",
+          );
           return;
         }
 
-        setAccessState(
-          data?.verification_status === "verified" ? "allowed" : "unverified",
-        );
+        setAccessState("unverified");
       } catch (error) {
         console.error("Error resolving profile access:", error);
         if (isMounted) setAccessState("unverified");

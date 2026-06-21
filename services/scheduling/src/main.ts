@@ -164,7 +164,7 @@ void startService({
       return bookingListResponseSchema.parse({
         items: items.map((booking) =>
           bookingDetailSchema
-            .omit({ lastUpdatedAt: true, notes: true, requestedAt: true })
+            .omit({ lastUpdatedAt: true, requestedAt: true })
             .parse(booking),
         ),
         total: items.length,

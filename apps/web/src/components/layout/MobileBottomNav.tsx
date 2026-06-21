@@ -1,9 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTranslation } from "react-i18next";
-import { useProfile } from "@/hooks/useProfile";
-import { backendDb } from "@/integrations/backend/client";
 import {
   LayoutDashboard,
   Search,
@@ -11,7 +8,6 @@ import {
   MessageCircle,
   Users,
   Plus,
-  Briefcase,
   Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -34,53 +30,6 @@ export const MobileBottomNav = () => {
   const { t } = useTranslation();
   const location = useLocation();
   const { user, userRole, isOnboardingComplete } = useAuth();
-  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
-  const { profileId } = useProfile();
-
-  const fetchUnread = useCallback(async () => {
-    if (!profileId || !userRole) {
-      setUnreadMessageCount(0);
-      return;
-    }
-
-    const senderType = userRole === "professional" ? "clinic" : "professional";
-    const filterColumn =
-      userRole === "professional" ? "professional_id" : "clinic_id";
-
-    const { data: conversations } = await backendDb
-      .from("conversations")
-      .select("id")
-      .eq(filterColumn, profileId);
-
-    if (!conversations || conversations.length === 0) {
-      setUnreadMessageCount(0);
-      return;
-    }
-
-    const conversationIds = conversations.map(
-      (conversation) => conversation.id,
-    );
-    const { count } = await backendDb
-      .from("messages")
-      .select("*", { count: "exact", head: true })
-      .in("conversation_id", conversationIds)
-      .eq("sender_type", senderType)
-      .eq("is_read", false);
-
-    setUnreadMessageCount(count || 0);
-  }, [profileId, userRole]);
-
-  useEffect(() => {
-    void fetchUnread();
-
-    const intervalId = window.setInterval(() => {
-      void fetchUnread();
-    }, 30000);
-
-    return () => {
-      window.clearInterval(intervalId);
-    };
-  }, [fetchUnread]);
 
   // Only show for authenticated users on specific routes
   const shouldShow =
@@ -111,8 +60,7 @@ export const MobileBottomNav = () => {
     return "/shifts";
   };
 
-  // Don't show quick action for admin users
-  const showCenterAction = userRole === "professional" || userRole === "clinic";
+  const showCenterAction = userRole === "clinic";
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -155,7 +103,6 @@ export const MobileBottomNav = () => {
             icon={MessageCircle}
             label={t("mobile.messages")}
             isActive={isActive("/messages")}
-            badge={unreadMessageCount > 0 ? unreadMessageCount : undefined}
           />
 
           {/* Profile */}
@@ -169,11 +116,7 @@ export const MobileBottomNav = () => {
           {/* Floating Action Button */}
           {showCenterAction && (
             <Link
-              to={
-                userRole === "clinic"
-                  ? "/dashboard/clinic?action=create-shift"
-                  : "/shifts"
-              }
+              to="/dashboard/clinic?action=create-shift"
               className={cn(
                 "absolute left-1/2 -translate-x-1/2 -top-5",
                 "w-14 h-14 rounded-2xl",
@@ -184,17 +127,9 @@ export const MobileBottomNav = () => {
                   ? "bg-gradient-to-br from-accent to-accent/80 shadow-accent/25"
                   : "bg-gradient-to-br from-primary to-primary/80 shadow-primary/25",
               )}
-              aria-label={
-                userRole === "clinic"
-                  ? t("mobile.postShift")
-                  : t("mobile.findShifts")
-              }
+              aria-label={t("mobile.postShift")}
             >
-              {userRole === "clinic" ? (
-                <Plus className="h-6 w-6 text-white" />
-              ) : (
-                <Briefcase className="h-6 w-6 text-white" />
-              )}
+              <Plus className="h-6 w-6 text-white" />
             </Link>
           )}
         </div>

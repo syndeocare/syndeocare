@@ -6,12 +6,14 @@ import {
   conversationMessageSendInputSchema,
   conversationSummarySchema,
   domainEventCatalog,
+  standardConversationStartInputSchema,
 } from "@repo/contracts";
 import {
   listConversationMessagesForSubject,
   listConversationsForSubject,
   sendConversationMessageBySubject,
   startAdminConversationBySubject,
+  startStandardConversationBySubject,
 } from "@repo/persistence";
 import { startService } from "@repo/service-core";
 import { z } from "zod";
@@ -84,6 +86,35 @@ void startService({
         items: conversations,
         total: conversations.length,
       });
+    });
+
+    app.post("/internal/conversations/:subject", async (request, reply) => {
+      const parsedParams = subjectParamsSchema.safeParse(request.params);
+      const parsedBody = standardConversationStartInputSchema.safeParse(
+        request.body,
+      );
+
+      if (!parsedParams.success || !parsedBody.success) {
+        return reply.code(400).send({
+          code: "VALIDATION_ERROR",
+          message: "A valid professional and clinic are required.",
+        });
+      }
+
+      const conversation = await startStandardConversationBySubject(
+        parsedParams.data.subject,
+        parsedBody.data,
+      );
+
+      if (!conversation) {
+        return reply.code(404).send({
+          code: "CONVERSATION_TARGET_NOT_FOUND",
+          message:
+            "No visible professional-clinic conversation could be opened.",
+        });
+      }
+
+      return conversationSummarySchema.parse(conversation);
     });
 
     app.get(

@@ -41,6 +41,11 @@ import {
   gatewayDocumentTypeMatches,
   getGatewayDocumentTypeKey,
 } from "@/lib/document-types";
+import {
+  formatYemeniPhone,
+  isValidYemeniMobile,
+  normalizeYemeniPhoneInput,
+} from "@/lib/yemen-phone";
 
 type Step = "organization" | "location" | "documents" | "complete";
 
@@ -554,6 +559,20 @@ const ClinicOnboarding = () => {
       return;
     }
 
+    if (!isValidYemeniMobile(orgData.phone)) {
+      toast({
+        variant: "destructive",
+        title: t("onboarding.fields.phone"),
+        description: t(
+          "onboarding.fields.yemenPhoneInvalid",
+          "Enter a valid Yemeni mobile number starting with 71, 73, 77, or 78.",
+        ),
+      });
+      return;
+    }
+
+    const formattedPhone = formatYemeniPhone(orgData.phone);
+
     setIsSubmitting(true);
     try {
       if (
@@ -569,7 +588,7 @@ const ClinicOnboarding = () => {
           {
             organizationName: orgData.name.trim(),
             description: orgData.description.trim() || null,
-            contactPhone: orgData.phone.trim() || null,
+            contactPhone: formattedPhone,
             websiteUrl: locationData.website.trim() || null,
             address: locationData.address.trim() || null,
             locationLat: locationData.location_lat,
@@ -583,7 +602,7 @@ const ClinicOnboarding = () => {
         .update({
           name: orgData.name.trim(),
           email: orgData.email.trim(),
-          phone: orgData.phone.trim(),
+          phone: formattedPhone,
           description: orgData.description.trim(),
           tax_id: orgData.tax_id.trim(),
           logo_url: logoUrl,
@@ -631,7 +650,7 @@ const ClinicOnboarding = () => {
           {
             organizationName: orgData.name.trim(),
             description: orgData.description.trim() || null,
-            contactPhone: orgData.phone.trim() || null,
+            contactPhone: formatYemeniPhone(orgData.phone),
             websiteUrl: locationData.website.trim() || null,
             address: locationData.address.trim(),
             locationLat: locationData.location_lat,
@@ -830,16 +849,31 @@ const ClinicOnboarding = () => {
                     </Label>
                     <div className="relative">
                       <Phone className="absolute start-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                      <span className="absolute start-10 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground">
+                        +967
+                      </span>
                       <Input
                         id="phone"
-                        placeholder={t("onboarding.fields.phonePlaceholder")}
-                        value={orgData.phone}
+                        inputMode="numeric"
+                        placeholder="77XXXXXXX"
+                        value={normalizeYemeniPhoneInput(orgData.phone)}
                         onChange={(e) =>
-                          setOrgData({ ...orgData, phone: e.target.value })
+                          setOrgData({
+                            ...orgData,
+                            phone: normalizeYemeniPhoneInput(e.target.value),
+                          })
                         }
-                        className="ps-10"
+                        className="ps-24"
                       />
                     </div>
+                    {orgData.phone && !isValidYemeniMobile(orgData.phone) && (
+                      <p className="text-xs text-destructive">
+                        {t(
+                          "onboarding.fields.yemenPhoneInvalid",
+                          "Enter a valid Yemeni mobile number starting with 71, 73, 77, or 78.",
+                        )}
+                      </p>
+                    )}
                   </div>
                 </div>
 

@@ -208,14 +208,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         });
 
         if (FEATURES.emailVerification) {
-          try {
-            await requestEmailOtp(normalizedEmail);
-          } catch (error) {
-            console.warn(
-              "Email OTP request failed after signup; continuing with verification step.",
-              error,
-            );
-          }
+          await requestEmailOtp(normalizedEmail);
           await logoutGatewaySession(createdSession.tokens.refreshToken);
           await applyStoredSession(null);
 

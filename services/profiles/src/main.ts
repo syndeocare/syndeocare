@@ -120,10 +120,27 @@ void startService({
         });
       }
 
-      const profile = await updateProfessionalProfileBySubject(
-        parsedSubject.data.subject,
-        parsedBody.data,
-      );
+      let profile: Awaited<
+        ReturnType<typeof updateProfessionalProfileBySubject>
+      >;
+      try {
+        profile = await updateProfessionalProfileBySubject(
+          parsedSubject.data.subject,
+          parsedBody.data,
+        );
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          error.message.includes("phone number is already registered")
+        ) {
+          return reply.code(409).send({
+            code: "PHONE_ALREADY_REGISTERED",
+            message: error.message,
+          });
+        }
+
+        throw error;
+      }
 
       if (!profile) {
         return reply.code(404).send({

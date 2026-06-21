@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { motion } from "framer-motion";
 import {
   Upload,
@@ -230,6 +231,15 @@ const DocumentUploadCard = ({
               >
                 <X className="w-4 h-4" />
               </button>
+            </div>
+          )}
+
+          {uploading && (
+            <div className="mb-3 space-y-1.5">
+              <Progress value={65} className="h-2 animate-pulse" />
+              <p className="text-xs text-muted-foreground">
+                {t("documents.uploading", "Uploading securely…")}
+              </p>
             </div>
           )}
 
