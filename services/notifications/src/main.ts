@@ -67,9 +67,9 @@ void startService({
 
       const resendApiKey = process.env.RESEND_API_KEY;
       const fromEmail =
-        process.env.RESEND_FROM_EMAIL ?? "onboarding@resend.dev";
+        process.env.RESEND_FROM_EMAIL?.trim() || "onboarding@resend.dev";
       const targetEmail =
-        process.env.RESEND_TEST_EMAIL ?? parsedBody.data.toEmail;
+        process.env.RESEND_TEST_EMAIL?.trim() || parsedBody.data.toEmail;
 
       if (!resendApiKey) {
         return reply.code(503).send({
