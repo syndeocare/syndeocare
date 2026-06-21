@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/contexts/AuthContext";
+import { useProfile } from "@/hooks/useProfile";
 import { ChatContainer } from "@/components/chat/ChatContainer";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MessageCircle } from "lucide-react";
@@ -18,9 +19,11 @@ const Messages = () => {
   const [profileId, setProfileId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [hasActiveConversation, setHasActiveConversation] = useState(false);
+  const { profileId: resolvedProfileId, isLoading: profileLoading } =
+    useProfile();
 
   useEffect(() => {
-    if (authLoading) return;
+    if (authLoading || profileLoading) return;
     if (!user) {
       navigate("/auth");
       return;
@@ -42,22 +45,32 @@ const Messages = () => {
         ? user.user_metadata.clinicId
         : null;
 
-    if (userRole === "professional" && profileMetadataId) {
+    if (
+      userRole === "professional" &&
+      (profileMetadataId || resolvedProfileId)
+    ) {
       setUserType("professional");
-      setProfileId(profileMetadataId);
+      setProfileId(profileMetadataId || resolvedProfileId);
       setLoading(false);
       return;
     }
 
-    if (userRole === "clinic" && clinicMetadataId) {
+    if (userRole === "clinic" && (clinicMetadataId || resolvedProfileId)) {
       setUserType("clinic");
-      setProfileId(clinicMetadataId);
+      setProfileId(clinicMetadataId || resolvedProfileId);
       setLoading(false);
       return;
     }
 
     navigate("/");
-  }, [user, userRole, authLoading, navigate]);
+  }, [
+    user,
+    userRole,
+    authLoading,
+    profileLoading,
+    navigate,
+    resolvedProfileId,
+  ]);
 
   if (authLoading || loading) {
     return (

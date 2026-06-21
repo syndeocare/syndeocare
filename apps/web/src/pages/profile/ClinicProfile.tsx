@@ -229,7 +229,7 @@ const ClinicProfile = () => {
           mergedClinic = clinicData
             ? {
                 ...clinicData,
-                logo_url: gatewayClinic.logoUrl ?? clinicData.logo_url,
+                logo_url: gatewayClinic.logo_url ?? clinicData.logo_url,
                 name: gatewayClinic.name,
                 phone: gatewayClinic.phone ?? clinicData.phone,
                 description:
@@ -250,7 +250,7 @@ const ClinicProfile = () => {
                 address: gatewayClinic.address ?? null,
                 tax_id: null,
                 verification_status: gatewayClinic.verification_status,
-                logo_url: gatewayClinic.logoUrl ?? null,
+                logo_url: gatewayClinic.logo_url ?? null,
                 onboarding_completed:
                   gatewayClinic.onboarding_completed ?? false,
                 settings: {

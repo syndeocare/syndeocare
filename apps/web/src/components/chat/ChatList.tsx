@@ -124,6 +124,28 @@ export const ChatList = ({
 
       const standardItems = await Promise.all(
         (standardData || []).map(async (conv) => {
+          if (!conv.professional_id || !conv.clinic_id) {
+            return {
+              id: `standard:${conv.id}`,
+              kind: "standard" as const,
+              last_message_at: conv.last_message_at,
+              display_name:
+                conv.display_name ||
+                (conv.counterpart_role === "clinic"
+                  ? t("chat.clinic")
+                  : t("chat.professional")),
+              avatar_url: null,
+              counterpart_type:
+                conv.counterpart_role === "clinic"
+                  ? ("clinic" as const)
+                  : ("professional" as const),
+              counterpart_verification_status: null,
+              unread_count: 0,
+              last_message: undefined,
+              last_file_type: null,
+            };
+          }
+
           const { data: professional } = await backendDb
             .from("profiles")
             .select("id, full_name, avatar_url, verification_status")

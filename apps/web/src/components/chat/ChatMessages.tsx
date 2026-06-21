@@ -203,7 +203,13 @@ export const ChatMessages = ({
           throw error;
         }
 
-        setMessages((data || []).map(normalizeAdminMessage));
+        setMessages(
+          (data || []).map((message) =>
+            "admin_conversation_id" in message
+              ? normalizeAdminMessage(message as AdminMessageRow)
+              : (message as Message),
+          ),
+        );
         setLoading(false);
 
         await backendDb
@@ -330,6 +336,23 @@ export const ChatMessages = ({
         .eq("id", rawConversationId)
         .single();
       if (error || !convData) return;
+      if (!convData.professional_id || !convData.clinic_id) {
+        setConversation({
+          id: convData.id,
+          kind: "standard",
+          otherName:
+            convData.display_name ||
+            (convData.counterpart_role === "clinic"
+              ? t("chat.clinic")
+              : t("chat.professional")),
+          otherAvatar: null,
+          otherType:
+            convData.counterpart_role === "clinic" ? "clinic" : "professional",
+          otherVerificationStatus: null,
+        });
+        return;
+      }
+
       const { data: professional } = await backendDb
         .from("profiles")
         .select("id, full_name, avatar_url, verification_status")

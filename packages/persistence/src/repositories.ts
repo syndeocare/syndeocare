@@ -157,6 +157,48 @@ function buildDefaultOnboarding(role: PublicRegistrationRole | "admin") {
   };
 }
 
+async function assertPhoneNumberIsUnique(
+  phone: string | null | undefined,
+  actorId: string,
+) {
+  const normalized = phone?.trim();
+
+  if (!normalized) {
+    return;
+  }
+
+  const db = getDb();
+  const [professional] = await db
+    .select({ id: professionalProfiles.id })
+    .from(professionalProfiles)
+    .where(
+      and(
+        eq(professionalProfiles.primaryPhone, normalized),
+        ne(professionalProfiles.actorId, actorId),
+      ),
+    )
+    .limit(1);
+
+  if (professional) {
+    throw new Error("This phone number is already registered.");
+  }
+
+  const [clinic] = await db
+    .select({ id: clinicProfiles.id })
+    .from(clinicProfiles)
+    .where(
+      and(
+        eq(clinicProfiles.contactPhone, normalized),
+        ne(clinicProfiles.actorId, actorId),
+      ),
+    )
+    .limit(1);
+
+  if (clinic) {
+    throw new Error("This phone number is already registered.");
+  }
+}
+
 type ActorAggregate = {
   actor: typeof actors.$inferSelect;
   onboarding: typeof onboardingRecords.$inferSelect | null;
@@ -1121,6 +1163,7 @@ export async function updateProfessionalProfileBySubject(
 
   const db = getDb();
   const now = new Date();
+  await assertPhoneNumberIsUnique(input.primaryPhone, aggregate.actor.id);
 
   await db.transaction(async (tx) => {
     await tx
@@ -1194,6 +1237,7 @@ export async function updateClinicProfileBySubject(
 
   const db = getDb();
   const now = new Date();
+  await assertPhoneNumberIsUnique(input.contactPhone, aggregate.actor.id);
 
   await db.transaction(async (tx) => {
     await tx
@@ -1702,6 +1746,25 @@ export async function requestBookingBySubject(
     };
   }
 
+  const [clinicActor] = await db
+    .select({
+      externalUserId: actors.externalUserId,
+    })
+    .from(clinicProfiles)
+    .innerJoin(actors, eq(clinicProfiles.actorId, actors.id))
+    .where(eq(clinicProfiles.id, job.clinicId))
+    .limit(1);
+
+  if (clinicActor?.externalUserId) {
+    await createNotificationForExternalUserId({
+      recipientExternalUserId: clinicActor.externalUserId,
+      type: "booking_request",
+      title: "New shift application",
+      message: `${professional.fullName} applied for "${job.title}".`,
+      data: { bookingId: booking.id, jobId: job.id },
+    });
+  }
+
   return { ok: true, data: booking };
 }
 
@@ -1847,6 +1910,34 @@ export async function updateBookingStatusBySubject(
       message: "The booking status update could not be read back.",
       statusCode: 404,
     };
+  }
+
+  const [professionalActor] = await db
+    .select({
+      externalUserId: actors.externalUserId,
+    })
+    .from(professionalProfiles)
+    .innerJoin(actors, eq(professionalProfiles.actorId, actors.id))
+    .where(eq(professionalProfiles.id, current.professionalId))
+    .limit(1);
+
+  if (professionalActor?.externalUserId) {
+    const notificationType =
+      input.status === "accepted"
+        ? "booking_accepted"
+        : input.status === "cancelled"
+          ? "booking_cancelled"
+          : input.status === "confirmed"
+            ? "booking_confirmed"
+            : "booking_completed";
+
+    await createNotificationForExternalUserId({
+      recipientExternalUserId: professionalActor.externalUserId,
+      type: notificationType,
+      title: "Shift application updated",
+      message: `Your application for "${current.jobTitle}" is now ${input.status}.`,
+      data: { bookingId: updated.id, jobId: updated.jobId },
+    });
   }
 
   return { ok: true, data: updated };
@@ -2141,6 +2232,95 @@ export async function startAdminConversationBySubject(
   };
 }
 
+export async function startStandardConversationBySubject(
+  subject: string,
+  input: { professionalId: string; clinicId: string },
+): Promise<ConversationSummary | null> {
+  const actor = await getActorByAuthSubject(subject);
+
+  if (!actor || actor.role === "admin") {
+    return null;
+  }
+
+  const db = getDb();
+  const [[professional], [clinic]] = await Promise.all([
+    db
+      .select({
+        profile: professionalProfiles,
+        actor: actors,
+      })
+      .from(professionalProfiles)
+      .innerJoin(actors, eq(professionalProfiles.actorId, actors.id))
+      .where(eq(professionalProfiles.id, input.professionalId))
+      .limit(1),
+    db
+      .select({
+        clinic: clinicProfiles,
+        actor: actors,
+      })
+      .from(clinicProfiles)
+      .innerJoin(actors, eq(clinicProfiles.actorId, actors.id))
+      .where(eq(clinicProfiles.id, input.clinicId))
+      .limit(1),
+  ]);
+
+  if (!professional || !clinic) {
+    return null;
+  }
+
+  const isProfessionalParticipant =
+    actor.role === "professional" && professional.actor.id === actor.id;
+  const isClinicParticipant =
+    actor.role === "clinic" && clinic.actor.id === actor.id;
+
+  if (!isProfessionalParticipant && !isClinicParticipant) {
+    return null;
+  }
+
+  const existing = await db
+    .select()
+    .from(conversations)
+    .where(
+      and(
+        eq(conversations.kind, "standard"),
+        eq(conversations.professionalId, input.professionalId),
+        eq(conversations.clinicId, input.clinicId),
+      ),
+    )
+    .limit(1);
+
+  const conversation =
+    existing[0] ??
+    (
+      await db
+        .insert(conversations)
+        .values({
+          clinicId: input.clinicId,
+          kind: "standard",
+          professionalId: input.professionalId,
+        })
+        .returning()
+    )[0];
+
+  if (!conversation) {
+    return null;
+  }
+
+  const counterpart =
+    actor.role === "professional" ? clinic.actor : professional.actor;
+
+  return {
+    id: conversation.id,
+    kind: "standard",
+    displayName:
+      actor.role === "professional"
+        ? clinic.clinic.organizationName
+        : professional.profile.fullName,
+    counterpartRole: counterpart.role,
+    lastMessageAt: conversation.lastMessageAt.toISOString(),
+  };
+}
+
 export async function listConversationsForSubject(
   subject: string,
 ): Promise<ConversationSummary[]> {
@@ -2169,6 +2349,14 @@ export async function listConversationsForSubject(
           : conversation.adminActorId
         : null;
     const otherActor = otherActorId ? await getActorById(otherActorId) : null;
+    const standardCounterpart =
+      conversation.kind === "standard"
+        ? actor.role === "professional" && conversation.clinicId
+          ? await getClinicProfileById(conversation.clinicId)
+          : actor.role === "clinic" && conversation.professionalId
+            ? await getProfessionalProfileById(conversation.professionalId)
+            : null
+        : null;
 
     summaries.push({
       id: conversation.id,
@@ -2176,7 +2364,11 @@ export async function listConversationsForSubject(
       displayName:
         conversation.kind === "admin"
           ? actorDisplayName(otherActor ?? undefined)
-          : "Clinic conversation",
+          : standardCounterpart
+            ? "organizationName" in standardCounterpart
+              ? standardCounterpart.organizationName
+              : standardCounterpart.fullName
+            : "Clinic conversation",
       counterpartRole:
         conversation.kind === "admin"
           ? (otherActor?.role ?? "admin")

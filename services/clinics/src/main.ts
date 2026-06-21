@@ -109,10 +109,25 @@ void startService({
         });
       }
 
-      const clinic = await updateClinicProfileBySubject(
-        parsedSubject.data.subject,
-        parsedBody.data,
-      );
+      let clinic: Awaited<ReturnType<typeof updateClinicProfileBySubject>>;
+      try {
+        clinic = await updateClinicProfileBySubject(
+          parsedSubject.data.subject,
+          parsedBody.data,
+        );
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          error.message.includes("phone number is already registered")
+        ) {
+          return reply.code(409).send({
+            code: "PHONE_ALREADY_REGISTERED",
+            message: error.message,
+          });
+        }
+
+        throw error;
+      }
 
       if (!clinic) {
         return reply.code(404).send({

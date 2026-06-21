@@ -264,11 +264,15 @@ function mapConversation(item: any) {
   return {
     ...item,
     id: item.id,
+    kind: item.kind ?? "standard",
     professional_id: item.professionalId ?? item.professional_id ?? null,
     clinic_id: item.clinicId ?? item.clinic_id ?? null,
     admin_id: item.adminSubject ?? item.admin_id ?? null,
-    created_at: item.createdAt ?? item.created_at,
-    updated_at: item.updatedAt ?? item.updated_at,
+    display_name: item.displayName ?? item.display_name ?? null,
+    counterpart_role: item.counterpartRole ?? item.counterpart_role ?? null,
+    last_message_at: item.lastMessageAt ?? item.last_message_at,
+    created_at: item.createdAt ?? item.created_at ?? item.lastMessageAt,
+    updated_at: item.updatedAt ?? item.updated_at ?? item.lastMessageAt,
   };
 }
 
@@ -277,10 +281,16 @@ function mapMessage(item: any) {
     ...item,
     id: item.id,
     conversation_id: item.conversationId ?? item.conversation_id,
-    sender_id: item.senderSubject ?? item.sender_id,
-    content: item.body ?? item.content ?? "",
+    sender_id: item.senderActorId ?? item.senderSubject ?? item.sender_id,
+    sender_type: item.senderRole ?? item.sender_type,
+    content: item.content ?? item.body ?? "",
+    is_read: item.isRead ?? item.is_read ?? false,
     message_type: item.messageType ?? item.message_type ?? "text",
-    media_url: item.mediaUrl ?? item.media_url ?? null,
+    media_url: item.mediaUrl ?? item.media_url ?? item.fileUrl ?? null,
+    file_url: item.fileUrl ?? item.file_url ?? item.mediaUrl ?? null,
+    file_type: item.fileType ?? item.file_type ?? null,
+    file_name: item.fileName ?? item.file_name ?? null,
+    file_size: item.fileSize ?? item.file_size ?? null,
     read_at: item.readAt ?? item.read_at ?? null,
     created_at: item.createdAt ?? item.created_at,
   };
@@ -605,11 +615,29 @@ class GatewayQueryBuilder {
         this.table,
         await requestGateway("/conversations", { headers: authHeaders() }),
       );
+    } else if (this.table === "admin_conversations") {
+      rows = normalizeRows(
+        "conversations",
+        await requestGateway("/conversations", { headers: authHeaders() }),
+      ).filter((row) => row.kind === "admin");
     } else if (this.table === "messages") {
       const conversationId = getFilter(this.filters, "conversation_id")?.value;
       rows = conversationId
         ? normalizeRows(
             this.table,
+            await requestGateway(
+              `/conversations/${encodeURIComponent(String(conversationId))}/messages`,
+              { headers: authHeaders() },
+            ),
+          )
+        : [];
+    } else if (this.table === "admin_messages") {
+      const conversationId =
+        getFilter(this.filters, "admin_conversation_id")?.value ??
+        getFilter(this.filters, "conversation_id")?.value;
+      rows = conversationId
+        ? normalizeRows(
+            "messages",
             await requestGateway(
               `/conversations/${encodeURIComponent(String(conversationId))}/messages`,
               { headers: authHeaders() },
@@ -633,7 +661,20 @@ class GatewayQueryBuilder {
       rows = [];
     }
 
-    rows = applyLocalFilters(rows, this.filters);
+    const filtersToApply =
+      this.table === "admin_conversations"
+        ? this.filters.filter(
+            (filter) =>
+              ![
+                "admin_user_id",
+                "target_user_id",
+                "target_profile_id",
+                "target_clinic_id",
+              ].includes(filter.column),
+          )
+        : this.filters;
+
+    rows = applyLocalFilters(rows, filtersToApply);
 
     if (this.orderBy) {
       const { column, ascending } = this.orderBy;
@@ -695,12 +736,68 @@ class GatewayQueryBuilder {
                   "content-type": "application/json",
                 },
                 body: JSON.stringify({
-                  body: row.body ?? row.content ?? "",
-                  messageType: row.messageType ?? row.message_type ?? "text",
-                  mediaUrl: row.mediaUrl ?? row.media_url,
+                  content: row.content ?? row.body ?? "",
+                  fileUrl: row.fileUrl ?? row.file_url ?? row.mediaUrl,
+                  fileType: row.fileType ?? row.file_type,
+                  fileName: row.fileName ?? row.file_name,
+                  fileSize: row.fileSize ?? row.file_size,
                 }),
               },
             ),
+          ),
+        );
+      }
+      return emptyResult(created, created.length);
+    }
+
+    if (this.table === "admin_messages") {
+      const created = [];
+      for (const row of rows) {
+        const conversationId =
+          row.conversationId ??
+          row.conversation_id ??
+          row.admin_conversation_id;
+        created.push(
+          mapMessage(
+            await requestGateway(
+              `/conversations/${encodeURIComponent(String(conversationId))}/messages`,
+              {
+                method: "POST",
+                headers: {
+                  ...authHeaders(),
+                  "content-type": "application/json",
+                },
+                body: JSON.stringify({
+                  content: row.content ?? "",
+                  fileUrl: row.fileUrl ?? row.file_url,
+                  fileType: row.fileType ?? row.file_type,
+                  fileName: row.fileName ?? row.file_name,
+                  fileSize: row.fileSize ?? row.file_size,
+                }),
+              },
+            ),
+          ),
+        );
+      }
+      return emptyResult(created, created.length);
+    }
+
+    if (this.table === "conversations") {
+      const created = [];
+      for (const row of rows) {
+        created.push(
+          mapConversation(
+            await requestGateway("/conversations", {
+              method: "POST",
+              headers: {
+                ...authHeaders(),
+                "content-type": "application/json",
+              },
+              body: JSON.stringify({
+                professionalId: row.professionalId ?? row.professional_id,
+                clinicId: row.clinicId ?? row.clinic_id,
+              }),
+            }),
           ),
         );
       }

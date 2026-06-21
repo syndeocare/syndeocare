@@ -145,6 +145,28 @@ type PlatformActor = {
   displayName?: string;
 };
 
+export type PlatformConversationSummary = {
+  id: string;
+  kind: "admin" | "standard";
+  displayName: string;
+  counterpartRole: "admin" | "clinic" | "professional";
+  lastMessageAt: string;
+};
+
+export type PlatformConversationMessage = {
+  id: string;
+  conversationId: string;
+  senderActorId: string;
+  senderRole: "admin" | "clinic" | "professional";
+  content: string;
+  isRead: boolean;
+  fileUrl: string | null;
+  fileType: string | null;
+  fileName: string | null;
+  fileSize: number | null;
+  createdAt: string;
+};
+
 export type LegacyProfessional = {
   id: string;
   user_id?: string;
@@ -233,6 +255,7 @@ export type LegacyShift = {
 export type LegacyBooking = {
   id: string;
   status: string;
+  notes?: string | null;
   check_in_time: string | null;
   check_out_time: string | null;
   professional_id: string;
@@ -567,6 +590,7 @@ function mapBookingToLegacy(item: PlatformBooking): LegacyBooking {
   return {
     id: item.id,
     status: item.status,
+    notes: item.notes ?? null,
     check_in_time: null,
     check_out_time: null,
     professional_id: item.professionalId,
@@ -840,6 +864,84 @@ export async function requestLegacyBooking(
   );
 
   return mapBookingToLegacy(response);
+}
+
+export async function listGatewayConversations(bridge: BackendActorBridge) {
+  if (!apiGatewayBaseUrl) {
+    throw new BackendRequestError("API gateway is not configured.", 500);
+  }
+
+  return requestJson<{ items: PlatformConversationSummary[]; total: number }>(
+    `${apiGatewayBaseUrl}/conversations`,
+    {
+      headers: buildGatewayHeaders(bridge),
+    },
+  );
+}
+
+export async function startGatewayConversation(
+  bridge: BackendActorBridge,
+  input: { professionalId: string; clinicId: string },
+) {
+  if (!apiGatewayBaseUrl) {
+    throw new BackendRequestError("API gateway is not configured.", 500);
+  }
+
+  return requestJson<PlatformConversationSummary>(
+    `${apiGatewayBaseUrl}/conversations`,
+    {
+      method: "POST",
+      headers: {
+        ...buildGatewayHeaders(bridge),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export async function listGatewayConversationMessages(
+  bridge: BackendActorBridge,
+  conversationId: string,
+) {
+  if (!apiGatewayBaseUrl) {
+    throw new BackendRequestError("API gateway is not configured.", 500);
+  }
+
+  return requestJson<{ items: PlatformConversationMessage[]; total: number }>(
+    `${apiGatewayBaseUrl}/conversations/${encodeURIComponent(conversationId)}/messages`,
+    {
+      headers: buildGatewayHeaders(bridge),
+    },
+  );
+}
+
+export async function sendGatewayConversationMessage(
+  bridge: BackendActorBridge,
+  conversationId: string,
+  input: {
+    content: string;
+    fileUrl?: string | null;
+    fileType?: string | null;
+    fileName?: string | null;
+    fileSize?: number | null;
+  },
+) {
+  if (!apiGatewayBaseUrl) {
+    throw new BackendRequestError("API gateway is not configured.", 500);
+  }
+
+  return requestJson<PlatformConversationMessage>(
+    `${apiGatewayBaseUrl}/conversations/${encodeURIComponent(conversationId)}/messages`,
+    {
+      method: "POST",
+      headers: {
+        ...buildGatewayHeaders(bridge),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+  );
 }
 
 export async function updateLegacyBookingStatus(

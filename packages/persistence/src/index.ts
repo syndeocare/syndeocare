@@ -38,6 +38,7 @@ export {
   saveAdminCatalogItem,
   sendConversationMessageBySubject,
   startAdminConversationBySubject,
+  startStandardConversationBySubject,
   syncActorExternalUserIdBySubject,
   updateBookingStatusBySubject,
   updateClinicProfileBySubject,
