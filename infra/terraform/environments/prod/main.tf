@@ -1,6 +1,14 @@
 terraform {
   required_version = ">= 1.6.0"
 
+  backend "s3" {
+    bucket         = "syndeocare-prod-terraform-state-433956820920"
+    key            = "prod/terraform.tfstate"
+    region         = "us-east-1"
+    dynamodb_table = "syndeocare-prod-terraform-locks"
+    encrypt        = true
+  }
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
