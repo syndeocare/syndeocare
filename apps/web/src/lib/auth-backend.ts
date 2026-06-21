@@ -276,36 +276,10 @@ export function getStoredAccessToken() {
   return readStoredGatewaySession()?.tokens.accessToken;
 }
 
-function buildGatewayDevelopmentHeaders(
-  session: StoredGatewaySession,
-): HeadersInit {
-  return {
-    "x-dev-user-id": session.principal.sub,
-    "x-dev-user-role": session.principal.role,
-    ...(session.principal.email
-      ? { "x-dev-user-email": session.principal.email }
-      : {}),
-    ...(session.principal.clinicId
-      ? { "x-dev-clinic-id": session.principal.clinicId }
-      : {}),
-    ...(session.principal.profileId
-      ? { "x-dev-profile-id": session.principal.profileId }
-      : {}),
-    "x-dev-onboarding-completed": String(
-      Boolean(session.principal.onboardingCompleted),
-    ),
-    "x-dev-verification-status": session.principal.verificationStatus,
-    ...(session.principal.displayName
-      ? { "x-dev-display-name": session.principal.displayName }
-      : {}),
-  };
-}
-
 async function validateStoredGatewaySession(session: StoredGatewaySession) {
   const principal = await requestJson<GatewayPrincipal>("/me", {
     headers: {
       Authorization: `Bearer ${session.tokens.accessToken}`,
-      ...buildGatewayDevelopmentHeaders(session),
     },
   });
 
@@ -325,7 +299,6 @@ export function getGatewayAuthorizationHeaders(): HeadersInit | undefined {
 
   return {
     Authorization: `Bearer ${session.tokens.accessToken}`,
-    ...buildGatewayDevelopmentHeaders(session),
   };
 }
 
