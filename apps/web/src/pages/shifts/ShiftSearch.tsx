@@ -87,6 +87,14 @@ interface Profile {
   verification_status: string;
 }
 
+const CLINIC_VISIBLE_BOOKING_STATUSES = new Set([
+  "accepted",
+  "confirmed",
+  "completed",
+  "checked_in",
+  "checked_out",
+]);
+
 const ShiftSearch = () => {
   const { t, i18n } = useTranslation();
   const isRTL = i18n.language === "ar";
@@ -97,6 +105,9 @@ const ShiftSearch = () => {
   const [showShiftDetail, setShowShiftDetail] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [bookedShiftIds, setBookedShiftIds] = useState<string[]>([]);
+  const [bookingStatusByShiftId, setBookingStatusByShiftId] = useState<
+    Record<string, string>
+  >({});
   const [roleOptions, setRoleOptions] = useState(
     withAllOption(DEFAULT_JOB_ROLE_OPTIONS),
   );
@@ -159,6 +170,7 @@ const ShiftSearch = () => {
     verificationStatus?: string,
   ) => {
     const bookedIds = new Set<string>();
+    const nextBookingStatusByShiftId: Record<string, string> = {};
 
     if (user && isGatewayBackendConfigured()) {
       try {
@@ -178,7 +190,10 @@ const ShiftSearch = () => {
           .filter((booking) =>
             ["requested", "accepted", "confirmed"].includes(booking.status),
           )
-          .forEach((booking) => bookedIds.add(booking.shift.id));
+          .forEach((booking) => {
+            bookedIds.add(booking.shift.id);
+            nextBookingStatusByShiftId[booking.shift.id] = booking.status;
+          });
       } catch (error) {
         console.warn("Falling back to backend database booking lookup", error);
       }
@@ -187,14 +202,18 @@ const ShiftSearch = () => {
     // Get all active bookings (requested, accepted, confirmed, checked_in)
     const { data: bookings } = await backendDb
       .from("bookings")
-      .select("shift_id")
+      .select("shift_id, status")
       .eq("professional_id", profileId)
       .in("status", ["requested", "accepted", "confirmed", "checked_in"]);
 
     if (bookings) {
-      bookings.forEach((booking) => bookedIds.add(booking.shift_id));
+      bookings.forEach((booking) => {
+        bookedIds.add(booking.shift_id);
+        nextBookingStatusByShiftId[booking.shift_id] = booking.status;
+      });
     }
 
+    setBookingStatusByShiftId(nextBookingStatusByShiftId);
     setBookedShiftIds(Array.from(bookedIds));
   };
 
@@ -497,131 +516,151 @@ const ShiftSearch = () => {
               />
             ) : (
               <div className="space-y-4">
-                {filteredShifts.map((shift, index) => (
-                  <motion.div
-                    key={shift.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 + index * 0.03 }}
-                    className="bg-card rounded-xl border border-border p-5 shadow-card hover:shadow-card-hover hover:border-primary/20 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    onClick={() => {
-                      setSelectedShift(shift);
-                      setShowShiftDetail(true);
-                    }}
-                    role="article"
-                    aria-label={`${shift.clinic?.name} - ${shift.role_required} - $${shift.hourly_rate}/hr`}
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
+                {filteredShifts.map((shift, index) => {
+                  const canViewClinicIdentity =
+                    CLINIC_VISIBLE_BOOKING_STATUSES.has(
+                      bookingStatusByShiftId[shift.id] ?? "",
+                    );
+                  const clinicLabel = canViewClinicIdentity
+                    ? shift.clinic?.name
+                    : t("shifts.modal.clinicHidden", "Clinic hidden");
+
+                  return (
+                    <motion.div
+                      key={shift.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1 + index * 0.03 }}
+                      className="bg-card rounded-xl border border-border p-5 shadow-card hover:shadow-card-hover hover:border-primary/20 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      onClick={() => {
                         setSelectedShift(shift);
                         setShowShiftDetail(true);
-                      }
-                    }}
-                  >
-                    <div className="flex items-start gap-4">
-                      {/* Clinic Logo */}
-                      <div className="w-14 h-14 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0 overflow-hidden">
-                        {shift.clinic?.logo_url ? (
-                          <img
-                            src={shift.clinic.logo_url}
-                            alt={shift.clinic.name}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <Building2 className="w-7 h-7 text-accent" />
-                        )}
-                      </div>
-
-                      {/* Shift Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <Link
-                            to={`/clinic/${shift.clinic?.id}`}
-                            className="font-medium text-foreground hover:text-primary transition-colors"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {shift.clinic?.name}
-                          </Link>
-                          {shift.is_urgent && (
-                            <Badge variant="destructive" className="text-xs">
-                              {t("common.urgent")}
-                            </Badge>
-                          )}
-                          {shift.clinic?.rating_avg &&
-                            shift.clinic.rating_avg > 0 && (
-                              <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                                <Star className="w-3 h-3 text-warning fill-warning" />
-                                {shift.clinic.rating_avg.toFixed(1)}
-                              </div>
-                            )}
-                        </div>
-
-                        <p className="text-sm text-muted-foreground mb-2">
-                          {shift.role_required}
-                        </p>
-
-                        <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Calendar className="w-4 h-4" />
-                            {new Date(shift.shift_date).toLocaleDateString(
-                              isRTL ? "ar-SA" : "en-US",
-                              {
-                                weekday: "short",
-                                month: "short",
-                                day: "numeric",
-                              },
-                            )}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-4 h-4" />
-                            {shift.start_time} - {shift.end_time}
-                          </span>
-                          {shift.location_address && (
-                            <span className="flex items-center gap-1 max-w-[200px] truncate">
-                              <MapPin className="w-4 h-4 flex-shrink-0" />
-                              {shift.location_address}
-                            </span>
+                      }}
+                      role="article"
+                      aria-label={`${clinicLabel} - ${shift.role_required} - $${shift.hourly_rate}/hr`}
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setSelectedShift(shift);
+                          setShowShiftDetail(true);
+                        }
+                      }}
+                    >
+                      <div className="flex items-start gap-4">
+                        {/* Clinic Logo */}
+                        <div className="w-14 h-14 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                          {canViewClinicIdentity && shift.clinic?.logo_url ? (
+                            <img
+                              src={shift.clinic.logo_url}
+                              alt={shift.clinic.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <Building2 className="w-7 h-7 text-accent" />
                           )}
                         </div>
-                      </div>
 
-                      {/* Rate */}
-                      <div className="text-end flex-shrink-0">
-                        <div className="flex items-center gap-1 text-lg font-bold text-primary">
-                          <DollarSign className="w-4 h-4" />
-                          {shift.hourly_rate}
-                        </div>
-                        <span className="text-xs text-muted-foreground">
-                          {t("common.perHour")}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Certifications */}
-                    {shift.required_certifications &&
-                      shift.required_certifications.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-3 pt-3 border-t border-border">
-                          {shift.required_certifications
-                            .slice(0, 3)
-                            .map((cert, i) => (
-                              <Badge
-                                key={i}
-                                variant="outline"
-                                className="text-xs"
+                        {/* Shift Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            {canViewClinicIdentity ? (
+                              <Link
+                                to={`/clinic/${shift.clinic?.id}`}
+                                className="font-medium text-foreground hover:text-primary transition-colors"
+                                onClick={(e) => e.stopPropagation()}
                               >
-                                {cert}
+                                {shift.clinic?.name}
+                              </Link>
+                            ) : (
+                              <span className="font-medium text-foreground">
+                                {t(
+                                  "shifts.modal.clinicHidden",
+                                  "Clinic hidden",
+                                )}
+                              </span>
+                            )}
+                            {shift.is_urgent && (
+                              <Badge variant="destructive" className="text-xs">
+                                {t("common.urgent")}
                               </Badge>
-                            ))}
-                          {shift.required_certifications.length > 3 && (
-                            <Badge variant="outline" className="text-xs">
-                              +{shift.required_certifications.length - 3}
-                            </Badge>
-                          )}
+                            )}
+                            {canViewClinicIdentity &&
+                              shift.clinic?.rating_avg &&
+                              shift.clinic.rating_avg > 0 && (
+                                <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                  <Star className="w-3 h-3 text-warning fill-warning" />
+                                  {shift.clinic.rating_avg.toFixed(1)}
+                                </div>
+                              )}
+                          </div>
+
+                          <p className="text-sm text-muted-foreground mb-2">
+                            {shift.role_required}
+                          </p>
+
+                          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Calendar className="w-4 h-4" />
+                              {new Date(shift.shift_date).toLocaleDateString(
+                                isRTL ? "ar-SA" : "en-US",
+                                {
+                                  weekday: "short",
+                                  month: "short",
+                                  day: "numeric",
+                                },
+                              )}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Clock className="w-4 h-4" />
+                              {shift.start_time} - {shift.end_time}
+                            </span>
+                            {shift.location_address && (
+                              <span className="flex items-center gap-1 max-w-[200px] truncate">
+                                <MapPin className="w-4 h-4 flex-shrink-0" />
+                                {shift.location_address}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      )}
-                  </motion.div>
-                ))}
+
+                        {/* Rate */}
+                        <div className="text-end flex-shrink-0">
+                          <div className="flex items-center gap-1 text-lg font-bold text-primary">
+                            <DollarSign className="w-4 h-4" />
+                            {shift.hourly_rate}
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {t("common.perHour")}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Certifications */}
+                      {shift.required_certifications &&
+                        shift.required_certifications.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-3 pt-3 border-t border-border">
+                            {shift.required_certifications
+                              .slice(0, 3)
+                              .map((cert, i) => (
+                                <Badge
+                                  key={i}
+                                  variant="outline"
+                                  className="text-xs"
+                                >
+                                  {cert}
+                                </Badge>
+                              ))}
+                            {shift.required_certifications.length > 3 && (
+                              <Badge variant="outline" className="text-xs">
+                                +{shift.required_certifications.length - 3}
+                              </Badge>
+                            )}
+                          </div>
+                        )}
+                    </motion.div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -635,8 +674,14 @@ const ShiftSearch = () => {
         shift={selectedShift}
         profileId={profile?.id || ""}
         verificationStatus={profile?.verification_status || "pending"}
+        currentBookingStatus={
+          selectedShift ? bookingStatusByShiftId[selectedShift.id] : undefined
+        }
         onApplicationSuccess={() => {
-          fetchShifts();
+          if (profile) {
+            void fetchBookedShifts(profile.id, profile.verification_status);
+          }
+          void fetchShifts();
           setShowShiftDetail(false);
         }}
       />

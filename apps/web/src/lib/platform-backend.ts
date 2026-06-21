@@ -515,13 +515,20 @@ function buildGatewayHeaders(bridge: BackendActorBridge): HeadersInit {
 function mapProfessionalSummaryToLegacy(
   item: PlatformProfessionalSummary,
 ): LegacyProfessional {
+  const qualifications = item.licenseNumber
+    ? item.licenseNumber
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean)
+    : [];
+
   return {
     id: item.id,
     full_name: item.fullName,
     avatar_url: item.profileImageUrl ?? null,
     bio: item.bio ?? item.headline ?? null,
     specialties: [item.specialty, ...item.languages].filter(Boolean),
-    qualifications: item.licenseNumber ? [item.licenseNumber] : [],
+    qualifications,
     hourly_rate: null,
     rating_avg: item.rating ?? 0,
     rating_count: null,
@@ -1052,9 +1059,16 @@ export async function updateCurrentProfessionalProfile(
   const primarySpecialty =
     draft.specialties.map((value) => value.trim()).find(Boolean) ??
     current.specialty;
+  const secondarySpecialties = draft.specialties
+    .map((value) => value.trim())
+    .filter((value) => value && value !== primarySpecialty);
+  const qualifications = draft.qualifications
+    .map((value) => value.trim())
+    .filter(Boolean);
   const licenseNumber =
-    draft.qualifications.map((value) => value.trim()).find(Boolean) ??
-    current.licenseNumber;
+    qualifications.length > 0
+      ? qualifications.join(", ")
+      : current.licenseNumber;
 
   const response = await requestJson<PlatformProfessionalSummary>(
     `${apiGatewayBaseUrl}/profiles/me`,
@@ -1081,7 +1095,9 @@ export async function updateCurrentProfessionalProfile(
           : {}),
         yearsExperience: current.yearsExperience,
         languages:
-          current.languages.length > 0 ? current.languages : [primarySpecialty],
+          secondarySpecialties.length > 0
+            ? secondarySpecialties
+            : [primarySpecialty],
         availability: current.availability,
         location: buildGatewayLocationInput(
           draft.locationAddress,

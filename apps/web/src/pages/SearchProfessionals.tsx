@@ -25,7 +25,6 @@ import {
   Star,
   CheckCircle2,
   User,
-  MessageCircle,
   Filter,
   X,
   DollarSign,
@@ -37,8 +36,9 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { useToast } from "@/hooks/use-toast";
 import {
+  getCurrentClinicProfile,
+  isGatewayBackendConfigured,
   isPlatformBackendConfigured,
   listLegacyProfessionals,
 } from "@/lib/platform-backend";
@@ -46,6 +46,7 @@ import {
   DEFAULT_SPECIALTY_OPTIONS,
   fetchActiveSpecialtyNames,
 } from "@/lib/admin-catalogs";
+import { StartChatButton } from "@/components/chat/StartChatButton";
 
 interface Professional {
   id: string;
@@ -69,12 +70,10 @@ export default function SearchProfessionals() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { user, userRole } = useAuth();
-  const { toast } = useToast();
   const isRTL = i18n.language === "ar";
 
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [loading, setLoading] = useState(true);
-  const [startingChat, setStartingChat] = useState<string | null>(null);
   const [clinicId, setClinicId] = useState<string | null>(null);
   const [specialtyOptions, setSpecialtyOptions] = useState(
     DEFAULT_SPECIALTY_OPTIONS,
@@ -84,6 +83,19 @@ export default function SearchProfessionals() {
   useEffect(() => {
     const fetchClinicId = async () => {
       if (user && userRole === "clinic") {
+        if (isGatewayBackendConfigured()) {
+          try {
+            const clinic = await getCurrentClinicProfile({
+              user,
+              userRole: "clinic",
+            });
+            setClinicId(clinic.id);
+            return;
+          } catch (error) {
+            console.warn("Falling back to legacy clinic id lookup", error);
+          }
+        }
+
         const { data } = await backendDb
           .from("clinics")
           .select("id")
@@ -524,60 +536,16 @@ export default function SearchProfessionals() {
                     {t("searchProfessionals.viewProfile")}
                   </Button>
                   {user && userRole === "clinic" && clinicId && (
-                    <Button
+                    <StartChatButton
+                      targetType="professional"
+                      targetId={pro.id}
+                      targetUserId={pro.user_id}
+                      currentProfileId={clinicId}
+                      currentUserType="clinic"
                       variant="default"
                       size="sm"
                       className="flex-1"
-                      disabled={startingChat === pro.id}
-                      onClick={async () => {
-                        setStartingChat(pro.id);
-                        try {
-                          // Check if conversation exists
-                          const { data: existing, error: fetchError } =
-                            await backendDb
-                              .from("conversations")
-                              .select("id")
-                              .eq("professional_id", pro.id)
-                              .eq("clinic_id", clinicId)
-                              .single();
-
-                          if (fetchError && fetchError.code !== "PGRST116")
-                            throw fetchError;
-
-                          let conversationId = existing?.id;
-
-                          if (!conversationId) {
-                            const { data: newConv, error: createError } =
-                              await backendDb
-                                .from("conversations")
-                                .insert({
-                                  professional_id: pro.id,
-                                  clinic_id: clinicId,
-                                })
-                                .select("id")
-                                .single();
-                            if (createError) throw createError;
-                            conversationId = newConv.id;
-                          }
-
-                          navigate(`/messages?conversation=${conversationId}`);
-                        } catch (error) {
-                          toast({
-                            variant: "destructive",
-                            title: t("chat.startError"),
-                            description:
-                              error instanceof Error
-                                ? error.message
-                                : t("chat.startError"),
-                          });
-                        } finally {
-                          setStartingChat(null);
-                        }
-                      }}
-                    >
-                      <MessageCircle className="h-4 w-4 me-1" />
-                      {t("searchProfessionals.message")}
-                    </Button>
+                    />
                   )}
                 </div>
               </CardContent>

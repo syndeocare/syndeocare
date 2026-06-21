@@ -5,6 +5,10 @@ import { backendDb } from "@/integrations/backend/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { BACKEND_CONFIG } from "@/config/backend";
 import { getGatewayAuthorizationHeaders } from "@/lib/auth-backend";
+import {
+  isGatewayBackendConfigured,
+  startGatewayConversation,
+} from "@/lib/platform-backend";
 import { Button } from "@/components/ui/button";
 import { MessageCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -85,6 +89,24 @@ export const StartChatButton = ({
         currentUserType === "professional" ? currentProfileId : targetId;
       const clinicId =
         currentUserType === "clinic" ? currentProfileId : targetId;
+
+      if (user && isGatewayBackendConfigured()) {
+        const conversation = await startGatewayConversation(
+          {
+            user,
+            userRole: currentUserType,
+            clinicId: currentUserType === "clinic" ? clinicId : undefined,
+            profileId:
+              currentUserType === "professional" ? professionalId : undefined,
+            onboardingCompleted: true,
+            verificationStatus: "verified",
+          },
+          { clinicId, professionalId },
+        );
+
+        navigate(`/messages?conversation=standard:${conversation.id}`);
+        return;
+      }
 
       // Check if conversation already exists
       const { data: existing, error: fetchError } = await backendDb

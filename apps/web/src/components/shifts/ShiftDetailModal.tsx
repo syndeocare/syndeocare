@@ -60,6 +60,7 @@ interface ShiftDetailModalProps {
   shift: Shift | null;
   profileId: string;
   verificationStatus: string;
+  currentBookingStatus?: string;
   onApplicationSuccess?: () => void;
 }
 
@@ -69,6 +70,7 @@ const ShiftDetailModal = ({
   shift,
   profileId,
   verificationStatus,
+  currentBookingStatus,
   onApplicationSuccess,
 }: ShiftDetailModalProps) => {
   const { t, i18n } = useTranslation();
@@ -81,6 +83,13 @@ const ShiftDetailModal = ({
   const { user } = useAuth();
 
   const isVerified = verificationStatus === "verified";
+  const canViewClinicIdentity = [
+    "accepted",
+    "confirmed",
+    "completed",
+    "checked_in",
+    "checked_out",
+  ].includes(currentBookingStatus ?? "");
 
   // Check for shift overlap on mount - must be before any conditional returns
   useEffect(() => {
@@ -108,8 +117,8 @@ const ShiftDetailModal = ({
 
   useEffect(() => {
     setProposal("");
-    setHasApplied(false);
-  }, [shift?.id]);
+    setHasApplied(Boolean(currentBookingStatus));
+  }, [currentBookingStatus, shift?.id]);
 
   // Early return AFTER all hooks
   if (!shift) return null;
@@ -239,7 +248,7 @@ const ShiftDetailModal = ({
       <DialogContent className="max-w-lg" dir={isRTL ? "rtl" : "ltr"}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            {shift.clinic.name}
+            {shift.title}
             {shift.is_urgent && (
               <Badge variant="destructive" className="text-xs">
                 {t("common.urgent")}
@@ -368,32 +377,51 @@ const ShiftDetailModal = ({
 
           {/* Clinic Info */}
           <Separator />
-          <Link
-            to={`/clinic/${shift.clinic.id}`}
-            className="flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/50 transition-colors group"
-          >
-            <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center">
-              <Building2 className="w-5 h-5 text-accent" />
-            </div>
-            <div className="flex-1">
-              <p className="font-medium text-foreground group-hover:text-primary transition-colors">
-                {shift.clinic.name}
-              </p>
-              {shift.clinic.address && (
-                <p className="text-sm text-muted-foreground">
-                  {shift.clinic.address}
+          {canViewClinicIdentity ? (
+            <Link
+              to={`/clinic/${shift.clinic.id}`}
+              className="flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/50 transition-colors group"
+            >
+              <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center">
+                <Building2 className="w-5 h-5 text-accent" />
+              </div>
+              <div className="flex-1">
+                <p className="font-medium text-foreground group-hover:text-primary transition-colors">
+                  {shift.clinic.name}
                 </p>
-              )}
+                {shift.clinic.address && (
+                  <p className="text-sm text-muted-foreground">
+                    {shift.clinic.address}
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {shift.clinic.rating_avg && (
+                  <Badge variant="secondary" className="text-sm">
+                    ★ {shift.clinic.rating_avg.toFixed(1)}
+                  </Badge>
+                )}
+                <ExternalLink className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+              </div>
+            </Link>
+          ) : (
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/40">
+              <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center">
+                <Building2 className="w-5 h-5 text-accent" />
+              </div>
+              <div className="flex-1">
+                <p className="font-medium text-foreground">
+                  {t("shifts.modal.clinicHidden", "Clinic hidden")}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {t(
+                    "shifts.modal.clinicHiddenDesc",
+                    "Clinic details are shared after your application is accepted.",
+                  )}
+                </p>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              {shift.clinic.rating_avg && (
-                <Badge variant="secondary" className="text-sm">
-                  ★ {shift.clinic.rating_avg.toFixed(1)}
-                </Badge>
-              )}
-              <ExternalLink className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
-            </div>
-          </Link>
+          )}
 
           {/* Verification Warning */}
           {!isVerified && (

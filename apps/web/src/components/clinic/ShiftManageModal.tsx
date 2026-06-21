@@ -96,8 +96,17 @@ const ShiftManageModal = ({
 
   useEffect(() => {
     if (open && shift) {
-      fetchApplicants();
-      fetchInvitations();
+      void fetchApplicants();
+      void fetchInvitations();
+
+      const intervalId = window.setInterval(() => {
+        void fetchApplicants();
+        void fetchInvitations();
+      }, 10000);
+
+      return () => {
+        window.clearInterval(intervalId);
+      };
     }
   }, [open, shift]);
 
