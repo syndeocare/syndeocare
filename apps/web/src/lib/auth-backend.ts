@@ -301,6 +301,21 @@ function buildGatewayDevelopmentHeaders(
   };
 }
 
+async function validateStoredGatewaySession(session: StoredGatewaySession) {
+  const principal = await requestJson<GatewayPrincipal>("/me", {
+    headers: {
+      Authorization: `Bearer ${session.tokens.accessToken}`,
+      ...buildGatewayDevelopmentHeaders(session),
+    },
+  });
+
+  return {
+    ...session,
+    legacyUserId: await resolveLegacyUserId(principal),
+    principal,
+  };
+}
+
 export function getGatewayAuthorizationHeaders(): HeadersInit | undefined {
   const session = readStoredGatewaySession();
 
@@ -499,11 +514,19 @@ export async function restoreGatewaySession() {
   const expiresAt = current.resolvedAt + current.tokens.expiresIn * 1000;
 
   if (expiresAt > Date.now() + REFRESH_SKEW_MS) {
-    return current;
+    try {
+      const validated = await validateStoredGatewaySession(current);
+      writeStoredSession(validated);
+      return validated;
+    } catch {
+      clearStoredGatewaySession();
+      return null;
+    }
   }
 
   try {
-    return await refreshStoredGatewaySession();
+    const refreshed = await refreshStoredGatewaySession();
+    return refreshed ? await validateStoredGatewaySession(refreshed) : null;
   } catch {
     clearStoredGatewaySession();
     return null;

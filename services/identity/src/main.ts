@@ -673,6 +673,21 @@ async function ensureKeycloakFirstBrokerAutoLink(adminAccessToken: string) {
     "REQUIRED",
   );
 
+  let createUserExecution = userCreationExecutions.find(
+    (execution) =>
+      execution.level === 0 &&
+      execution.providerId === "idp-create-user-if-unique",
+  );
+
+  if (createUserExecution) {
+    await updateKeycloakAuthenticationExecutionRequirement(
+      adminAccessToken,
+      userCreationFlowAlias,
+      createUserExecution,
+      "ALTERNATIVE",
+    );
+  }
+
   while ((detectExistingExecution.index ?? 0) > 0) {
     await raiseKeycloakAuthenticationExecutionPriority(
       adminAccessToken,
@@ -697,15 +712,27 @@ async function ensureKeycloakFirstBrokerAutoLink(adminAccessToken: string) {
     userCreationExecutions.find(
       (execution) => execution.displayName === autoLinkSubflowAlias,
     ) ?? autoLinkSubflow;
-  while ((autoLinkSubflow.index ?? 0) > 0) {
+  createUserExecution =
+    userCreationExecutions.find(
+      (execution) =>
+        execution.level === 0 &&
+        execution.providerId === "idp-create-user-if-unique",
+    ) ?? createUserExecution;
+  while (createUserExecution && (createUserExecution.index ?? 0) > 0) {
     await raiseKeycloakAuthenticationExecutionPriority(
       adminAccessToken,
-      autoLinkSubflow,
+      createUserExecution,
     );
     userCreationExecutions = await getKeycloakAuthenticationExecutions(
       adminAccessToken,
       userCreationFlowAlias,
     );
+    createUserExecution =
+      userCreationExecutions.find(
+        (execution) =>
+          execution.level === 0 &&
+          execution.providerId === "idp-create-user-if-unique",
+      ) ?? createUserExecution;
     autoLinkSubflow =
       userCreationExecutions.find(
         (execution) => execution.displayName === autoLinkSubflowAlias,

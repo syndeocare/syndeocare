@@ -261,6 +261,9 @@ function mapBooking(item: any) {
 }
 
 function mapConversation(item: any) {
+  const counterpartRole = item.counterpartRole ?? item.counterpart_role ?? null;
+  const displayName = item.displayName ?? item.display_name ?? null;
+
   return {
     ...item,
     id: item.id,
@@ -268,8 +271,15 @@ function mapConversation(item: any) {
     professional_id: item.professionalId ?? item.professional_id ?? null,
     clinic_id: item.clinicId ?? item.clinic_id ?? null,
     admin_id: item.adminSubject ?? item.admin_id ?? null,
-    display_name: item.displayName ?? item.display_name ?? null,
-    counterpart_role: item.counterpartRole ?? item.counterpart_role ?? null,
+    admin_display_name:
+      item.adminDisplayName ?? item.admin_display_name ?? displayName,
+    admin_email: item.adminEmail ?? item.admin_email ?? null,
+    target_type: item.targetType ?? item.target_type ?? counterpartRole,
+    target_profile_id:
+      item.targetProfileId ?? item.target_profile_id ?? item.professionalId,
+    target_clinic_id: item.targetClinicId ?? item.target_clinic_id,
+    display_name: displayName,
+    counterpart_role: counterpartRole,
     last_message_at: item.lastMessageAt ?? item.last_message_at,
     created_at: item.createdAt ?? item.created_at ?? item.lastMessageAt,
     updated_at: item.updatedAt ?? item.updated_at ?? item.lastMessageAt,
@@ -277,12 +287,20 @@ function mapConversation(item: any) {
 }
 
 function mapMessage(item: any) {
+  const conversationId = item.conversationId ?? item.conversation_id;
+  const senderActorId =
+    item.senderActorId ?? item.senderSubject ?? item.sender_id;
+  const senderRole = item.senderRole ?? item.sender_type ?? item.sender_role;
+
   return {
     ...item,
     id: item.id,
-    conversation_id: item.conversationId ?? item.conversation_id,
-    sender_id: item.senderActorId ?? item.senderSubject ?? item.sender_id,
-    sender_type: item.senderRole ?? item.sender_type,
+    conversation_id: conversationId,
+    admin_conversation_id: item.admin_conversation_id ?? conversationId,
+    sender_id: senderActorId,
+    sender_user_id: item.sender_user_id ?? senderActorId,
+    sender_type: senderRole,
+    sender_role: senderRole,
     content: item.content ?? item.body ?? "",
     is_read: item.isRead ?? item.is_read ?? false,
     message_type: item.messageType ?? item.message_type ?? "text",

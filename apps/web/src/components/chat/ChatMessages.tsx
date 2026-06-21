@@ -276,6 +276,24 @@ export const ChatMessages = ({
 
         if (error || !convData) return;
 
+        const fallbackConversation: ConversationDetails = {
+          id: convData.id,
+          kind: "admin",
+          otherName:
+            convData.display_name ||
+            convData.admin_display_name ||
+            convData.admin_email ||
+            t("chat.adminSupport"),
+          otherAvatar: null,
+          otherType:
+            convData.counterpart_role === "clinic"
+              ? "clinic"
+              : convData.counterpart_role === "professional"
+                ? "professional"
+                : "admin",
+          otherVerificationStatus: null,
+        };
+
         if (userType === "admin") {
           if (
             convData.target_type === "professional" &&
@@ -299,10 +317,15 @@ export const ChatMessages = ({
             return;
           }
 
+          if (!convData.target_clinic_id) {
+            setConversation(fallbackConversation);
+            return;
+          }
+
           const { data: clinic } = await backendDb
             .from("clinics")
             .select("name, logo_url, verification_status")
-            .eq("id", convData.target_clinic_id!)
+            .eq("id", convData.target_clinic_id)
             .single();
 
           setConversation({
@@ -313,6 +336,11 @@ export const ChatMessages = ({
             otherType: "clinic",
             otherVerificationStatus: clinic?.verification_status ?? null,
           });
+          return;
+        }
+
+        if (convData.display_name && !convData.admin_display_name) {
+          setConversation(fallbackConversation);
           return;
         }
 

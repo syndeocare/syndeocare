@@ -209,6 +209,28 @@ export const ChatList = ({
             .limit(1)
             .maybeSingle();
 
+          const fallbackAdminItem = {
+            id: `admin:${conv.id}`,
+            kind: "admin" as const,
+            last_message_at: conv.last_message_at,
+            display_name:
+              conv.display_name ||
+              conv.admin_display_name ||
+              conv.admin_email ||
+              t("chat.adminSupport"),
+            avatar_url: null,
+            counterpart_type:
+              conv.counterpart_role === "clinic"
+                ? ("clinic" as const)
+                : conv.counterpart_role === "professional"
+                  ? ("professional" as const)
+                  : ("admin" as const),
+            counterpart_verification_status: null,
+            unread_count: unreadCount || 0,
+            last_message: lastMsg?.content,
+            last_file_type: lastMsg?.file_type,
+          };
+
           if (userType === "admin") {
             if (conv.target_type === "professional" && conv.target_profile_id) {
               const { data: professional } = await backendDb
@@ -232,10 +254,14 @@ export const ChatList = ({
               };
             }
 
+            if (!conv.target_clinic_id) {
+              return fallbackAdminItem;
+            }
+
             const { data: clinic } = await backendDb
               .from("clinics")
               .select("name, logo_url, verification_status")
-              .eq("id", conv.target_clinic_id!)
+              .eq("id", conv.target_clinic_id)
               .single();
 
             return {
@@ -251,6 +277,10 @@ export const ChatList = ({
               last_message: lastMsg?.content,
               last_file_type: lastMsg?.file_type,
             };
+          }
+
+          if (!conv.admin_display_name && conv.display_name) {
+            return fallbackAdminItem;
           }
 
           return {
