@@ -76,7 +76,11 @@ async function checkOnboardingStatus(
         userRole: role,
       } satisfies BackendActorBridge);
 
-      return status.onboardingCompleted;
+      return (
+        status.onboardingCompleted ||
+        (status.verificationStatus !== "rejected" &&
+          Boolean(status.submittedAt))
+      );
     } catch (error) {
       console.warn("Unable to load gateway onboarding status", error);
     }

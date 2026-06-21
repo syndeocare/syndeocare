@@ -76,8 +76,29 @@ function mapLegacyVerificationStatus(
   }
 }
 
+function resolveOnboardingCompleted(input: {
+  actor: Pick<
+    typeof actors.$inferSelect,
+    "onboardingCompleted" | "role" | "verificationStatus"
+  >;
+  onboarding?: Pick<
+    typeof onboardingRecords.$inferSelect,
+    "submittedAt"
+  > | null;
+}) {
+  if (input.actor.role === "admin" || input.actor.onboardingCompleted) {
+    return true;
+  }
+
+  return (
+    input.actor.verificationStatus !== "rejected" &&
+    Boolean(input.onboarding?.submittedAt)
+  );
+}
+
 function mapProfessionalProfileSummary(row: {
   actor: typeof actors.$inferSelect;
+  onboarding?: typeof onboardingRecords.$inferSelect | null;
   profile: typeof professionalProfiles.$inferSelect;
 }): ProfessionalProfileSummary {
   return {
@@ -92,7 +113,10 @@ function mapProfessionalProfileSummary(row: {
     languages: row.profile.languages,
     rating: numericToNumber(row.profile.rating),
     verificationStatus: row.actor.verificationStatus,
-    onboardingCompleted: row.actor.onboardingCompleted,
+    onboardingCompleted: resolveOnboardingCompleted({
+      actor: row.actor,
+      onboarding: row.onboarding,
+    }),
     profileImageUrl: row.profile.profileImageUrl ?? undefined,
     city: row.profile.city,
     region: row.profile.region,
@@ -109,6 +133,7 @@ function mapProfessionalProfileSummary(row: {
 function mapClinicProfileSummary(row: {
   actor: typeof actors.$inferSelect;
   clinic: typeof clinicProfiles.$inferSelect;
+  onboarding?: typeof onboardingRecords.$inferSelect | null;
 }): ClinicProfileSummary {
   return {
     id: row.clinic.id,
@@ -123,7 +148,10 @@ function mapClinicProfileSummary(row: {
     latitude: numericToNumber(row.clinic.latitude),
     longitude: numericToNumber(row.clinic.longitude),
     verificationStatus: row.actor.verificationStatus,
-    onboardingCompleted: row.actor.onboardingCompleted,
+    onboardingCompleted: resolveOnboardingCompleted({
+      actor: row.actor,
+      onboarding: row.onboarding,
+    }),
     logoUrl: row.clinic.logoUrl ?? undefined,
     openRoles: row.clinic.openRoles,
     rating: numericToNumber(row.clinic.rating),
@@ -258,7 +286,7 @@ export async function getAuthPrincipalBySubject(
     permissions: [],
     clinicId: clinicRow?.id,
     profileId: professionalRow?.id,
-    onboardingCompleted: aggregate.actor.onboardingCompleted,
+    onboardingCompleted: resolveOnboardingCompleted(aggregate),
     verificationStatus: aggregate.actor.verificationStatus,
     displayName: aggregate.actor.displayName ?? undefined,
     profileImageUrl:
@@ -287,7 +315,7 @@ export async function getOnboardingStatusBySubject(
 
   return {
     role: aggregate.actor.role,
-    onboardingCompleted: aggregate.actor.onboardingCompleted,
+    onboardingCompleted: resolveOnboardingCompleted(aggregate),
     verificationStatus: aggregate.actor.verificationStatus,
     requiredDocuments: aggregate.onboarding.requiredDocuments,
     missingDocuments: aggregate.onboarding.missingDocuments,
@@ -583,6 +611,7 @@ export async function getProfessionalProfileBySubject(
   const rows = await db
     .select({
       actor: actors,
+      onboarding: onboardingRecords,
       profile: professionalProfiles,
     })
     .from(actors)
@@ -590,6 +619,7 @@ export async function getProfessionalProfileBySubject(
       professionalProfiles,
       eq(professionalProfiles.actorId, actors.id),
     )
+    .leftJoin(onboardingRecords, eq(onboardingRecords.actorId, actors.id))
     .where(
       and(eq(actors.authSubject, subject), eq(actors.role, "professional")),
     )
@@ -612,9 +642,11 @@ export async function getClinicProfileBySubject(
     .select({
       actor: actors,
       clinic: clinicProfiles,
+      onboarding: onboardingRecords,
     })
     .from(actors)
     .innerJoin(clinicProfiles, eq(clinicProfiles.actorId, actors.id))
+    .leftJoin(onboardingRecords, eq(onboardingRecords.actorId, actors.id))
     .where(and(eq(actors.authSubject, subject), eq(actors.role, "clinic")))
     .limit(1);
 
@@ -1037,7 +1069,7 @@ export async function updateOnboardingBySubject(
   const db = getDb();
   const now = new Date();
   const shouldMarkComplete =
-    input.submitForReview && input.missingDocuments.length === 0;
+    aggregate.actor.onboardingCompleted || input.submitForReview;
 
   await db.transaction(async (tx) => {
     await tx
