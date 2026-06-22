@@ -332,9 +332,10 @@ resource "aws_lb_listener" "https" {
 resource "aws_route53_record" "api_alias" {
   count = local.tls_enabled ? 1 : 0
 
-  zone_id = data.aws_route53_zone.api[0].zone_id
-  name    = var.api_domain_name
-  type    = "A"
+  zone_id         = data.aws_route53_zone.api[0].zone_id
+  name            = var.api_domain_name
+  type            = "A"
+  allow_overwrite = true
 
   alias {
     evaluate_target_health = true
