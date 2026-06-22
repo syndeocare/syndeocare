@@ -58,6 +58,11 @@ variable "notifications_image" {
   default = "public.ecr.aws/docker/library/nginx:stable-alpine"
 }
 
+variable "messaging_image" {
+  type    = string
+  default = "public.ecr.aws/docker/library/nginx:stable-alpine"
+}
+
 variable "keycloak_base_url" {
   type    = string
   default = "https://auth.staging.syndeocare.example.com"
@@ -423,6 +428,35 @@ module "notifications_service" {
   tags = local.tags
 }
 
+module "messaging_service" {
+  source                           = "../../modules/ecs-service"
+  name                             = "${local.name}-messaging"
+  cluster_arn                      = module.event_backbone.cluster_arn
+  vpc_id                           = module.vpc.vpc_id
+  private_subnet_ids               = module.vpc.private_subnet_ids
+  allowed_cidr_blocks              = [module.vpc.vpc_cidr_block]
+  enable_service_discovery         = true
+  service_discovery_namespace_id   = module.event_backbone.service_discovery_namespace_id
+  service_discovery_namespace_name = module.event_backbone.service_discovery_namespace_name
+  discovery_name                   = "messaging"
+  image                            = var.messaging_image
+  container_name                   = "messaging"
+  container_port                   = 4116
+  desired_count                    = 2
+  health_check_path                = "/health"
+  environment = {
+    NODE_ENV    = "production"
+    PORT        = "4116"
+    SERVICE_DIR = "services/messaging"
+    NATS_URL    = module.event_backbone.nats_url
+  }
+  secrets = {
+    DATABASE_URL           = "${module.postgres.secret_arn}:url::"
+    INTERNAL_SERVICE_TOKEN = "${aws_secretsmanager_secret.runtime.arn}:internal_service_token::"
+  }
+  tags = local.tags
+}
+
 module "identity_service" {
   source                           = "../../modules/ecs-service"
   name                             = "${local.name}-identity"
@@ -580,6 +614,7 @@ module "api_gateway_service" {
     KEYCLOAK_PUBLIC_CLIENT_ID      = var.keycloak_public_client_id
     SERVICE_CLINICS_URL            = "http://${module.clinics_service.service_discovery_service_name}:4113"
     SERVICE_IDENTITY_URL           = "http://${module.identity_service.service_discovery_service_name}:4111"
+    SERVICE_MESSAGING_URL          = "http://${module.messaging_service.service_discovery_service_name}:4116"
     SERVICE_PROFILES_URL           = "http://${module.profiles_service.service_discovery_service_name}:4112"
     SERVICE_SCHEDULING_URL         = "http://${module.scheduling_service.service_discovery_service_name}:4114"
     STORAGE_ENDPOINT               = ""

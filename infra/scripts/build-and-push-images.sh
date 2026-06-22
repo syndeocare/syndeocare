@@ -21,6 +21,7 @@ pnpm --filter @repo/profiles-service... build
 pnpm --filter @repo/clinics-service... build
 pnpm --filter @repo/scheduling-service... build
 pnpm --filter @repo/notifications-service... build
+pnpm --filter @repo/messaging-service... build
 
 aws ecr describe-repositories --repository-names "$REPOSITORY" --region "$AWS_REGION" >/dev/null 2>&1 \
   || aws ecr create-repository --repository-name "$REPOSITORY" --region "$AWS_REGION" >/dev/null
@@ -42,3 +43,4 @@ printf '%s=%s\n' "PROFILES_IMAGE" "$IMAGE_URI"
 printf '%s=%s\n' "CLINICS_IMAGE" "$IMAGE_URI"
 printf '%s=%s\n' "SCHEDULING_IMAGE" "$IMAGE_URI"
 printf '%s=%s\n' "NOTIFICATIONS_IMAGE" "$IMAGE_URI"
+printf '%s=%s\n' "MESSAGING_IMAGE" "$IMAGE_URI"
