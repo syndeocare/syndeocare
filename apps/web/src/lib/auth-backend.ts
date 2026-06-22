@@ -593,7 +593,10 @@ export async function confirmEmailVerification(token: string) {
   });
 }
 
-export async function updateGatewayPassword(password: string) {
+export async function updateGatewayPassword(
+  currentPassword: string,
+  password: string,
+) {
   const headers = getGatewayAuthorizationHeaders();
 
   if (!headers) {
@@ -601,7 +604,7 @@ export async function updateGatewayPassword(password: string) {
   }
 
   return requestJson("/auth/password", {
-    body: JSON.stringify({ password }),
+    body: JSON.stringify({ currentPassword, password }),
     headers: {
       "content-type": "application/json",
       ...headers,

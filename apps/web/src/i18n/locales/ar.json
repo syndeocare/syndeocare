@@ -1158,6 +1158,8 @@
     "email": "البريد الإلكتروني",
     "changePassword": "تغيير كلمة المرور",
     "changePasswordDesc": "حدّث كلمة المرور مع البقاء مسجلاً للدخول.",
+    "currentPassword": "كلمة المرور الحالية",
+    "currentPasswordRequired": "أدخل كلمة المرور الحالية أولاً.",
     "newPassword": "كلمة المرور الجديدة",
     "confirmNewPassword": "تأكيد كلمة المرور الجديدة",
     "updatePassword": "تحديث كلمة المرور",

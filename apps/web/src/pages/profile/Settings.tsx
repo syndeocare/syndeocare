@@ -155,6 +155,7 @@ export default function Settings() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
+    currentPassword: "",
     newPassword: "",
     confirmPassword: "",
   });
@@ -164,6 +165,15 @@ export default function Settings() {
 
   const handleChangePassword = async () => {
     if (!user) return;
+
+    if (passwordForm.currentPassword.length < AUTH_CONFIG.minPasswordLength) {
+      toast({
+        variant: "destructive",
+        title: t("settings.passwordUpdateFailed"),
+        description: t("settings.currentPasswordRequired"),
+      });
+      return;
+    }
 
     if (passwordForm.newPassword.length < AUTH_CONFIG.minPasswordLength) {
       toast({
@@ -185,9 +195,16 @@ export default function Settings() {
 
     setIsUpdatingPassword(true);
     try {
-      await updateGatewayPassword(passwordForm.newPassword);
+      await updateGatewayPassword(
+        passwordForm.currentPassword,
+        passwordForm.newPassword,
+      );
 
-      setPasswordForm({ newPassword: "", confirmPassword: "" });
+      setPasswordForm({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
       toast({
         title: t("settings.passwordUpdated"),
         description: t("settings.passwordUpdatedDesc"),
@@ -483,6 +500,27 @@ export default function Settings() {
               </div>
 
               <FormField
+                label={t("settings.currentPassword")}
+                htmlFor="settings-current-password"
+                required
+              >
+                <Input
+                  id="settings-current-password"
+                  type="password"
+                  value={passwordForm.currentPassword}
+                  onChange={(event) =>
+                    setPasswordForm((current) => ({
+                      ...current,
+                      currentPassword: event.target.value,
+                    }))
+                  }
+                  placeholder={t("settings.currentPassword")}
+                  className="h-11"
+                  autoComplete="current-password"
+                />
+              </FormField>
+
+              <FormField
                 label={t("settings.newPassword")}
                 htmlFor="settings-new-password"
                 required
@@ -498,6 +536,7 @@ export default function Settings() {
                   }
                   placeholder={t("auth.createPasswordPlaceholder")}
                   className="h-11"
+                  autoComplete="new-password"
                   showStrength
                 />
               </FormField>
@@ -519,6 +558,7 @@ export default function Settings() {
                   }
                   placeholder={t("settings.confirmNewPassword")}
                   className="h-11"
+                  autoComplete="new-password"
                 />
               </FormField>
 

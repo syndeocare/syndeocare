@@ -185,6 +185,7 @@ export const authEmailOtpConfirmInputSchema = z.object({
 });
 
 export const authPasswordUpdateInputSchema = z.object({
+  currentPassword: z.string().min(8),
   password: z.string().min(8),
 });
 

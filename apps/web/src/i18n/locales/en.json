@@ -1158,6 +1158,8 @@
     "email": "Email",
     "changePassword": "Change password",
     "changePasswordDesc": "Update your password while staying signed in.",
+    "currentPassword": "Current password",
+    "currentPasswordRequired": "Enter your current password first.",
     "newPassword": "New password",
     "confirmNewPassword": "Confirm new password",
     "updatePassword": "Update password",

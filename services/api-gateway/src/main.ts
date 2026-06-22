@@ -1238,7 +1238,7 @@ void startService({
         if (!parsedBody.success) {
           return reply.code(400).send({
             code: "VALIDATION_ERROR",
-            message: "A valid password is required.",
+            message: "A valid current password and new password are required.",
           });
         }
 

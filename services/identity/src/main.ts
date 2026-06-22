@@ -129,6 +129,12 @@ const authEmailActionTokenSchema = z.object({
 
 const EMAIL_OTP_TTL_SECONDS = 10 * 60;
 
+class InvalidCurrentPasswordError extends Error {
+  constructor() {
+    super("The current password is incorrect.");
+  }
+}
+
 function getKeycloakConfig() {
   return {
     adminPassword: process.env.KEYCLOAK_ADMIN_PASSWORD ?? "admin",
@@ -1531,6 +1537,41 @@ async function exchangePasswordForSession(
   );
 }
 
+async function verifyKeycloakUserPassword(
+  adminAccessToken: string,
+  userId: string,
+  password: string,
+) {
+  const config = getKeycloakConfig();
+  const user = await getKeycloakUser(adminAccessToken, userId);
+  const username = user.email ?? user.username;
+
+  if (!username) {
+    throw new Error("Keycloak user has no login identifier.");
+  }
+
+  const { response } = await requestKeycloakForm(
+    `${config.baseUrl}/realms/${config.realm}/protocol/openid-connect/token`,
+    new URLSearchParams({
+      client_id: config.publicClientId,
+      grant_type: "password",
+      password,
+      scope: "openid profile email",
+      username,
+    }),
+  );
+
+  if (response.status === 400 || response.status === 401) {
+    return false;
+  }
+
+  if (!response.ok) {
+    throw new Error("Keycloak current password verification failed.");
+  }
+
+  return true;
+}
+
 async function exchangePasswordForSessionWithRetry(
   input: z.infer<typeof authSignInInputSchema>,
   fallbackRole: z.infer<typeof authSignUpInputSchema>["role"],
@@ -2133,10 +2174,21 @@ async function confirmEmailOtp(
 }
 
 async function updateActorPassword(options: {
+  currentPassword: string;
   password: string;
   subject: string;
 }) {
   const adminAccessToken = await getAdminAccessToken();
+  const currentPasswordValid = await verifyKeycloakUserPassword(
+    adminAccessToken,
+    options.subject,
+    options.currentPassword,
+  );
+
+  if (!currentPasswordValid) {
+    throw new InvalidCurrentPasswordError();
+  }
+
   await resetKeycloakUserPassword(
     adminAccessToken,
     options.subject,
@@ -2795,10 +2847,18 @@ void startService({
 
       try {
         return await updateActorPassword({
+          currentPassword: parsedBody.data.currentPassword,
           password: parsedBody.data.password,
           subject: parsedSubject.data.subject,
         });
       } catch (error) {
+        if (error instanceof InvalidCurrentPasswordError) {
+          return reply.code(401).send({
+            code: "AUTH_CURRENT_PASSWORD_INVALID",
+            message: error.message,
+          });
+        }
+
         return reply.code(503).send({
           code: "AUTH_PROVIDER_UNAVAILABLE",
           message:
