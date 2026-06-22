@@ -427,6 +427,7 @@ module "notifications_service" {
     RESEND_TEST_EMAIL = var.resend_test_email
   }
   secrets = {
+    DATABASE_URL           = "${module.postgres.secret_arn}:url::"
     INTERNAL_SERVICE_TOKEN = "${aws_secretsmanager_secret.runtime.arn}:internal_service_token::"
     RESEND_API_KEY         = "${aws_secretsmanager_secret.runtime.arn}:resend_api_key::"
   }
