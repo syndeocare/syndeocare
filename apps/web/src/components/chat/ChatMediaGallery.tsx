@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { backendDb } from "@/integrations/backend/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -54,9 +54,35 @@ export const ChatMediaGallery = ({
     Record<string, string>
   >({});
 
+  const fetchMedia = useCallback(async () => {
+    setLoading(true);
+    try {
+      const table =
+        conversationKind === "admin" ? "admin_messages" : "messages";
+      const conversationColumn =
+        conversationKind === "admin"
+          ? "admin_conversation_id"
+          : "conversation_id";
+      const { data, error } = await backendDb
+        .from(table)
+        .select(
+          "id, file_url, file_name, file_type, file_size, created_at, content",
+        )
+        .eq(conversationColumn, conversationId)
+        .not("file_url", "is", null)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      setMediaItems(data || []);
+    } catch (error) {
+      console.error("Error fetching media:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [conversationId, conversationKind]);
+
   useEffect(() => {
     if (isOpen) void fetchMedia();
-  }, [isOpen, conversationId, conversationKind]);
+  }, [fetchMedia, isOpen]);
 
   useEffect(() => {
     const s3Urls = Array.from(
@@ -103,32 +129,6 @@ export const ChatMediaGallery = ({
       cancelled = true;
     };
   }, [conversationId, isOpen, mediaItems, resolvedMediaUrls]);
-
-  const fetchMedia = async () => {
-    setLoading(true);
-    try {
-      const table =
-        conversationKind === "admin" ? "admin_messages" : "messages";
-      const conversationColumn =
-        conversationKind === "admin"
-          ? "admin_conversation_id"
-          : "conversation_id";
-      const { data, error } = await backendDb
-        .from(table)
-        .select(
-          "id, file_url, file_name, file_type, file_size, created_at, content",
-        )
-        .eq(conversationColumn, conversationId)
-        .not("file_url", "is", null)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      setMediaItems(data || []);
-    } catch (error) {
-      console.error("Error fetching media:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const images = mediaItems.filter((i) => i.file_type?.startsWith("image/"));
   const videos = mediaItems.filter(

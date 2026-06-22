@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -59,11 +59,7 @@ const SpecialtiesManagement = () => {
     is_active: true,
   });
 
-  useEffect(() => {
-    fetchItems();
-  }, []);
-
-  const fetchItems = async () => {
+  const fetchItems = useCallback(async () => {
     setIsLoading(true);
     try {
       setItems(await listAdminCatalogItems("specialty"));
@@ -75,7 +71,11 @@ const SpecialtiesManagement = () => {
       });
     }
     setIsLoading(false);
-  };
+  }, [t, toast]);
+
+  useEffect(() => {
+    void fetchItems();
+  }, [fetchItems]);
 
   const openDialog = (s?: Specialty) => {
     if (s) {
@@ -117,7 +117,7 @@ const SpecialtiesManagement = () => {
         toast({ title: t("admin.config.specialtyCreated") });
       }
       setIsDialogOpen(false);
-      fetchItems();
+      await fetchItems();
     } catch (err: any) {
       toast({
         variant: "destructive",
@@ -134,7 +134,7 @@ const SpecialtiesManagement = () => {
     try {
       await deleteAdminCatalogItem(s.id);
       toast({ title: t("admin.config.specialtyDeleted") });
-      fetchItems();
+      await fetchItems();
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -155,7 +155,7 @@ const SpecialtiesManagement = () => {
         isActive: !s.is_active,
         displayOrder: s.display_order,
       });
-      fetchItems();
+      await fetchItems();
     } catch (err: any) {
       toast({
         variant: "destructive",

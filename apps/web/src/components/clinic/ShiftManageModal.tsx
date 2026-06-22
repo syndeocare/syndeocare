@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
@@ -94,24 +94,9 @@ const ShiftManageModal = ({
   const { toast } = useToast();
   const { user } = useAuth();
 
-  useEffect(() => {
-    if (open && shift) {
-      void fetchApplicants();
-      void fetchInvitations();
-
-      const intervalId = window.setInterval(() => {
-        void fetchApplicants();
-        void fetchInvitations();
-      }, 10000);
-
-      return () => {
-        window.clearInterval(intervalId);
-      };
-    }
-  }, [open, shift]);
-
-  const fetchInvitations = async () => {
+  const fetchInvitations = useCallback(async () => {
     if (!shift) return;
+
     if (isGatewayBackendConfigured() && shift.source === "platform") {
       setInvitations([]);
       return;
@@ -137,9 +122,9 @@ const ShiftManageModal = ({
       );
       setInvitations(enriched);
     }
-  };
+  }, [shift]);
 
-  const fetchApplicants = async () => {
+  const fetchApplicants = useCallback(async () => {
     if (!shift) return;
 
     setIsLoading(true);
@@ -209,7 +194,25 @@ const ShiftManageModal = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [clinicId, shift, t, toast, user]);
+
+  useEffect(() => {
+    if (!open || !shift) {
+      return;
+    }
+
+    void fetchApplicants();
+    void fetchInvitations();
+
+    const intervalId = window.setInterval(() => {
+      void fetchApplicants();
+      void fetchInvitations();
+    }, 10000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [fetchApplicants, fetchInvitations, open, shift]);
 
   const handleAccept = async (bookingId: string) => {
     setUpdatingId(bookingId);
@@ -329,7 +332,7 @@ const ShiftManageModal = ({
         description: t("shifts.modal.applicantAcceptedDesc"),
       });
 
-      fetchApplicants();
+      await fetchApplicants();
       onUpdate?.();
     } catch (error: any) {
       toast({
@@ -411,7 +414,7 @@ const ShiftManageModal = ({
         description: t("shifts.modal.applicantDeclinedDesc"),
       });
 
-      fetchApplicants();
+      await fetchApplicants();
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -694,7 +697,7 @@ const ShiftManageModal = ({
             onOpenChange={setShowInviteModal}
             shiftId={shift.id}
             clinicId={clinicId}
-            onSuccess={() => fetchInvitations()}
+            onSuccess={() => void fetchInvitations()}
           />
         )}
       </DialogContent>

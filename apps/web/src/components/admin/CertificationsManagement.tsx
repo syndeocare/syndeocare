@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,11 +53,7 @@ const CertificationsManagement = () => {
     is_active: true,
   });
 
-  useEffect(() => {
-    fetchCertifications();
-  }, []);
-
-  const fetchCertifications = async () => {
+  const fetchCertifications = useCallback(async () => {
     try {
       setCertifications(await listAdminCatalogItems("certification"));
     } catch (error: any) {
@@ -69,7 +65,11 @@ const CertificationsManagement = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [t, toast]);
+
+  useEffect(() => {
+    void fetchCertifications();
+  }, [fetchCertifications]);
 
   const handleOpenDialog = (cert?: Certification) => {
     if (cert) {
@@ -117,7 +117,7 @@ const CertificationsManagement = () => {
       }
 
       setIsDialogOpen(false);
-      fetchCertifications();
+      await fetchCertifications();
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -135,7 +135,7 @@ const CertificationsManagement = () => {
     try {
       await deleteAdminCatalogItem(cert.id);
       toast({ title: t("admin.config.certificationDeleted") });
-      fetchCertifications();
+      await fetchCertifications();
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -156,7 +156,7 @@ const CertificationsManagement = () => {
         description: cert.description,
         isActive: !cert.is_active,
       });
-      fetchCertifications();
+      await fetchCertifications();
     } catch (error: any) {
       toast({
         variant: "destructive",

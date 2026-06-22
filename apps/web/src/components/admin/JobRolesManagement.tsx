@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -60,11 +60,7 @@ const JobRolesManagement = () => {
     is_active: true,
   });
 
-  useEffect(() => {
-    fetchRoles();
-  }, []);
-
-  const fetchRoles = async () => {
+  const fetchRoles = useCallback(async () => {
     try {
       setRoles(await listAdminCatalogItems("job_role"));
     } catch (error: any) {
@@ -76,7 +72,11 @@ const JobRolesManagement = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [t, toast]);
+
+  useEffect(() => {
+    void fetchRoles();
+  }, [fetchRoles]);
 
   const handleOpenDialog = (role?: JobRole) => {
     if (role) {
@@ -129,7 +129,7 @@ const JobRolesManagement = () => {
       }
 
       setIsDialogOpen(false);
-      fetchRoles();
+      await fetchRoles();
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -147,7 +147,7 @@ const JobRolesManagement = () => {
     try {
       await deleteAdminCatalogItem(role.id);
       toast({ title: t("admin.config.roleDeleted") });
-      fetchRoles();
+      await fetchRoles();
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -168,7 +168,7 @@ const JobRolesManagement = () => {
         isActive: !role.is_active,
         displayOrder: role.display_order,
       });
-      fetchRoles();
+      await fetchRoles();
     } catch (error: any) {
       toast({
         variant: "destructive",

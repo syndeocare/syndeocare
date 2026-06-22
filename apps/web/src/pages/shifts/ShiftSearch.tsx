@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -120,21 +120,62 @@ const ShiftSearch = () => {
   const { user, userRole, isOnboardingComplete } = useAuth();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    fetchProfile();
-  }, [user]);
+  const fetchBookedShifts = useCallback(
+    async (profileId: string, verificationStatus?: string) => {
+      const bookedIds = new Set<string>();
+      const nextBookingStatusByShiftId: Record<string, string> = {};
 
-  useEffect(() => {
-    void fetchActiveJobRoleNames().then((roles) =>
-      setRoleOptions(withAllOption(roles)),
-    );
-  }, []);
+      if (user && isGatewayBackendConfigured()) {
+        try {
+          const bookings = await listLegacyBookings({
+            user,
+            userRole: "professional",
+            profileId,
+            verificationStatus:
+              verificationStatus === "verified"
+                ? "verified"
+                : verificationStatus === "rejected"
+                  ? "rejected"
+                  : "pending",
+          });
 
-  useEffect(() => {
-    fetchShifts();
-  }, [filters, profile, bookedShiftIds]);
+          bookings
+            .filter((booking) =>
+              ["requested", "accepted", "confirmed"].includes(booking.status),
+            )
+            .forEach((booking) => {
+              bookedIds.add(booking.shift.id);
+              nextBookingStatusByShiftId[booking.shift.id] = booking.status;
+            });
+        } catch (error) {
+          console.warn(
+            "Falling back to backend database booking lookup",
+            error,
+          );
+        }
+      }
 
-  const fetchProfile = async () => {
+      // Get all active bookings (requested, accepted, confirmed, checked_in)
+      const { data: bookings } = await backendDb
+        .from("bookings")
+        .select("shift_id, status")
+        .eq("professional_id", profileId)
+        .in("status", ["requested", "accepted", "confirmed", "checked_in"]);
+
+      if (bookings) {
+        bookings.forEach((booking) => {
+          bookedIds.add(booking.shift_id);
+          nextBookingStatusByShiftId[booking.shift_id] = booking.status;
+        });
+      }
+
+      setBookingStatusByShiftId(nextBookingStatusByShiftId);
+      setBookedShiftIds(Array.from(bookedIds));
+    },
+    [user],
+  );
+
+  const fetchProfile = useCallback(async () => {
     if (!user) return;
     if (isGatewayBackendConfigured()) {
       try {
@@ -163,61 +204,19 @@ const ShiftSearch = () => {
       setProfile(data);
       await fetchBookedShifts(data.id, data.verification_status);
     }
-  };
+  }, [fetchBookedShifts, user]);
 
-  const fetchBookedShifts = async (
-    profileId: string,
-    verificationStatus?: string,
-  ) => {
-    const bookedIds = new Set<string>();
-    const nextBookingStatusByShiftId: Record<string, string> = {};
+  useEffect(() => {
+    void fetchProfile();
+  }, [fetchProfile]);
 
-    if (user && isGatewayBackendConfigured()) {
-      try {
-        const bookings = await listLegacyBookings({
-          user,
-          userRole: "professional",
-          profileId,
-          verificationStatus:
-            verificationStatus === "verified"
-              ? "verified"
-              : verificationStatus === "rejected"
-                ? "rejected"
-                : "pending",
-        });
+  useEffect(() => {
+    void fetchActiveJobRoleNames().then((roles) =>
+      setRoleOptions(withAllOption(roles)),
+    );
+  }, []);
 
-        bookings
-          .filter((booking) =>
-            ["requested", "accepted", "confirmed"].includes(booking.status),
-          )
-          .forEach((booking) => {
-            bookedIds.add(booking.shift.id);
-            nextBookingStatusByShiftId[booking.shift.id] = booking.status;
-          });
-      } catch (error) {
-        console.warn("Falling back to backend database booking lookup", error);
-      }
-    }
-
-    // Get all active bookings (requested, accepted, confirmed, checked_in)
-    const { data: bookings } = await backendDb
-      .from("bookings")
-      .select("shift_id, status")
-      .eq("professional_id", profileId)
-      .in("status", ["requested", "accepted", "confirmed", "checked_in"]);
-
-    if (bookings) {
-      bookings.forEach((booking) => {
-        bookedIds.add(booking.shift_id);
-        nextBookingStatusByShiftId[booking.shift_id] = booking.status;
-      });
-    }
-
-    setBookingStatusByShiftId(nextBookingStatusByShiftId);
-    setBookedShiftIds(Array.from(bookedIds));
-  };
-
-  const fetchShifts = async () => {
+  const fetchShifts = useCallback(async () => {
     setIsLoading(true);
     try {
       let data: Shift[] = [];
@@ -309,7 +308,11 @@ const ShiftSearch = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [bookedShiftIds, filters]);
+
+  useEffect(() => {
+    void fetchShifts();
+  }, [fetchShifts]);
 
   const clearFilters = () => {
     setFilters({

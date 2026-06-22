@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
@@ -96,57 +96,60 @@ const ClinicDashboard = () => {
   } = useAuth();
   const navigate = useNavigate();
 
-  const mergeShifts = (items: Shift[]) => {
+  const mergeShifts = useCallback((items: Shift[]) => {
     const byId = new Map<string, Shift>();
     items.forEach((item) => byId.set(item.id, item));
     return Array.from(byId.values()).sort((a, b) => {
       const dateCompare = a.shift_date.localeCompare(b.shift_date);
       return dateCompare || a.start_time.localeCompare(b.start_time);
     });
-  };
+  }, []);
 
-  const fetchClinicShifts = async (clinicId: string) => {
-    const today = new Date().toISOString().split("T")[0];
-    const collected: Shift[] = [];
+  const fetchClinicShifts = useCallback(
+    async (clinicId: string) => {
+      const today = new Date().toISOString().split("T")[0];
+      const collected: Shift[] = [];
 
-    if (isPlatformBackendConfigured()) {
-      try {
-        const jobs = await listLegacyJobs();
-        collected.push(
-          ...((jobs as unknown as Shift[]).filter(
-            (shift) =>
-              shift.clinic?.id === clinicId && shift.shift_date >= today,
-          ) ?? []),
-        );
-      } catch (error) {
-        console.warn("Falling back to BackendDb clinic shifts fetch", error);
+      if (isPlatformBackendConfigured()) {
+        try {
+          const jobs = await listLegacyJobs();
+          collected.push(
+            ...((jobs as unknown as Shift[]).filter(
+              (shift) =>
+                shift.clinic?.id === clinicId && shift.shift_date >= today,
+            ) ?? []),
+          );
+        } catch (error) {
+          console.warn("Falling back to BackendDb clinic shifts fetch", error);
+        }
       }
-    }
 
-    const { data: shiftsData } = await backendDb
-      .from("shifts")
-      .select("*")
-      .eq("clinic_id", clinicId)
-      .gte("shift_date", today)
-      .order("shift_date", { ascending: true })
-      .limit(10);
+      const { data: shiftsData } = await backendDb
+        .from("shifts")
+        .select("*")
+        .eq("clinic_id", clinicId)
+        .gte("shift_date", today)
+        .order("shift_date", { ascending: true })
+        .limit(10);
 
-    if (shiftsData) {
-      collected.push(
-        ...(shiftsData as Shift[]).map((shift) => ({
-          ...shift,
-          source: shift.source ?? ("legacy" as const),
-        })),
-      );
-    }
+      if (shiftsData) {
+        collected.push(
+          ...(shiftsData as Shift[]).map((shift) => ({
+            ...shift,
+            source: shift.source ?? ("legacy" as const),
+          })),
+        );
+      }
 
-    setShifts(mergeShifts(collected).slice(0, 10));
-  };
+      setShifts(mergeShifts(collected).slice(0, 10));
+    },
+    [mergeShifts],
+  );
 
-  const fetchShifts = async () => {
+  const fetchShifts = useCallback(async () => {
     if (!clinic?.id) return;
     await fetchClinicShifts(clinic.id);
-  };
+  }, [clinic?.id, fetchClinicShifts]);
 
   useEffect(() => {
     if (!authLoading) {
@@ -196,6 +199,7 @@ const ClinicDashboard = () => {
         if (clinicData) {
           setClinic(clinicData);
           await fetchClinicShifts(clinicData.id);
+          let loadedGatewaySpend = false;
 
           if (isGatewayBackendConfigured()) {
             try {
@@ -230,6 +234,7 @@ const ClinicDashboard = () => {
                 );
               }, 0);
               setMonthlySpend(totalSpend);
+              loadedGatewaySpend = true;
             } catch (error) {
               console.warn(
                 "Falling back to BackendDb clinic booking stats",
@@ -238,7 +243,7 @@ const ClinicDashboard = () => {
             }
           }
 
-          if (!monthlySpend) {
+          if (!loadedGatewaySpend) {
             const startOfMonth = new Date();
             startOfMonth.setDate(1);
             startOfMonth.setHours(0, 0, 0, 0);
@@ -292,9 +297,9 @@ const ClinicDashboard = () => {
     };
 
     if (user && isOnboardingComplete) {
-      fetchData();
+      void fetchData();
     }
-  }, [user, isOnboardingComplete]);
+  }, [fetchClinicShifts, isOnboardingComplete, user]);
 
   if (authLoading || isLoading) {
     return (

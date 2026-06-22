@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -89,11 +89,7 @@ const DocumentTypesManagement = () => {
     max_size_mb: 10,
   });
 
-  useEffect(() => {
-    fetchDocumentTypes();
-  }, []);
-
-  const fetchDocumentTypes = async () => {
+  const fetchDocumentTypes = useCallback(async () => {
     try {
       setDocumentTypes(await listAdminCatalogItems("document_type"));
     } catch (error: any) {
@@ -105,7 +101,11 @@ const DocumentTypesManagement = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [t, toast]);
+
+  useEffect(() => {
+    void fetchDocumentTypes();
+  }, [fetchDocumentTypes]);
 
   const handleOpenDialog = (docType?: DocumentType) => {
     if (docType) {
@@ -194,7 +194,7 @@ const DocumentTypesManagement = () => {
       }
 
       setIsDialogOpen(false);
-      fetchDocumentTypes();
+      await fetchDocumentTypes();
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -212,7 +212,7 @@ const DocumentTypesManagement = () => {
     try {
       await deleteAdminCatalogItem(docType.id);
       toast({ title: t("admin.config.documentTypeDeleted") });
-      fetchDocumentTypes();
+      await fetchDocumentTypes();
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -237,7 +237,7 @@ const DocumentTypesManagement = () => {
         maxSizeMb: docType.max_size_mb ?? 10,
         displayOrder: docType.display_order,
       });
-      fetchDocumentTypes();
+      await fetchDocumentTypes();
     } catch (error: any) {
       toast({
         variant: "destructive",
