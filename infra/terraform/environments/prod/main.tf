@@ -31,6 +31,11 @@ variable "api_public_base_url" {
   default = "https://api.syndeocare.example.com"
 }
 
+variable "web_public_url" {
+  type    = string
+  default = "https://syndeocare.ai"
+}
+
 variable "platform_api_image" {
   type    = string
   default = "public.ecr.aws/docker/library/nginx:stable-alpine"
@@ -403,7 +408,7 @@ module "object_storage" {
   source               = "../../modules/object-storage"
   public_bucket_name   = var.storage_public_bucket
   private_bucket_name  = var.storage_private_bucket
-  cors_allowed_origins = compact([local.public_base_url])
+  cors_allowed_origins = distinct(compact([local.public_base_url, var.web_public_url]))
   tags                 = local.tags
 }
 

@@ -199,6 +199,7 @@ jobs:
         env:
           TF_VAR_aws_region: ${{ vars.AWS_REGION }}
           TF_VAR_api_public_base_url: ${{ vars.API_PUBLIC_BASE_URL }}
+          TF_VAR_web_public_url: ${{ vars.WEB_PUBLIC_URL }}
           TF_VAR_keycloak_base_url: ${{ vars.KEYCLOAK_BASE_URL }}
           TF_VAR_keycloak_admin_username: ${{ vars.KEYCLOAK_ADMIN_USERNAME }}
           TF_VAR_keycloak_admin_password: ${{ secrets.KEYCLOAK_ADMIN_PASSWORD }}
