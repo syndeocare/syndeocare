@@ -152,9 +152,9 @@ export const ChatList = ({
                   ? ("clinic" as const)
                   : ("professional" as const),
               counterpart_verification_status: null,
-              unread_count: 0,
-              last_message: undefined,
-              last_file_type: null,
+              unread_count: conv.unread_count ?? 0,
+              last_message: conv.last_message ?? undefined,
+              last_file_type: conv.last_file_type ?? null,
             };
           }
 
@@ -168,19 +168,6 @@ export const ChatList = ({
             .select("id, name, logo_url, verification_status")
             .eq("id", conv.clinic_id)
             .single();
-          const { count: unreadCount } = await backendDb
-            .from("messages")
-            .select("*", { count: "exact", head: true })
-            .eq("conversation_id", conv.id)
-            .eq("is_read", false)
-            .neq("sender_type", userType);
-          const { data: lastMsg } = await backendDb
-            .from("messages")
-            .select("content, file_type")
-            .eq("conversation_id", conv.id)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
 
           const isViewerProfessional = userType === "professional";
           const counterpart = isViewerProfessional ? clinic : professional;
@@ -198,29 +185,15 @@ export const ChatList = ({
             counterpart_type: isViewerProfessional ? "clinic" : "professional",
             counterpart_verification_status:
               counterpart?.verification_status ?? null,
-            unread_count: unreadCount || 0,
-            last_message: lastMsg?.content,
-            last_file_type: lastMsg?.file_type,
+            unread_count: conv.unread_count ?? 0,
+            last_message: conv.last_message ?? undefined,
+            last_file_type: conv.last_file_type ?? null,
           };
         }),
       );
 
       const adminItems = await Promise.all(
         (adminData || []).map(async (conv) => {
-          const { count: unreadCount } = await backendDb
-            .from("admin_messages")
-            .select("*", { count: "exact", head: true })
-            .eq("admin_conversation_id", conv.id)
-            .eq("is_read", false)
-            .neq("sender_type", userType);
-          const { data: lastMsg } = await backendDb
-            .from("admin_messages")
-            .select("content, file_type")
-            .eq("admin_conversation_id", conv.id)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
           const fallbackAdminItem = {
             id: `admin:${conv.id}`,
             kind: "admin" as const,
@@ -238,9 +211,9 @@ export const ChatList = ({
                   ? ("professional" as const)
                   : ("admin" as const),
             counterpart_verification_status: null,
-            unread_count: unreadCount || 0,
-            last_message: lastMsg?.content,
-            last_file_type: lastMsg?.file_type,
+            unread_count: conv.unread_count ?? 0,
+            last_message: conv.last_message ?? undefined,
+            last_file_type: conv.last_file_type ?? null,
           };
 
           if (userType === "admin") {
@@ -260,9 +233,9 @@ export const ChatList = ({
                 counterpart_type: "professional" as const,
                 counterpart_verification_status:
                   professional?.verification_status ?? null,
-                unread_count: unreadCount || 0,
-                last_message: lastMsg?.content,
-                last_file_type: lastMsg?.file_type,
+                unread_count: conv.unread_count ?? 0,
+                last_message: conv.last_message ?? undefined,
+                last_file_type: conv.last_file_type ?? null,
               };
             }
 
@@ -285,9 +258,9 @@ export const ChatList = ({
               counterpart_type: "clinic" as const,
               counterpart_verification_status:
                 clinic?.verification_status ?? null,
-              unread_count: unreadCount || 0,
-              last_message: lastMsg?.content,
-              last_file_type: lastMsg?.file_type,
+              unread_count: conv.unread_count ?? 0,
+              last_message: conv.last_message ?? undefined,
+              last_file_type: conv.last_file_type ?? null,
             };
           }
 
@@ -306,9 +279,9 @@ export const ChatList = ({
             avatar_url: null,
             counterpart_type: "admin" as const,
             counterpart_verification_status: null,
-            unread_count: unreadCount || 0,
-            last_message: lastMsg?.content,
-            last_file_type: lastMsg?.file_type,
+            unread_count: conv.unread_count ?? 0,
+            last_message: conv.last_message ?? undefined,
+            last_file_type: conv.last_file_type ?? null,
           };
         }),
       );

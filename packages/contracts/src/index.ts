@@ -654,6 +654,9 @@ export const conversationSummarySchema = z.object({
   displayName: z.string().min(1),
   counterpartRole: userRoleSchema,
   lastMessageAt: z.string().datetime(),
+  unreadCount: z.number().int().nonnegative().optional(),
+  lastMessage: z.string().nullable().optional(),
+  lastFileType: z.string().nullable().optional(),
 });
 
 export const conversationListResponseSchema = z.object({

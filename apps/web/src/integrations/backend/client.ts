@@ -284,6 +284,9 @@ function mapConversation(item: any) {
     display_name: displayName,
     counterpart_role: counterpartRole,
     last_message_at: item.lastMessageAt ?? item.last_message_at,
+    unread_count: item.unreadCount ?? item.unread_count ?? 0,
+    last_message: item.lastMessage ?? item.last_message ?? null,
+    last_file_type: item.lastFileType ?? item.last_file_type ?? null,
     created_at: item.createdAt ?? item.created_at ?? item.lastMessageAt,
     updated_at: item.updatedAt ?? item.updated_at ?? item.lastMessageAt,
   };

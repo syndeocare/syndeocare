@@ -2135,6 +2135,9 @@ export type ConversationSummary = {
   displayName: string;
   counterpartRole: "admin" | "clinic" | "professional";
   lastMessageAt: string;
+  unreadCount?: number;
+  lastMessage?: string | null;
+  lastFileType?: string | null;
 };
 
 export type ConversationMessage = {
@@ -2457,6 +2460,25 @@ export async function listConversationsForSubject(
             ? await getProfessionalProfileById(conversation.professionalId)
             : null
         : null;
+    const [unread] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(conversationMessages)
+      .where(
+        and(
+          eq(conversationMessages.conversationId, conversation.id),
+          ne(conversationMessages.senderActorId, actor.id),
+          eq(conversationMessages.isRead, false),
+        ),
+      );
+    const [lastMessage] = await db
+      .select({
+        content: conversationMessages.content,
+        fileType: conversationMessages.fileType,
+      })
+      .from(conversationMessages)
+      .where(eq(conversationMessages.conversationId, conversation.id))
+      .orderBy(desc(conversationMessages.createdAt))
+      .limit(1);
 
     summaries.push({
       id: conversation.id,
@@ -2476,6 +2498,9 @@ export async function listConversationsForSubject(
             ? "professional"
             : "clinic",
       lastMessageAt: conversation.lastMessageAt.toISOString(),
+      unreadCount: unread?.count ?? 0,
+      lastMessage: lastMessage?.content ?? null,
+      lastFileType: lastMessage?.fileType ?? null,
     });
   }
 
