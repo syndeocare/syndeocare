@@ -14,7 +14,6 @@ import {
   createNotificationForExternalUserId,
   deleteAllNotificationsForExternalUserId,
   deleteNotificationForExternalUserId,
-  getActorExternalUserIdBySubject,
   listNotificationsForExternalUserId,
   markAllNotificationsReadForExternalUserId,
   markNotificationReadForExternalUserId,
@@ -33,16 +32,8 @@ const notificationParamsSchema = z.object({
   notificationId: z.string().uuid(),
 });
 
-async function requireExternalUserId(subject: string) {
-  const externalUserId = await getActorExternalUserIdBySubject(subject);
-
-  if (!externalUserId) {
-    throw new Error(
-      "The authenticated actor has not synced a legacy external user id yet.",
-    );
-  }
-
-  return externalUserId;
+function notificationRecipientIdForSubject(subject: string) {
+  return subject;
 }
 
 void startService({
@@ -123,7 +114,7 @@ void startService({
         }
 
         try {
-          const externalUserId = await requireExternalUserId(
+          const externalUserId = notificationRecipientIdForSubject(
             parsedParams.data.subject,
           );
 
@@ -194,7 +185,7 @@ void startService({
         }
 
         try {
-          const externalUserId = await requireExternalUserId(
+          const externalUserId = notificationRecipientIdForSubject(
             parsedParams.data.subject,
           );
 
@@ -227,7 +218,7 @@ void startService({
         }
 
         try {
-          const externalUserId = await requireExternalUserId(
+          const externalUserId = notificationRecipientIdForSubject(
             parsedParams.data.subject,
           );
           const notification = await markNotificationReadForExternalUserId(
@@ -268,7 +259,7 @@ void startService({
         }
 
         try {
-          const externalUserId = await requireExternalUserId(
+          const externalUserId = notificationRecipientIdForSubject(
             parsedParams.data.subject,
           );
 
@@ -303,7 +294,7 @@ void startService({
         }
 
         try {
-          const externalUserId = await requireExternalUserId(
+          const externalUserId = notificationRecipientIdForSubject(
             parsedParams.data.subject,
           );
 

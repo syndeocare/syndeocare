@@ -468,12 +468,15 @@ export async function syncActorExternalUserIdBySubject(
 export async function getActorExternalUserIdBySubject(subject: string) {
   const db = getDb();
   const rows = await db
-    .select({ externalUserId: actors.externalUserId })
+    .select({
+      authSubject: actors.authSubject,
+      externalUserId: actors.externalUserId,
+    })
     .from(actors)
     .where(eq(actors.authSubject, subject))
     .limit(1);
 
-  return rows[0]?.externalUserId ?? null;
+  return rows[0]?.externalUserId ?? rows[0]?.authSubject ?? null;
 }
 
 function mapAppNotification(
@@ -949,6 +952,7 @@ export async function ensureActorAccount(input: {
       .insert(actors)
       .values({
         authSubject: input.subject,
+        externalUserId: input.subject,
         role: input.role,
         email: input.email,
         displayName,
@@ -959,6 +963,7 @@ export async function ensureActorAccount(input: {
       .onConflictDoUpdate({
         target: actors.authSubject,
         set: {
+          externalUserId: sql`coalesce(${actors.externalUserId}, ${input.subject})`,
           role: input.role,
           email: input.email,
           displayName,
@@ -1787,16 +1792,19 @@ export async function requestBookingBySubject(
 
   const [clinicActor] = await db
     .select({
+      authSubject: actors.authSubject,
       externalUserId: actors.externalUserId,
     })
     .from(clinicProfiles)
     .innerJoin(actors, eq(clinicProfiles.actorId, actors.id))
     .where(eq(clinicProfiles.id, job.clinicId))
     .limit(1);
+  const clinicNotificationRecipient =
+    clinicActor?.externalUserId ?? clinicActor?.authSubject;
 
-  if (clinicActor?.externalUserId) {
+  if (clinicNotificationRecipient) {
     await createNotificationForExternalUserId({
-      recipientExternalUserId: clinicActor.externalUserId,
+      recipientExternalUserId: clinicNotificationRecipient,
       type: "booking_request",
       title: "New shift application",
       message: `${professional.fullName} applied for "${job.title}".`,
@@ -1953,14 +1961,17 @@ export async function updateBookingStatusBySubject(
 
   const [professionalActor] = await db
     .select({
+      authSubject: actors.authSubject,
       externalUserId: actors.externalUserId,
     })
     .from(professionalProfiles)
     .innerJoin(actors, eq(professionalProfiles.actorId, actors.id))
     .where(eq(professionalProfiles.id, current.professionalId))
     .limit(1);
+  const professionalNotificationRecipient =
+    professionalActor?.externalUserId ?? professionalActor?.authSubject;
 
-  if (professionalActor?.externalUserId) {
+  if (professionalNotificationRecipient) {
     const notificationType =
       input.status === "accepted"
         ? "booking_accepted"
@@ -1971,7 +1982,7 @@ export async function updateBookingStatusBySubject(
             : "booking_completed";
 
     await createNotificationForExternalUserId({
-      recipientExternalUserId: professionalActor.externalUserId,
+      recipientExternalUserId: professionalNotificationRecipient,
       type: notificationType,
       title: "Shift application updated",
       message: `Your application for "${current.jobTitle}" is now ${input.status}.`,
@@ -2608,9 +2619,12 @@ export async function sendConversationMessageBySubject(input: {
 
   const recipient = await getConversationMessageRecipient(actor, conversation);
 
-  if (recipient?.actor.externalUserId) {
+  const notificationRecipient =
+    recipient?.actor.externalUserId ?? recipient?.actor.authSubject;
+
+  if (notificationRecipient) {
     await createNotificationForExternalUserId({
-      recipientExternalUserId: recipient.actor.externalUserId,
+      recipientExternalUserId: notificationRecipient,
       type: "new_message",
       title: "New message",
       message: `${actorDisplayName(actor)} sent you a message.`,
