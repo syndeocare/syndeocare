@@ -620,6 +620,7 @@ module "api_gateway_service" {
     SERVICE_CLINICS_URL            = "http://${module.clinics_service.service_discovery_service_name}:4113"
     SERVICE_IDENTITY_URL           = "http://${module.identity_service.service_discovery_service_name}:4111"
     SERVICE_MESSAGING_URL          = "http://${module.messaging_service.service_discovery_service_name}:4116"
+    SERVICE_NOTIFICATIONS_URL      = "http://${module.notifications_service.service_discovery_service_name}:4115"
     SERVICE_PROFILES_URL           = "http://${module.profiles_service.service_discovery_service_name}:4112"
     SERVICE_SCHEDULING_URL         = "http://${module.scheduling_service.service_discovery_service_name}:4114"
     STORAGE_ENDPOINT               = ""
