@@ -103,19 +103,28 @@ function resolveOnboardingCompleted(input: {
   );
 }
 
-function mapProfessionalProfileSummary(row: {
-  actor: typeof actors.$inferSelect;
-  onboarding?: typeof onboardingRecords.$inferSelect | null;
-  profile: typeof professionalProfiles.$inferSelect;
-}): ProfessionalProfileSummary {
+function mapProfessionalProfileSummary(
+  row: {
+    actor: typeof actors.$inferSelect;
+    onboarding?: typeof onboardingRecords.$inferSelect | null;
+    profile: typeof professionalProfiles.$inferSelect;
+  },
+  options: { redactSensitiveFields?: boolean } = {},
+): ProfessionalProfileSummary {
+  const redactSensitiveFields = options.redactSensitiveFields ?? false;
+
   return {
     id: row.profile.id,
     fullName: row.profile.fullName,
     specialty: row.profile.specialty,
     headline: row.profile.headline ?? undefined,
     bio: row.profile.bio ?? undefined,
-    licenseNumber: row.profile.licenseNumber ?? undefined,
-    primaryPhone: row.profile.primaryPhone ?? undefined,
+    licenseNumber: redactSensitiveFields
+      ? undefined
+      : (row.profile.licenseNumber ?? undefined),
+    primaryPhone: redactSensitiveFields
+      ? undefined
+      : (row.profile.primaryPhone ?? undefined),
     yearsExperience: row.profile.yearsExperience,
     languages: row.profile.languages,
     rating: numericToNumber(row.profile.rating),
@@ -684,7 +693,9 @@ export async function getProfessionalProfileById(
     .limit(1);
   const row = rows[0];
 
-  return row ? mapProfessionalProfileSummary(row) : null;
+  return row
+    ? mapProfessionalProfileSummary(row, { redactSensitiveFields: true })
+    : null;
 }
 
 export async function listProfessionalProfiles(
@@ -739,7 +750,9 @@ export async function listProfessionalProfiles(
 
       return true;
     })
-    .map(mapProfessionalProfileSummary);
+    .map((row) =>
+      mapProfessionalProfileSummary(row, { redactSensitiveFields: true }),
+    );
 
   return {
     items,
@@ -1419,23 +1432,41 @@ export async function persistVerificationDocumentBySubject(
   return getOnboardingStatusBySubject(subject);
 }
 
-function mapJobListingDetail(row: {
-  clinic: typeof clinicProfiles.$inferSelect;
-  job: typeof jobListings.$inferSelect;
-}): JobListingDetail {
+const REDACTED_CLINIC_ID = "redacted-clinic";
+const REDACTED_CLINIC_NAME = "Verified Healthcare Facility";
+
+function approximateCoordinate(value: string) {
+  return Number(numericToNumber(value).toFixed(2));
+}
+
+function mapJobListingDetail(
+  row: {
+    clinic: typeof clinicProfiles.$inferSelect;
+    job: typeof jobListings.$inferSelect;
+  },
+  options: { redactClinicIdentity?: boolean } = {},
+): JobListingDetail {
+  const redactClinicIdentity = options.redactClinicIdentity ?? false;
+
   return {
     id: row.job.id,
     title: row.job.title,
     specialty: row.job.specialty,
     employmentType: row.job.employmentType,
     status: row.job.status,
-    clinicId: row.clinic.id,
-    clinicName: row.clinic.organizationName,
+    clinicId: redactClinicIdentity ? REDACTED_CLINIC_ID : row.clinic.id,
+    clinicName: redactClinicIdentity
+      ? REDACTED_CLINIC_NAME
+      : row.clinic.organizationName,
     location: {
       city: row.job.city,
       region: row.job.region,
-      latitude: numericToNumber(row.job.latitude),
-      longitude: numericToNumber(row.job.longitude),
+      latitude: redactClinicIdentity
+        ? approximateCoordinate(row.job.latitude)
+        : numericToNumber(row.job.latitude),
+      longitude: redactClinicIdentity
+        ? approximateCoordinate(row.job.longitude)
+        : numericToNumber(row.job.longitude),
       radiusKm: row.job.radiusKm ?? undefined,
     },
     startsAt: row.job.startsAt.toISOString(),
@@ -1546,7 +1577,7 @@ export async function listJobListings(
 
       return true;
     })
-    .map(mapJobListingDetail);
+    .map((row) => mapJobListingDetail(row, { redactClinicIdentity: true }));
 }
 
 export async function getJobListingById(
@@ -1564,7 +1595,7 @@ export async function getJobListingById(
     .limit(1);
   const row = rows[0];
 
-  return row ? mapJobListingDetail(row) : null;
+  return row ? mapJobListingDetail(row, { redactClinicIdentity: true }) : null;
 }
 
 export async function createJobListingBySubject(
@@ -1621,7 +1652,21 @@ export async function createJobListingBySubject(
     })
     .where(eq(clinicProfiles.id, clinic.id));
 
-  return inserted[0] ? getJobListingById(inserted[0].id) : null;
+  if (!inserted[0]) {
+    return null;
+  }
+
+  const rows = await db
+    .select({
+      clinic: clinicProfiles,
+      job: jobListings,
+    })
+    .from(jobListings)
+    .innerJoin(clinicProfiles, eq(jobListings.clinicId, clinicProfiles.id))
+    .where(eq(jobListings.id, inserted[0].id))
+    .limit(1);
+
+  return rows[0] ? mapJobListingDetail(rows[0]) : null;
 }
 
 export async function listBookingsForSubject(
@@ -2402,6 +2447,25 @@ export async function startStandardConversationBySubject(
       ),
     )
     .limit(1);
+
+  if (isProfessionalParticipant && !existing[0]) {
+    const allowedBookings = await db
+      .select({ id: bookings.id, status: bookings.status })
+      .from(bookings)
+      .where(
+        and(
+          eq(bookings.professionalId, input.professionalId),
+          eq(bookings.clinicId, input.clinicId),
+        ),
+      );
+    const hasAcceptedRelationship = allowedBookings.some((booking) =>
+      ["accepted", "confirmed", "completed"].includes(booking.status),
+    );
+
+    if (!hasAcceptedRelationship) {
+      return null;
+    }
+  }
 
   const conversation =
     existing[0] ??

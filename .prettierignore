@@ -15,3 +15,6 @@ pnpm-lock.yaml
 
 # Generated native/mobile output
 apps/web/android/
+
+# SQL migrations are formatted by hand.
+packages/persistence/migrations/*.sql

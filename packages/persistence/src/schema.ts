@@ -9,6 +9,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 import type { UploadedDocument } from "@repo/contracts";
@@ -283,6 +284,11 @@ export const bookings = pgTable(
       table.jobId,
       table.professionalId,
     ),
+    activeJobProfessionalUniqueIdx: uniqueIndex(
+      "bookings_active_job_professional_unique_idx",
+    )
+      .on(table.jobId, table.professionalId)
+      .where(sql`${table.status} IN ('requested', 'accepted', 'confirmed')`),
   }),
 );
 
@@ -403,6 +409,14 @@ export const conversations = pgTable(
       table.clinicId,
       table.professionalId,
     ),
+    uniqueStandardClinicProfessionalIdx: uniqueIndex(
+      "conversations_standard_clinic_professional_unique_idx",
+    )
+      .on(table.clinicId, table.professionalId)
+      .where(sql`${table.kind} = 'standard'`),
+    uniqueAdminTargetIdx: uniqueIndex("conversations_admin_target_unique_idx")
+      .on(table.adminActorId, table.targetActorId)
+      .where(sql`${table.kind} = 'admin'`),
     lastMessageIdx: index("conversations_last_message_idx").on(
       table.kind,
       table.lastMessageAt,

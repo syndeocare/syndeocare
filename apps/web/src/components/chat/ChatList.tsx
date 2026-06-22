@@ -20,6 +20,10 @@ import { formatDistanceToNow } from "date-fns";
 import { ar, enUS } from "date-fns/locale";
 import { VerificationBadge } from "@/components/ui/verification-badge";
 import { Button } from "@/components/ui/button";
+import {
+  isGatewayBackendConfigured,
+  listGatewayConversations,
+} from "@/lib/platform-backend";
 
 interface Conversation {
   id: string;
@@ -89,6 +93,34 @@ export const ChatList = ({
 
     try {
       setLoadError(null);
+
+      if (isGatewayBackendConfigured()) {
+        const response = await listGatewayConversations({
+          user,
+          userRole: userType,
+          clinicId: userType === "clinic" ? profileId : undefined,
+          profileId: userType === "professional" ? profileId : undefined,
+          onboardingCompleted: true,
+          verificationStatus: "verified",
+        });
+
+        setConversations(
+          response.items.map((conv) => ({
+            id: `${conv.kind}:${conv.id}`,
+            kind: conv.kind,
+            last_message_at: conv.lastMessageAt,
+            display_name: conv.displayName,
+            avatar_url: null,
+            counterpart_type: conv.counterpartRole,
+            counterpart_verification_status: null,
+            unread_count: conv.unreadCount ?? 0,
+            last_message: conv.lastMessage ?? undefined,
+            last_file_type: conv.lastFileType ?? null,
+          })),
+        );
+        setLoading(false);
+        return;
+      }
 
       const standardConversationsPromise =
         userType === "admin"

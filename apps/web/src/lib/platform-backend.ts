@@ -105,6 +105,9 @@ type PlatformJob = {
   languages: string[];
 };
 
+const REDACTED_CLINIC_ID = "redacted-clinic";
+const REDACTED_CLINIC_NAME = "Verified Healthcare Facility";
+
 type PlatformBooking = {
   id: string;
   jobId: string;
@@ -562,6 +565,9 @@ function mapClinicSummaryToLegacy(item: PlatformClinicSummary): LegacyClinic {
 function mapJobToLegacyShift(item: PlatformJob): LegacyShift {
   const startsAt = toDateParts(item.startsAt);
   const endsAt = item.endsAt ? toDateParts(item.endsAt) : { time: "" };
+  const isClinicRedacted =
+    item.clinicId === REDACTED_CLINIC_ID ||
+    item.clinicName === REDACTED_CLINIC_NAME;
 
   return {
     id: item.id,
@@ -582,7 +588,7 @@ function mapJobToLegacyShift(item: PlatformJob): LegacyShift {
     is_filled: item.status !== "open",
     clinic: {
       id: item.clinicId,
-      name: item.clinicName,
+      name: isClinicRedacted ? "" : item.clinicName,
       address: buildLocationAddress(item.location.city, item.location.region),
       rating_avg: null,
       logo_url: null,

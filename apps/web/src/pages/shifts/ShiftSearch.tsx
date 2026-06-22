@@ -95,6 +95,9 @@ const CLINIC_VISIBLE_BOOKING_STATUSES = new Set([
   "checked_out",
 ]);
 
+const canRevealClinicForStatus = (status?: string) =>
+  CLINIC_VISIBLE_BOOKING_STATUSES.has(status ?? "");
+
 const ShiftSearch = () => {
   const { t, i18n } = useTranslation();
   const isRTL = i18n.language === "ar";
@@ -329,13 +332,20 @@ const ShiftSearch = () => {
     filters.maxRate < 200 ||
     filters.dateRange !== "all";
 
-  const filteredShifts = shifts.filter(
-    (shift) =>
-      shift.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      shift.role_required?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      shift.clinic?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      shift.location_address?.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+  const filteredShifts = shifts.filter((shift) => {
+    const normalizedQuery = searchQuery.toLowerCase();
+    const canViewClinicIdentity = canRevealClinicForStatus(
+      bookingStatusByShiftId[shift.id],
+    );
+
+    return (
+      shift.title?.toLowerCase().includes(normalizedQuery) ||
+      shift.role_required?.toLowerCase().includes(normalizedQuery) ||
+      (canViewClinicIdentity &&
+        shift.clinic?.name?.toLowerCase().includes(normalizedQuery)) ||
+      shift.location_address?.toLowerCase().includes(normalizedQuery)
+    );
+  });
 
   const FilterContent = () => (
     <div className="space-y-6">
@@ -520,10 +530,9 @@ const ShiftSearch = () => {
             ) : (
               <div className="space-y-4">
                 {filteredShifts.map((shift, index) => {
-                  const canViewClinicIdentity =
-                    CLINIC_VISIBLE_BOOKING_STATUSES.has(
-                      bookingStatusByShiftId[shift.id] ?? "",
-                    );
+                  const canViewClinicIdentity = canRevealClinicForStatus(
+                    bookingStatusByShiftId[shift.id],
+                  );
                   const clinicLabel = canViewClinicIdentity
                     ? shift.clinic?.name
                     : t("shifts.modal.clinicHidden", "Clinic hidden");

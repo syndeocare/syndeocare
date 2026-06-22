@@ -129,7 +129,9 @@ export default function SearchProfessionals() {
     setLoading(true);
     try {
       if (isPlatformBackendConfigured()) {
-        const data = await listLegacyProfessionals();
+        const data = await listLegacyProfessionals({
+          verificationStatus: "approved",
+        });
         setProfessionals(data);
         return;
       }

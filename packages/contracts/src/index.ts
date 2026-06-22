@@ -1059,6 +1059,13 @@ export const initialV1RouteCatalog = [
     protected: true,
   },
   {
+    method: "POST",
+    path: "/v1/conversations",
+    summary:
+      "Start or open a clinic-professional conversation for the authenticated actor",
+    protected: true,
+  },
+  {
     method: "GET",
     path: "/v1/conversations/:conversationId/messages",
     summary: "List messages for a visible conversation",
