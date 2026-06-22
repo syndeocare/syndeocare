@@ -225,3 +225,46 @@ jobs:
         if: ${{ steps.context.outputs.deploy_backend == 'true' && vars.BACKEND_DEPLOY_MODE == 'ecs' }}
         working-directory: infra/terraform/environments/${{ steps.context.outputs.terraform_env }}
         run: terraform apply -input=false -auto-approve tfplan
+
+      - name: Smoke test deployed API gateway
+        if: ${{ steps.context.outputs.deploy_backend == 'true' && vars.BACKEND_DEPLOY_MODE == 'ecs' }}
+        run: |
+          set -euo pipefail
+
+          api_base="${API_PUBLIC_BASE_URL:-https://api.syndeocare.ai}"
+          api_base="${api_base%/}/v1"
+
+          check_route() {
+            local method="$1"
+            local path="$2"
+            local payload="${3:-{}}"
+            local body_file
+            local status
+            body_file="$(mktemp)"
+
+            status="$(
+              curl -sS -o "$body_file" -w "%{http_code}" \
+                --retry 5 \
+                --retry-delay 5 \
+                --max-time 20 \
+                -X "$method" \
+                -H "content-type: application/json" \
+                -d "$payload" \
+                "${api_base}${path}"
+            )"
+
+            if [[ "$status" == "404" ]]; then
+              echo "Expected ${method} ${api_base}${path} to be registered, got 404:"
+              cat "$body_file"
+              exit 1
+            fi
+
+            if [[ "$status" == "000" || "$status" =~ ^5 ]]; then
+              echo "Expected ${method} ${api_base}${path} to be reachable, got ${status}:"
+              cat "$body_file"
+              exit 1
+            fi
+          }
+
+          check_route "POST" "/conversations" "{}"
+          check_route "PATCH" "/bookings/smoke-test-booking" '{"status":"accepted"}'
