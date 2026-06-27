@@ -607,6 +607,7 @@ function DetailsContent({
           render={({ field, fieldState }) => (
             <Field
               autoCapitalize="words"
+              autoComplete="name"
               error={fieldState.error?.message}
               label={
                 role === "clinic"
@@ -621,6 +622,8 @@ function DetailsContent({
                 )
               }
               onChangeText={field.onChange}
+              returnKeyType="next"
+              textContentType={role === "clinic" ? "organizationName" : "name"}
               value={field.value}
             />
           )}
@@ -674,11 +677,15 @@ function EmailPasswordFields({
         name="email"
         render={({ field, fieldState }) => (
           <Field
+            autoComplete="email"
             error={fieldState.error?.message}
+            keyboardType="email-address"
             label={t("auth.email")}
             leftIcon={<Mail color={colors.muted} size={20} />}
             onChangeText={field.onChange}
             placeholder="name@example.com"
+            returnKeyType="next"
+            textContentType="username"
             value={field.value}
           />
         )}
@@ -688,12 +695,15 @@ function EmailPasswordFields({
         name="password"
         render={({ field, fieldState }) => (
           <Field
+            autoComplete="current-password"
             error={fieldState.error?.message}
             label={t("auth.password")}
             leftIcon={<Lock color={colors.muted} size={20} />}
             onChangeText={field.onChange}
             placeholder="••••••••"
+            returnKeyType="done"
             secureTextEntry
+            textContentType="password"
             value={field.value}
           />
         )}

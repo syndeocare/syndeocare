@@ -204,15 +204,20 @@ export default function ProfileScreen() {
         <SectionHeader title={t("profile.quickUpdate")} />
         <Text style={text.body}>{t("profile.yemenFixed")}</Text>
         <Field
+          autoComplete="tel"
+          keyboardType="phone-pad"
           label={t("profile.yemenPhone")}
           onChangeText={setPhone}
           placeholder="77xxxxxxx"
+          returnKeyType="next"
+          textContentType="telephoneNumber"
           value={phone}
         />
         <Field
           label={isClinic ? t("profile.facilityDescription") : t("profile.bio")}
           multiline
           onChangeText={setDescription}
+          returnKeyType="default"
           value={description}
         />
         <Button
@@ -247,15 +252,21 @@ export default function ProfileScreen() {
           </>
         ) : null}
         <Field
+          autoComplete="current-password"
           label={t("profile.currentPassword")}
           onChangeText={setCurrentPassword}
+          returnKeyType="next"
           secureTextEntry
+          textContentType="password"
           value={currentPassword}
         />
         <Field
+          autoComplete="new-password"
           label={t("profile.newPassword")}
           onChangeText={setNewPassword}
+          returnKeyType="done"
           secureTextEntry
+          textContentType="newPassword"
           value={newPassword}
         />
         <Button

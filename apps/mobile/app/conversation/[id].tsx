@@ -166,6 +166,7 @@ export default function ConversationScreen() {
             label={t("conversation.message")}
             multiline
             onChangeText={setContent}
+            returnKeyType="default"
             value={content}
           />
           {attachment ? (

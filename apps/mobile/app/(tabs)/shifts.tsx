@@ -430,6 +430,7 @@ export default function ShiftsScreen() {
               multiline
               onChangeText={setProposal}
               placeholder={t("shifts.proposalPlaceholder")}
+              returnKeyType="default"
               value={proposal}
             />
             <Button
@@ -455,74 +456,88 @@ export default function ShiftsScreen() {
         visible={showCreateShift}
       >
         <View style={styles.modalShade}>
-          <ScrollView
-            contentContainerStyle={[
-              styles.modal,
-              { backgroundColor: palette.surface },
-            ]}
+          <View
+            style={[styles.modalSheet, { backgroundColor: palette.surface }]}
           >
-            <Text style={text.h2}>{t("shifts.createShift")}</Text>
-            <Text style={text.body}>{t("shifts.createShiftBody")}</Text>
-            <Field
-              label={t("shifts.shiftTitle")}
-              onChangeText={(value) =>
-                setShiftDraft((draft) => ({ ...draft, title: value }))
-              }
-              value={shiftDraft.title}
-            />
-            <Field
-              label={t("shifts.specialty")}
-              onChangeText={(value) =>
-                setShiftDraft((draft) => ({ ...draft, specialty: value }))
-              }
-              value={shiftDraft.specialty}
-            />
-            <Field
-              label={t("shifts.startsAt")}
-              onChangeText={(value) =>
-                setShiftDraft((draft) => ({ ...draft, startsAt: value }))
-              }
-              placeholder="2026-06-28T09:00:00+03:00"
-              value={shiftDraft.startsAt}
-            />
-            <Field
-              label={t("shifts.endsAt")}
-              onChangeText={(value) =>
-                setShiftDraft((draft) => ({ ...draft, endsAt: value }))
-              }
-              placeholder="2026-06-28T17:00:00+03:00"
-              value={shiftDraft.endsAt}
-            />
-            <Field
-              label={t("shifts.hourlyRate")}
-              onChangeText={(value) =>
-                setShiftDraft((draft) => ({ ...draft, amount: value }))
-              }
-              value={shiftDraft.amount}
-            />
-            <Field
-              label={t("shifts.summary")}
-              multiline
-              onChangeText={(value) =>
-                setShiftDraft((draft) => ({ ...draft, summary: value }))
-              }
-              value={shiftDraft.summary}
-            />
-            <Field
-              label={t("shifts.description")}
-              multiline
-              onChangeText={(value) =>
-                setShiftDraft((draft) => ({ ...draft, description: value }))
-              }
-              value={shiftDraft.description}
-            />
-            <Field
-              label={t("shifts.requirements")}
-              onChangeText={(value) =>
-                setShiftDraft((draft) => ({ ...draft, requirements: value }))
-              }
-              value={shiftDraft.requirements}
-            />
+            <ScrollView
+              contentContainerStyle={styles.modalScroll}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <Text style={text.h2}>{t("shifts.createShift")}</Text>
+              <Text style={text.body}>{t("shifts.createShiftBody")}</Text>
+              <Field
+                label={t("shifts.shiftTitle")}
+                onChangeText={(value) =>
+                  setShiftDraft((draft) => ({ ...draft, title: value }))
+                }
+                returnKeyType="next"
+                value={shiftDraft.title}
+              />
+              <Field
+                label={t("shifts.specialty")}
+                onChangeText={(value) =>
+                  setShiftDraft((draft) => ({ ...draft, specialty: value }))
+                }
+                returnKeyType="next"
+                value={shiftDraft.specialty}
+              />
+              <Field
+                autoComplete="off"
+                label={t("shifts.startsAt")}
+                onChangeText={(value) =>
+                  setShiftDraft((draft) => ({ ...draft, startsAt: value }))
+                }
+                placeholder="2026-06-28T09:00:00+03:00"
+                returnKeyType="next"
+                value={shiftDraft.startsAt}
+              />
+              <Field
+                autoComplete="off"
+                label={t("shifts.endsAt")}
+                onChangeText={(value) =>
+                  setShiftDraft((draft) => ({ ...draft, endsAt: value }))
+                }
+                placeholder="2026-06-28T17:00:00+03:00"
+                returnKeyType="next"
+                value={shiftDraft.endsAt}
+              />
+              <Field
+                keyboardType="decimal-pad"
+                label={t("shifts.hourlyRate")}
+                onChangeText={(value) =>
+                  setShiftDraft((draft) => ({ ...draft, amount: value }))
+                }
+                returnKeyType="next"
+                value={shiftDraft.amount}
+              />
+              <Field
+                label={t("shifts.summary")}
+                multiline
+                onChangeText={(value) =>
+                  setShiftDraft((draft) => ({ ...draft, summary: value }))
+                }
+                returnKeyType="default"
+                value={shiftDraft.summary}
+              />
+              <Field
+                label={t("shifts.description")}
+                multiline
+                onChangeText={(value) =>
+                  setShiftDraft((draft) => ({ ...draft, description: value }))
+                }
+                returnKeyType="default"
+                value={shiftDraft.description}
+              />
+              <Field
+                label={t("shifts.requirements")}
+                onChangeText={(value) =>
+                  setShiftDraft((draft) => ({ ...draft, requirements: value }))
+                }
+                returnKeyType="done"
+                value={shiftDraft.requirements}
+              />
+            </ScrollView>
             <Button
               loading={createShiftMutation.isPending}
               onPress={() => createShiftMutation.mutate()}
@@ -535,7 +550,7 @@ export default function ShiftsScreen() {
             >
               <Text style={styles.cancelText}>{t("shifts.cancel")}</Text>
             </Pressable>
-          </ScrollView>
+          </View>
         </View>
       </Modal>
     </Screen>
@@ -576,6 +591,17 @@ const styles = StyleSheet.create({
   },
   modal: {
     backgroundColor: "#ffffff",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    gap: 14,
+    maxHeight: "88%",
+    padding: 20,
+  },
+  modalScroll: {
+    gap: 14,
+    paddingBottom: 14,
+  },
+  modalSheet: {
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     gap: 14,

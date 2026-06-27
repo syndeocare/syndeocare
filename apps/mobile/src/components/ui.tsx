@@ -1,16 +1,21 @@
+import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { Link } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { Languages, Moon, Sun } from "lucide-react-native";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  type TextInputProps,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -131,6 +136,11 @@ const gradients = {
 
 type ScreenTone = "app" | "auth";
 
+function pressFeedback() {
+  if (Platform.OS === "web") return;
+  void Haptics.selectionAsync().catch(() => undefined);
+}
+
 export function BrandMark({ size = 48 }: { size?: number }) {
   return (
     <View
@@ -228,7 +238,12 @@ export function PreferenceControls({
     <View style={[styles.preferenceControls, isRTL && styles.rowReverse]}>
       <Pressable
         accessibilityLabel={nextLanguageLabel}
-        onPress={toggleLanguage}
+        accessibilityRole="button"
+        hitSlop={6}
+        onPress={() => {
+          pressFeedback();
+          toggleLanguage();
+        }}
         style={({ pressed }) => [
           styles.preferenceButton,
           {
@@ -256,7 +271,12 @@ export function PreferenceControls({
       </Pressable>
       <Pressable
         accessibilityLabel={nextThemeLabel}
-        onPress={toggleTheme}
+        accessibilityRole="button"
+        hitSlop={6}
+        onPress={() => {
+          pressFeedback();
+          toggleTheme();
+        }}
         style={({ pressed }) => [
           styles.preferenceButton,
           {
@@ -322,6 +342,7 @@ export function Screen({
       }
       style={styles.root}
     >
+      <StatusBar style={onDark ? "light" : "dark"} />
       {isAuth || isDark ? (
         <>
           <View style={[styles.glow, styles.glowAccent]} />
@@ -329,83 +350,88 @@ export function Screen({
         </>
       ) : null}
       <SafeAreaView style={styles.safe}>
-        <ScrollView
-          contentContainerStyle={[
-            styles.scroll,
-            isAuth && styles.authScroll,
-            direction === "rtl" && styles.rtlContent,
-          ]}
-          keyboardShouldPersistTaps="handled"
-          refreshControl={
-            onRefresh ? (
-              <RefreshControl
-                refreshing={Boolean(refreshing)}
-                onRefresh={onRefresh}
-                tintColor="#ffffff"
-              />
-            ) : undefined
-          }
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={styles.safe}
         >
-          {isAuth ? (
-            <View
-              style={[
-                styles.authPreferences,
-                direction === "rtl" && styles.alignStart,
-              ]}
-            >
-              <PreferenceControls compact onDark />
-            </View>
-          ) : null}
-          {title ? (
-            <View
-              style={[
-                styles.screenHeader,
-                {
-                  backgroundColor: onDark
-                    ? "rgba(32,22,42,0.72)"
-                    : "rgba(255,255,255,0.82)",
-                  borderColor: onDark
-                    ? "rgba(255,255,255,0.10)"
-                    : "rgba(86,132,154,0.16)",
-                  shadowColor: palette.shadow,
-                },
-              ]}
-            >
+          <ScrollView
+            contentContainerStyle={[
+              styles.scroll,
+              isAuth && styles.authScroll,
+              direction === "rtl" && styles.rtlContent,
+            ]}
+            keyboardShouldPersistTaps="handled"
+            refreshControl={
+              onRefresh ? (
+                <RefreshControl
+                  refreshing={Boolean(refreshing)}
+                  onRefresh={onRefresh}
+                  tintColor={onDark ? "#ffffff" : colors.primary}
+                />
+              ) : undefined
+            }
+          >
+            {isAuth ? (
               <View
                 style={[
-                  styles.screenHeaderTop,
-                  direction === "rtl" && styles.rowReverse,
+                  styles.authPreferences,
+                  direction === "rtl" && styles.alignStart,
                 ]}
               >
-                <BrandLockup compact onDark={onDark} />
-                {!isAuth ? (
-                  <PreferenceControls compact onDark={onDark} />
-                ) : null}
+                <PreferenceControls compact onDark />
               </View>
-              <Text
+            ) : null}
+            {title ? (
+              <View
                 style={[
-                  styles.screenTitle,
-                  { color: onDark ? "#ffffff" : palette.text },
-                  direction === "rtl" && styles.textRight,
+                  styles.screenHeader,
+                  {
+                    backgroundColor: onDark
+                      ? "rgba(32,22,42,0.72)"
+                      : "rgba(255,255,255,0.82)",
+                    borderColor: onDark
+                      ? "rgba(255,255,255,0.10)"
+                      : "rgba(86,132,154,0.16)",
+                    shadowColor: palette.shadow,
+                  },
                 ]}
               >
-                {title}
-              </Text>
-              {subtitle ? (
+                <View
+                  style={[
+                    styles.screenHeaderTop,
+                    direction === "rtl" && styles.rowReverse,
+                  ]}
+                >
+                  <BrandLockup compact onDark={onDark} />
+                  {!isAuth ? (
+                    <PreferenceControls compact onDark={onDark} />
+                  ) : null}
+                </View>
                 <Text
                   style={[
-                    styles.screenSubtitle,
-                    { color: onDark ? colors.darkMuted : palette.muted },
+                    styles.screenTitle,
+                    { color: onDark ? "#ffffff" : palette.text },
                     direction === "rtl" && styles.textRight,
                   ]}
                 >
-                  {subtitle}
+                  {title}
                 </Text>
-              ) : null}
-            </View>
-          ) : null}
-          {children}
-        </ScrollView>
+                {subtitle ? (
+                  <Text
+                    style={[
+                      styles.screenSubtitle,
+                      { color: onDark ? colors.darkMuted : palette.muted },
+                      direction === "rtl" && styles.textRight,
+                    ]}
+                  >
+                    {subtitle}
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
+            {children}
+          </ScrollView>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </LinearGradient>
   );
@@ -452,8 +478,13 @@ export function SectionHeader({
       <Text style={textStyles.strong}>{title}</Text>
       {action ? (
         <Pressable
+          accessibilityRole="button"
           disabled={!onActionPress}
-          onPress={onActionPress}
+          hitSlop={8}
+          onPress={() => {
+            pressFeedback();
+            onActionPress?.();
+          }}
           style={({ pressed }) => pressed && styles.buttonPressed}
         >
           <Text style={styles.sectionAction}>{action}</Text>
@@ -521,11 +552,13 @@ export function Avatar({
 export function Button({
   children,
   disabled,
+  accessibilityLabel,
   loading,
   onPress,
   tone = "primary",
 }: {
   children: React.ReactNode;
+  accessibilityLabel?: string;
   disabled?: boolean;
   loading?: boolean;
   onPress?: () => void;
@@ -536,8 +569,13 @@ export function Button({
 
   return (
     <Pressable
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="button"
       disabled={disabled || loading}
-      onPress={onPress}
+      onPress={() => {
+        pressFeedback();
+        onPress?.();
+      }}
       style={({ pressed }) => [
         styles.buttonShell,
         tone === "secondary" && [
@@ -589,23 +627,31 @@ export function Button({
 
 export function Field({
   autoCapitalize = "none",
+  autoComplete,
   error,
+  keyboardType,
   label,
   leftIcon,
   multiline,
   onChangeText,
   placeholder,
+  returnKeyType,
   secureTextEntry,
+  textContentType,
   value,
 }: {
   autoCapitalize?: "characters" | "none" | "sentences" | "words";
+  autoComplete?: TextInputProps["autoComplete"];
   error?: string;
+  keyboardType?: TextInputProps["keyboardType"];
   label: string;
   leftIcon?: React.ReactNode;
   multiline?: boolean;
   onChangeText: (value: string) => void;
   placeholder?: string;
+  returnKeyType?: TextInputProps["returnKeyType"];
   secureTextEntry?: boolean;
+  textContentType?: TextInputProps["textContentType"];
   value: string;
 }) {
   const [focused, setFocused] = useState(false);
@@ -641,14 +687,19 @@ export function Field({
       >
         {leftIcon ? <View style={styles.inputIcon}>{leftIcon}</View> : null}
         <TextInput
+          accessibilityLabel={label}
           autoCapitalize={autoCapitalize}
+          autoComplete={autoComplete}
+          keyboardType={keyboardType}
           multiline={multiline}
           onBlur={() => setFocused(false)}
           onChangeText={onChangeText}
           onFocus={() => setFocused(true)}
           placeholder={placeholder}
           placeholderTextColor={palette.placeholder}
+          returnKeyType={returnKeyType}
           secureTextEntry={secureTextEntry}
+          textContentType={textContentType}
           style={[
             styles.input,
             {
