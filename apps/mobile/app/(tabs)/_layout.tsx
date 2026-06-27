@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Tabs } from "expo-router";
 import {
-  Bell,
   BriefcaseBusiness,
   LayoutDashboard,
   MessageCircle,
@@ -59,24 +58,33 @@ export default function TabsLayout() {
         },
         tabBarInactiveTintColor: palette.muted,
         tabBarItemStyle: {
-          borderRadius: 12,
-          marginHorizontal: 1,
-          minHeight: 50,
-          paddingVertical: 3,
+          borderRadius: 18,
+          marginHorizontal: 2,
+          minHeight: 52,
+          paddingVertical: 4,
         },
+        tabBarActiveBackgroundColor:
+          palette.background === colors.dark
+            ? "rgba(102,60,109,0.34)"
+            : colors.primarySoft,
         tabBarLabelStyle: { fontSize: 10, fontWeight: "800" },
         tabBarStyle: {
           backgroundColor:
             palette.background === colors.dark
               ? "rgba(32,22,42,0.96)"
               : "rgba(255,255,255,0.96)",
-          borderTopColor: palette.border,
-          borderTopWidth: 1,
+          borderColor: palette.border,
+          borderRadius: 26,
+          borderWidth: 1,
+          bottom: 10,
           elevation: 8,
-          height: 68,
-          paddingBottom: 10,
-          paddingHorizontal: 8,
-          paddingTop: 7,
+          height: 72,
+          left: 14,
+          paddingBottom: 8,
+          paddingHorizontal: 10,
+          paddingTop: 8,
+          position: "absolute",
+          right: 14,
           shadowColor: palette.shadow,
           shadowOffset: { height: -8, width: 0 },
           shadowOpacity: 0.08,
@@ -115,9 +123,9 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="notifications"
         options={{
+          href: null,
           title: t("tabs.alerts"),
           tabBarBadge: unreadAlerts > 0 ? unreadAlerts : undefined,
-          tabBarIcon: ({ color, size }) => <Bell color={color} size={size} />,
         }}
       />
       <Tabs.Screen

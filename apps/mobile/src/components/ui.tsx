@@ -312,6 +312,7 @@ export function PreferenceControls({
 
 export function Screen({
   children,
+  headerEnd,
   onRefresh,
   refreshing,
   subtitle,
@@ -319,6 +320,7 @@ export function Screen({
   tone = "app",
 }: {
   children: React.ReactNode;
+  headerEnd?: React.ReactNode;
   onRefresh?: () => void;
   refreshing?: boolean;
   subtitle?: string;
@@ -371,16 +373,6 @@ export function Screen({
               ) : undefined
             }
           >
-            {isAuth ? (
-              <View
-                style={[
-                  styles.authPreferences,
-                  direction === "rtl" && styles.alignStart,
-                ]}
-              >
-                <PreferenceControls compact onDark />
-              </View>
-            ) : null}
             {title ? (
               <View
                 style={[
@@ -403,9 +395,7 @@ export function Screen({
                   ]}
                 >
                   <BrandLockup compact onDark={onDark} />
-                  {!isAuth ? (
-                    <PreferenceControls compact onDark={onDark} />
-                  ) : null}
+                  {!isAuth ? headerEnd : null}
                 </View>
                 <Text
                   style={[
@@ -836,10 +826,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.panelSoft,
     borderWidth: 1,
   },
-  authPreferences: {
-    alignSelf: "flex-end",
-    marginBottom: 8,
-  },
   authScroll: {
     justifyContent: "center",
     minHeight: "100%",
@@ -1136,7 +1122,7 @@ const styles = StyleSheet.create({
   scroll: {
     gap: 14,
     padding: 14,
-    paddingBottom: 32,
+    paddingBottom: 118,
   },
   screenHeaderTop: {
     alignItems: "center",

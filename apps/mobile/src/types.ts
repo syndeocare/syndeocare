@@ -40,6 +40,29 @@ export type ApiList<T> = {
   total: number;
 };
 
+export type CatalogKind =
+  | "certification"
+  | "document_type"
+  | "job_role"
+  | "specialty";
+
+export type CatalogItem = {
+  id: string;
+  kind: CatalogKind;
+  name: string;
+  nameAr: string | null;
+  abbreviation: string | null;
+  description: string | null;
+  isActive: boolean;
+  isRequired: boolean;
+  appliesTo: string;
+  allowedExtensions: string[];
+  maxSizeMb: number;
+  displayOrder: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type LocationValue = {
   city: string;
   region: string;
@@ -81,6 +104,8 @@ export type JobCreateInput = {
   startsAt: string;
   endsAt?: string;
   compensation: Money;
+  maxApplicants?: number;
+  proposalDeadline?: string | null;
   verificationRequired: boolean;
   summary: string;
   description: string;

@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import {
@@ -11,11 +11,13 @@ import {
   ErrorBanner,
   Field,
   LoadingBlock,
+  PreferenceControls,
   Screen,
   SectionHeader,
   colors,
   useTextStyles,
 } from "../../src/components/ui";
+import { AppHeaderActions } from "../../src/components/AppHeaderActions";
 import { formatYemenPhone, validateYemenPhone } from "../../src/config";
 import {
   getMyClinicProfile,
@@ -67,6 +69,18 @@ export default function ProfileScreen() {
       : profile && !isClinicProfile(profile)
         ? profile.fullName
         : session?.principal.displayName;
+
+  useEffect(() => {
+    if (!profile) return;
+    if (isClinicProfile(profile)) {
+      setPhone(profile.contactPhone?.replace(/^\+967/, "") ?? "");
+      setDescription(profile.description ?? "");
+      return;
+    }
+
+    setPhone(profile.primaryPhone?.replace(/^\+967/, "") ?? "");
+    setDescription(profile.bio ?? "");
+  }, [profile]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -149,6 +163,7 @@ export default function ProfileScreen() {
 
   return (
     <Screen
+      headerEnd={<AppHeaderActions />}
       onRefresh={() => void profileQuery.refetch()}
       refreshing={profileQuery.isFetching}
       title={t("profile.title")}
@@ -201,7 +216,7 @@ export default function ProfileScreen() {
       </Card>
 
       <Card>
-        <SectionHeader title={t("profile.quickUpdate")} />
+        <SectionHeader title={t("profile.profileDetails")} />
         <Text style={text.body}>{t("profile.yemenFixed")}</Text>
         <Field
           autoComplete="tel"
@@ -226,6 +241,12 @@ export default function ProfileScreen() {
         >
           {t("profile.save")}
         </Button>
+      </Card>
+
+      <Card>
+        <SectionHeader title={t("settings.title")} />
+        <Text style={text.body}>{t("settings.preferencesBody")}</Text>
+        <PreferenceControls />
       </Card>
 
       <Card>
@@ -282,9 +303,13 @@ export default function ProfileScreen() {
         ) : null}
       </Card>
 
-      <Button onPress={logout} tone="danger">
-        {t("profile.logout")}
-      </Button>
+      <Card>
+        <SectionHeader title={t("settings.account")} />
+        <Text style={text.body}>{t("settings.accountBody")}</Text>
+        <Button onPress={logout} tone="danger">
+          {t("profile.logout")}
+        </Button>
+      </Card>
     </Screen>
   );
 }

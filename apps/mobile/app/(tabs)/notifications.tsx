@@ -15,6 +15,7 @@ import {
   useTextStyles,
   useThemePalette,
 } from "../../src/components/ui";
+import { AppHeaderActions } from "../../src/components/AppHeaderActions";
 import {
   deleteNotification,
   listNotifications,
@@ -55,6 +56,7 @@ export default function NotificationsScreen() {
 
   return (
     <Screen
+      headerEnd={<AppHeaderActions />}
       onRefresh={() => void notificationsQuery.refetch()}
       refreshing={notificationsQuery.isFetching}
       title={t("notifications.title")}

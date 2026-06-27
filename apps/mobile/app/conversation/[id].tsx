@@ -1,13 +1,15 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import * as DocumentPicker from "expo-document-picker";
 import { Stack, useLocalSearchParams } from "expo-router";
-import { Paperclip } from "lucide-react-native";
-import { useState } from "react";
+import { MessageCircle, Paperclip, Send } from "lucide-react-native";
+import { useMemo, useState } from "react";
 import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 
 import {
+  Avatar,
   Button,
   Card,
+  EmptyState,
   ErrorBanner,
   Field,
   LoadingBlock,
@@ -16,6 +18,7 @@ import {
   useTextStyles,
   useThemePalette,
 } from "../../src/components/ui";
+import { AppHeaderActions } from "../../src/components/AppHeaderActions";
 import {
   getChatMediaAccessUrl,
   listMessages,
@@ -44,6 +47,17 @@ export default function ConversationScreen() {
     queryKey: ["conversation", id],
     refetchInterval: 10_000,
   });
+  const messages = useMemo(
+    () =>
+      [...(messagesQuery.data?.items ?? [])].sort(
+        (a, b) =>
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      ),
+    [messagesQuery.data?.items],
+  );
+  const counterpart = messages.find(
+    (message) => message.senderActorId !== session?.principal.sub,
+  );
 
   const sendMutation = useMutation({
     mutationFn: async () => {
@@ -96,6 +110,7 @@ export default function ConversationScreen() {
     <>
       <Stack.Screen options={{ headerShown: false }} />
       <Screen
+        headerEnd={<AppHeaderActions />}
         onRefresh={() => void messagesQuery.refetch()}
         refreshing={messagesQuery.isFetching}
         title={t("conversation.title")}
@@ -115,53 +130,99 @@ export default function ConversationScreen() {
           }
         />
 
-        {messagesQuery.data?.items.map((message) => {
-          const isMine = message.senderActorId === session?.principal.sub;
-          return (
-            <View
-              key={message.id}
-              style={[
-                styles.messageBubble,
-                {
-                  alignSelf: isMine ? "flex-end" : "flex-start",
-                  backgroundColor:
-                    isMine && theme === "dark"
-                      ? "#2F1F3A"
-                      : isMine
-                        ? colors.primarySoft
-                        : palette.surface,
-                  borderColor: palette.border,
-                },
-              ]}
-            >
-              <View style={[styles.messageHeader, isRTL && styles.rowReverse]}>
-                <Text style={text.strong}>{message.senderRole}</Text>
-                <Text style={[styles.time, { color: palette.muted }]}>
-                  {new Date(message.createdAt).toLocaleString()}
-                </Text>
-              </View>
-              <Text style={text.body}>{message.content}</Text>
-              {message.fileName ? (
-                <Pressable
-                  disabled={!message.fileUrl || accessMutation.isPending}
-                  onPress={() =>
-                    message.fileUrl
-                      ? accessMutation.mutate(message.fileUrl)
-                      : null
-                  }
-                  style={[styles.fileRow, isRTL && styles.rowReverse]}
-                >
-                  <Paperclip color={colors.primaryDark} size={16} />
-                  <Text style={styles.file}>
-                    {t("conversation.attachment")} {message.fileName}
-                  </Text>
-                </Pressable>
-              ) : null}
+        <Card>
+          <View style={[styles.conversationHeader, isRTL && styles.rowReverse]}>
+            <Avatar
+              label={counterpart?.senderRole ?? t("conversation.title")}
+            />
+            <View style={styles.grow}>
+              <Text style={text.h2}>{t("conversation.title")}</Text>
+              <Text style={text.body}>
+                {counterpart?.senderRole ?? t("conversation.secureThread")}
+              </Text>
             </View>
-          );
-        })}
+            <MessageCircle color={colors.primary} size={22} />
+          </View>
+        </Card>
+
+        {messages.length ? (
+          messages.map((message, index) => {
+            const isMine = message.senderActorId === session?.principal.sub;
+            const previous = messages[index - 1];
+            const currentDate = new Date(message.createdAt).toDateString();
+            const previousDate = previous
+              ? new Date(previous.createdAt).toDateString()
+              : "";
+            const showDate = currentDate !== previousDate;
+
+            return (
+              <View key={message.id} style={styles.messageGroup}>
+                {showDate ? (
+                  <View style={styles.datePill}>
+                    <Text style={styles.datePillText}>
+                      {new Date(message.createdAt).toLocaleDateString()}
+                    </Text>
+                  </View>
+                ) : null}
+                <View
+                  style={[
+                    styles.messageBubble,
+                    {
+                      alignSelf: isMine ? "flex-end" : "flex-start",
+                      backgroundColor:
+                        isMine && theme === "dark"
+                          ? "#2F1F3A"
+                          : isMine
+                            ? colors.primarySoft
+                            : palette.surface,
+                      borderColor: palette.border,
+                    },
+                  ]}
+                >
+                  <View
+                    style={[styles.messageHeader, isRTL && styles.rowReverse]}
+                  >
+                    <Text style={text.strong}>{message.senderRole}</Text>
+                    <Text style={[styles.time, { color: palette.muted }]}>
+                      {new Date(message.createdAt).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </Text>
+                  </View>
+                  <Text style={text.body}>{message.content}</Text>
+                  {message.fileName ? (
+                    <Pressable
+                      disabled={!message.fileUrl || accessMutation.isPending}
+                      onPress={() =>
+                        message.fileUrl
+                          ? accessMutation.mutate(message.fileUrl)
+                          : null
+                      }
+                      style={[styles.fileRow, isRTL && styles.rowReverse]}
+                    >
+                      <Paperclip color={colors.primaryDark} size={16} />
+                      <Text style={styles.file}>
+                        {t("conversation.attachment")} {message.fileName}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              </View>
+            );
+          })
+        ) : (
+          <EmptyState
+            body={t("conversation.emptyBody")}
+            title={t("conversation.emptyTitle")}
+          />
+        )}
 
         <Card>
+          <View style={[styles.composerTitle, isRTL && styles.rowReverse]}>
+            <Send color={colors.primary} size={18} />
+            <Text style={text.strong}>{t("conversation.composerTitle")}</Text>
+          </View>
           <Field
             label={t("conversation.message")}
             multiline
@@ -219,6 +280,35 @@ const styles = StyleSheet.create({
     gap: 8,
     maxWidth: "88%",
     padding: 14,
+  },
+  composerTitle: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+  conversationHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
+  },
+  datePill: {
+    alignSelf: "center",
+    backgroundColor: colors.panelSoft,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+  },
+  datePillText: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  grow: {
+    flex: 1,
+    gap: 2,
+  },
+  messageGroup: {
+    gap: 10,
   },
   messageHeader: {
     alignItems: "center",

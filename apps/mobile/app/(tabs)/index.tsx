@@ -20,6 +20,7 @@ import {
   useThemePalette,
   useTextStyles,
 } from "../../src/components/ui";
+import { AppHeaderActions } from "../../src/components/AppHeaderActions";
 import {
   getMe,
   listBookings,
@@ -61,6 +62,7 @@ export default function DashboardScreen() {
 
   return (
     <Screen
+      headerEnd={<AppHeaderActions />}
       onRefresh={refetchAll}
       refreshing={queries.some((query) => query.isFetching)}
       title={interpolate(t("dashboard.hi"), { name })}

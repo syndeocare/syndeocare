@@ -10,6 +10,8 @@ import type {
   AppNotification,
   AuthSession,
   Booking,
+  CatalogItem,
+  CatalogKind,
   ChatMediaUploadResult,
   ClinicProfile,
   Conversation,
@@ -475,6 +477,10 @@ export const submitOnboarding = (status: OnboardingStatus) =>
   });
 
 export const listJobs = () => apiRequest<ApiList<Job>>("/jobs");
+export const listCatalogItems = (kind: CatalogKind) =>
+  apiRequest<{ items: CatalogItem[] }>(
+    `/catalog?${new URLSearchParams({ kind }).toString()}`,
+  );
 export const createJob = (input: JobCreateInput) =>
   authenticatedRequest<Job>("/jobs", {
     body: JSON.stringify(input),
