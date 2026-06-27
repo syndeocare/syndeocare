@@ -1,7 +1,11 @@
 import { Stack } from "expo-router";
 import { Text } from "react-native";
 
-import { LoadingBlock, Screen, useTextStyles } from "../../../src/components/ui";
+import {
+  LoadingBlock,
+  Screen,
+  useTextStyles,
+} from "../../../src/components/ui";
 
 export default function OAuthCallbackScreen() {
   const text = useTextStyles();

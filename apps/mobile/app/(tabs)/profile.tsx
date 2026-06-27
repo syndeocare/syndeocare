@@ -48,7 +48,8 @@ export default function ProfileScreen() {
   const [newPassword, setNewPassword] = useState("");
 
   const profileQuery = useQuery<MobileProfile>({
-    queryFn: () => (isClinic ? getMyClinicProfile() : getMyProfessionalProfile()),
+    queryFn: () =>
+      isClinic ? getMyClinicProfile() : getMyProfessionalProfile(),
     queryKey: ["profile", session?.principal.role],
   });
 
@@ -80,7 +81,9 @@ export default function ProfileScreen() {
         await updateMyClinicProfile({
           ...profile,
           contactPhone: normalizedPhone,
-          description: description || (isClinicProfile(profile) ? profile.description : ""),
+          description:
+            description ||
+            (isClinicProfile(profile) ? profile.description : ""),
         });
       } else {
         await updateMyProfessionalProfile({
@@ -96,7 +99,8 @@ export default function ProfileScreen() {
   });
   const imageMutation = useMutation({
     mutationFn: async () => {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const permission =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
         throw new Error(t("profile.imagePermission"));
       }
@@ -149,7 +153,9 @@ export default function ProfileScreen() {
       refreshing={profileQuery.isFetching}
       title={t("profile.title")}
     >
-      {profileQuery.isLoading ? <LoadingBlock label={t("profile.loading")} /> : null}
+      {profileQuery.isLoading ? (
+        <LoadingBlock label={t("profile.loading")} />
+      ) : null}
       <ErrorBanner
         message={
           profileQuery.error instanceof Error
@@ -157,12 +163,12 @@ export default function ProfileScreen() {
             : saveMutation.error instanceof Error
               ? saveMutation.error.message
               : imageMutation.error instanceof Error
-              ? imageMutation.error.message
-              : verificationMutation.error instanceof Error
-                ? verificationMutation.error.message
-                : passwordMutation.error instanceof Error
-                  ? passwordMutation.error.message
-              : undefined
+                ? imageMutation.error.message
+                : verificationMutation.error instanceof Error
+                  ? verificationMutation.error.message
+                  : passwordMutation.error instanceof Error
+                    ? passwordMutation.error.message
+                    : undefined
         }
       />
 
@@ -204,14 +210,15 @@ export default function ProfileScreen() {
           value={phone}
         />
         <Field
-          label={
-            isClinic ? t("profile.facilityDescription") : t("profile.bio")
-          }
+          label={isClinic ? t("profile.facilityDescription") : t("profile.bio")}
           multiline
           onChangeText={setDescription}
           value={description}
         />
-        <Button loading={saveMutation.isPending} onPress={() => saveMutation.mutate()}>
+        <Button
+          loading={saveMutation.isPending}
+          onPress={() => saveMutation.mutate()}
+        >
           {t("profile.save")}
         </Button>
       </Card>

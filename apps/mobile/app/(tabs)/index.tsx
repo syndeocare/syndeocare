@@ -50,7 +50,9 @@ export default function DashboardScreen() {
     notifications.data?.items.filter((notification) => !notification.isRead)
       .length ?? 0;
   const name =
-    me.data?.displayName ?? session?.principal.displayName ?? t("dashboard.there");
+    me.data?.displayName ??
+    session?.principal.displayName ??
+    t("dashboard.there");
   const role = session?.principal.role;
 
   const refetchAll = () => {
@@ -132,7 +134,10 @@ export default function DashboardScreen() {
         </Card>
       ) : (
         <EmptyState
-          action={{ href: "/(tabs)/messages", label: t("dashboard.openMessages") }}
+          action={{
+            href: "/(tabs)/messages",
+            label: t("dashboard.openMessages"),
+          }}
           body={t("dashboard.noConversationsBody")}
           title={t("dashboard.noConversationsTitle")}
         />
@@ -171,7 +176,9 @@ function StatCard({
       </View>
       <View style={styles.statCopy}>
         <Text style={[styles.statValue, { color: palette.text }]}>{value}</Text>
-        <Text style={[styles.statLabel, { color: palette.muted }]}>{label}</Text>
+        <Text style={[styles.statLabel, { color: palette.muted }]}>
+          {label}
+        </Text>
       </View>
     </View>
   );

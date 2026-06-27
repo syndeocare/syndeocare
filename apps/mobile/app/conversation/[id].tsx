@@ -48,9 +48,7 @@ export default function ConversationScreen() {
   const sendMutation = useMutation({
     mutationFn: async () => {
       const trimmed = content.trim();
-      let uploaded:
-        | Awaited<ReturnType<typeof uploadChatMedia>>
-        | null = null;
+      let uploaded: Awaited<ReturnType<typeof uploadChatMedia>> | null = null;
 
       if (attachment) {
         uploaded = await uploadChatMedia(attachment);
@@ -113,7 +111,7 @@ export default function ConversationScreen() {
                 ? sendMutation.error.message
                 : accessMutation.error instanceof Error
                   ? accessMutation.error.message
-                : undefined
+                  : undefined
           }
         />
 
@@ -147,7 +145,9 @@ export default function ConversationScreen() {
                 <Pressable
                   disabled={!message.fileUrl || accessMutation.isPending}
                   onPress={() =>
-                    message.fileUrl ? accessMutation.mutate(message.fileUrl) : null
+                    message.fileUrl
+                      ? accessMutation.mutate(message.fileUrl)
+                      : null
                   }
                   style={[styles.fileRow, isRTL && styles.rowReverse]}
                 >

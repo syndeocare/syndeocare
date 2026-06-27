@@ -141,18 +141,21 @@ const en = {
   "shifts.alreadyApplied": "Already applied",
   "shifts.accept": "Accept",
   "shifts.amountInvalid": "Enter a valid hourly rate.",
-  "shifts.applicationsBody": "Review shift requests and update applicants from here.",
+  "shifts.applicationsBody":
+    "Review shift requests and update applicants from here.",
   "shifts.applicationsTitle": "Applications",
   "shifts.applyProposal": "Apply with proposal",
   "shifts.applyTitle": "Apply for this shift",
-  "shifts.applyBody": "Add a short proposal so the clinic understands your fit.",
+  "shifts.applyBody":
+    "Add a short proposal so the clinic understands your fit.",
   "shifts.cancel": "Cancel",
   "shifts.clinicNotReady": "Your clinic profile is not ready yet.",
   "shifts.createShift": "Create shift",
   "shifts.createShiftBody": "Publish a clear shift for verified professionals.",
   "shifts.decline": "Decline",
   "shifts.description": "Description",
-  "shifts.detailsRequired": "Add summary, description, and at least one requirement.",
+  "shifts.detailsRequired":
+    "Add summary, description, and at least one requirement.",
   "shifts.endsAt": "Ends at",
   "shifts.endsAtInvalid": "Enter a valid end date or leave it empty.",
   "shifts.hourlyRate": "Hourly rate",
@@ -162,7 +165,8 @@ const en = {
   "shifts.loading": "Loading shifts...",
   "shifts.noApplicationsBody": "Applications for your shifts will appear here.",
   "shifts.noApplicationsTitle": "No applications yet",
-  "shifts.noOpenBody": "Published shifts from approved clinics will appear here.",
+  "shifts.noOpenBody":
+    "Published shifts from approved clinics will appear here.",
   "shifts.noOpenTitle": "No open shifts",
   "shifts.publishShift": "Publish shift",
   "shifts.proposal": "Proposal",
@@ -206,7 +210,8 @@ const ar: Record<TranslationKey, string> = {
   "auth.createAccount": "إنشاء الحساب",
   "auth.createAccountToStart": "أنشئ حسابك للبدء",
   "auth.email": "البريد الإلكتروني",
-  "auth.emailFirstForReset": "أدخل بريدك الإلكتروني أولاً ثم اطلب إعادة التعيين.",
+  "auth.emailFirstForReset":
+    "أدخل بريدك الإلكتروني أولاً ثم اطلب إعادة التعيين.",
   "auth.forgotPassword": "نسيت كلمة المرور؟",
   "auth.fullName": "الاسم الكامل",
   "auth.googleFirstHint":
@@ -231,8 +236,7 @@ const ar: Record<TranslationKey, string> = {
   "auth.signUp": "إنشاء حساب",
   "auth.signUpWithEmail": "إنشاء حساب بالبريد الإلكتروني",
   "auth.startChoice": "اختر طريقة البدء",
-  "auth.terms":
-    "بالمتابعة، فإنك توافق على شروط SyndeoCare وسياسة الخصوصية.",
+  "auth.terms": "بالمتابعة، فإنك توافق على شروط SyndeoCare وسياسة الخصوصية.",
   "auth.welcomeBack": "مرحباً بعودتك",
   "conversation.attachment": "مرفق:",
   "conversation.attachFile": "إرفاق ملف",
@@ -245,7 +249,8 @@ const ar: Record<TranslationKey, string> = {
   "controls.dark": "داكن",
   "controls.light": "فاتح",
   "dashboard.bookings": "الحجوزات",
-  "dashboard.clinicBody": "راجع المتقدمين، انشر المناوبات، وحافظ على سير المحادثات.",
+  "dashboard.clinicBody":
+    "راجع المتقدمين، انشر المناوبات، وحافظ على سير المحادثات.",
   "dashboard.clinicOperations": "عمليات المنشأة",
   "dashboard.hi": "مرحباً {{name}}",
   "dashboard.latestConversation": "آخر محادثة",
@@ -257,7 +262,8 @@ const ar: Record<TranslationKey, string> = {
   "dashboard.noRecentMessage": "لا توجد رسالة حديثة",
   "dashboard.openMessages": "فتح الرسائل",
   "dashboard.openShifts": "المناوبات المفتوحة",
-  "dashboard.professionalBody": "اعثر على المناوبات، تابع طلباتك، ورد على المنشآت.",
+  "dashboard.professionalBody":
+    "اعثر على المناوبات، تابع طلباتك، ورد على المنشآت.",
   "dashboard.professionalWorkspace": "مساحة المختص",
   "dashboard.there": "بك",
   "dashboard.unreadAlerts": "تنبيهات غير مقروءة",
@@ -318,7 +324,8 @@ const ar: Record<TranslationKey, string> = {
   "shifts.alreadyApplied": "تم التقديم مسبقاً",
   "shifts.accept": "قبول",
   "shifts.amountInvalid": "أدخل أجراً صحيحاً بالساعة.",
-  "shifts.applicationsBody": "راجع طلبات المناوبات وحدّث حالة المتقدمين من هنا.",
+  "shifts.applicationsBody":
+    "راجع طلبات المناوبات وحدّث حالة المتقدمين من هنا.",
   "shifts.applicationsTitle": "الطلبات",
   "shifts.applyProposal": "التقديم مع عرض",
   "shifts.applyTitle": "التقديم على هذه المناوبة",
@@ -489,7 +496,10 @@ export function useT() {
   return usePreferences().t;
 }
 
-export function interpolate(value: string, tokens: Record<string, string | number>) {
+export function interpolate(
+  value: string,
+  tokens: Record<string, string | number>,
+) {
   return Object.entries(tokens).reduce(
     (result, [key, token]) => result.replaceAll(`{{${key}}}`, String(token)),
     value,

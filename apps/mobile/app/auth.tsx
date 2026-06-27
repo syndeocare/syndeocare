@@ -80,27 +80,24 @@ export default function AuthScreen() {
   const { signIn, signInWithGoogle, signUp } = useAuth();
   const t = useT();
 
-  const resolver = useMemo(
-    () => {
-      const signInSchema = z.object({
-        displayName: z.string().optional(),
-        email: z.string().email(t("validation.email")),
-        password: z.string().min(8, t("validation.passwordLength")),
-      });
+  const resolver = useMemo(() => {
+    const signInSchema = z.object({
+      displayName: z.string().optional(),
+      email: z.string().email(t("validation.email")),
+      password: z.string().min(8, t("validation.passwordLength")),
+    });
 
-      const signUpSchema = signInSchema.extend({
-        displayName: z.string().min(2, t("validation.name")),
-        password: z
-          .string()
-          .min(8, t("validation.passwordLength"))
-          .regex(/[A-Z]/, t("validation.passwordUpper"))
-          .regex(/\d/, t("validation.passwordNumber")),
-      });
+    const signUpSchema = signInSchema.extend({
+      displayName: z.string().min(2, t("validation.name")),
+      password: z
+        .string()
+        .min(8, t("validation.passwordLength"))
+        .regex(/[A-Z]/, t("validation.passwordUpper"))
+        .regex(/\d/, t("validation.passwordNumber")),
+    });
 
-      return zodResolver(mode === "signup" ? signUpSchema : signInSchema);
-    },
-    [mode, t],
-  );
+    return zodResolver(mode === "signup" ? signUpSchema : signInSchema);
+  }, [mode, t]);
 
   const form = useForm<FormValues>({
     defaultValues: { displayName: "", email: "", password: "" },
@@ -187,7 +184,9 @@ export default function AuthScreen() {
             googlePending={googleMutation.isPending}
             onGooglePress={handleGooglePress}
             onReset={() => resetMutation.mutate()}
-            onSubmit={form.handleSubmit((values) => authMutation.mutate(values))}
+            onSubmit={form.handleSubmit((values) =>
+              authMutation.mutate(values),
+            )}
             onSwitchToSignup={() => switchMode("signup")}
             resetPending={resetMutation.isPending}
             resetSuccess={resetMutation.isSuccess}
@@ -220,7 +219,9 @@ export default function AuthScreen() {
             errorMessage={errorMessage}
             form={form}
             onBack={() => setStep("role")}
-            onSubmit={form.handleSubmit((values) => authMutation.mutate(values))}
+            onSubmit={form.handleSubmit((values) =>
+              authMutation.mutate(values),
+            )}
             onSwitchToSignin={() => switchMode("signin")}
             role={role}
             submitPending={authMutation.isPending}
@@ -254,7 +255,10 @@ function GoogleButton({
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={colors.primary} style={styles.googleSpinner} />
+        <ActivityIndicator
+          color={colors.primary}
+          style={styles.googleSpinner}
+        />
       ) : (
         <View style={styles.googleIcon}>
           <Text style={styles.googleIconText}>G</Text>
@@ -376,11 +380,15 @@ function SignInContent({
           <View style={styles.detailsPanel}>
             <EmailPasswordFields form={form} />
             {resetSuccess ? (
-              <Text style={styles.success}>{t("auth.passwordResetRequested")}</Text>
+              <Text style={styles.success}>
+                {t("auth.passwordResetRequested")}
+              </Text>
             ) : null}
             <Pressable onPress={onReset} disabled={resetPending}>
               <Text style={styles.forgotText}>
-                {resetPending ? t("auth.sendingReset") : t("auth.forgotPassword")}
+                {resetPending
+                  ? t("auth.sendingReset")
+                  : t("auth.forgotPassword")}
               </Text>
             </Pressable>
             <Button
@@ -395,7 +403,9 @@ function SignInContent({
       </View>
 
       <View style={styles.footerLine}>
-        <Text style={[styles.footerMuted, copy.body]}>{t("auth.noAccount")} </Text>
+        <Text style={[styles.footerMuted, copy.body]}>
+          {t("auth.noAccount")}{" "}
+        </Text>
         <Pressable onPress={onSwitchToSignup}>
           <Text style={styles.footerLink}>{t("auth.signUp")}</Text>
         </Pressable>
@@ -419,7 +429,9 @@ function RoleContent({
     <>
       <View style={styles.centerHeader}>
         <Text style={[styles.title, copy.title]}>{t("auth.join")}</Text>
-        <Text style={[styles.subtitle, copy.body]}>{t("auth.startChoice")}</Text>
+        <Text style={[styles.subtitle, copy.body]}>
+          {t("auth.startChoice")}
+        </Text>
       </View>
 
       <View style={styles.roleCards}>
@@ -522,7 +534,9 @@ function MethodContent({
       <View style={styles.centerHeader}>
         <BackButton onPress={onBack} />
         <Text style={[styles.title, copy.title]}>
-          {role === "clinic" ? t("auth.clinicSignup") : t("auth.professionalSignup")}
+          {role === "clinic"
+            ? t("auth.clinicSignup")
+            : t("auth.professionalSignup")}
         </Text>
         <Text style={[styles.subtitle, copy.body]}>
           {t("auth.googleFirstHint")}
@@ -575,7 +589,9 @@ function DetailsContent({
       <View style={styles.centerHeader}>
         <BackButton onPress={onBack} />
         <Text style={[styles.title, copy.title]}>
-          {role === "clinic" ? t("auth.clinicSignup") : t("auth.professionalSignup")}
+          {role === "clinic"
+            ? t("auth.clinicSignup")
+            : t("auth.professionalSignup")}
         </Text>
         <Text style={[styles.subtitle, copy.body]}>
           {t("auth.createAccountToStart")}
@@ -592,7 +608,11 @@ function DetailsContent({
             <Field
               autoCapitalize="words"
               error={fieldState.error?.message}
-              label={role === "clinic" ? t("auth.organizationName") : t("auth.fullName")}
+              label={
+                role === "clinic"
+                  ? t("auth.organizationName")
+                  : t("auth.fullName")
+              }
               leftIcon={
                 role === "clinic" ? (
                   <Building2 color={colors.muted} size={20} />

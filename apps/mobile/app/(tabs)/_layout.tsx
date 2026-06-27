@@ -32,8 +32,9 @@ export default function TabsLayout() {
     refetchInterval: 15_000,
   });
   const unreadAlerts =
-    notificationsQuery.data?.items.filter((notification) => !notification.isRead)
-      .length ?? 0;
+    notificationsQuery.data?.items.filter(
+      (notification) => !notification.isRead,
+    ).length ?? 0;
   const unreadMessages =
     conversationsQuery.data?.items.reduce(
       (total, conversation) => total + (conversation.unreadCount ?? 0),

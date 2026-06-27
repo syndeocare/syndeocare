@@ -1,7 +1,14 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { CalendarClock, MapPin, Plus } from "lucide-react-native";
 import { useMemo, useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 import {
   Avatar,
@@ -49,7 +56,9 @@ function formatShiftWindow(job: Job) {
     ends && !Number.isNaN(ends.getTime())
       ? ends.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
       : "";
-  return endTime ? `${date} - ${startTime}-${endTime}` : `${date} - ${startTime}`;
+  return endTime
+    ? `${date} - ${startTime}-${endTime}`
+    : `${date} - ${startTime}`;
 }
 
 export default function ShiftsScreen() {
@@ -102,7 +111,9 @@ export default function ShiftsScreen() {
   const createShiftMutation = useMutation({
     mutationFn: async () => {
       const startsAt = new Date(shiftDraft.startsAt);
-      const endsAt = shiftDraft.endsAt ? new Date(shiftDraft.endsAt) : undefined;
+      const endsAt = shiftDraft.endsAt
+        ? new Date(shiftDraft.endsAt)
+        : undefined;
       const amount = Number(shiftDraft.amount);
 
       if (!shiftDraft.title.trim()) throw new Error(t("shifts.titleRequired"));
@@ -144,7 +155,11 @@ export default function ShiftsScreen() {
         verificationRequired: true,
       };
 
-      if (!input.description || !input.summary || input.requirements.length === 0) {
+      if (
+        !input.description ||
+        !input.summary ||
+        input.requirements.length === 0
+      ) {
         throw new Error(t("shifts.detailsRequired"));
       }
 
@@ -203,7 +218,9 @@ export default function ShiftsScreen() {
       refreshing={jobsQuery.isFetching || bookingsQuery.isFetching}
       title={t("shifts.title")}
     >
-      {jobsQuery.isLoading ? <LoadingBlock label={t("shifts.loading")} /> : null}
+      {jobsQuery.isLoading ? (
+        <LoadingBlock label={t("shifts.loading")} />
+      ) : null}
       <ErrorBanner
         message={
           jobsQuery.error instanceof Error
@@ -228,7 +245,12 @@ export default function ShiftsScreen() {
         <>
           <Card>
             <View style={styles.ctaTop}>
-              <View style={[styles.iconShell, { backgroundColor: colors.primarySoft }]}>
+              <View
+                style={[
+                  styles.iconShell,
+                  { backgroundColor: colors.primarySoft },
+                ]}
+              >
                 <Plus color={colors.primaryDark} size={20} />
               </View>
               <View style={styles.grow}>
@@ -345,7 +367,12 @@ export default function ShiftsScreen() {
           return (
             <Card key={job.id}>
               <View style={styles.row}>
-                <View style={[styles.iconShell, { backgroundColor: palette.surfaceMuted }]}>
+                <View
+                  style={[
+                    styles.iconShell,
+                    { backgroundColor: palette.surfaceMuted },
+                  ]}
+                >
                   <CalendarClock color={colors.accentDark} size={20} />
                 </View>
                 <View style={styles.grow}>
@@ -373,7 +400,9 @@ export default function ShiftsScreen() {
                   disabled={applied || job.status !== "open"}
                   onPress={() => setSelectedJob(job)}
                 >
-                  {applied ? t("shifts.alreadyApplied") : t("shifts.applyProposal")}
+                  {applied
+                    ? t("shifts.alreadyApplied")
+                    : t("shifts.applyProposal")}
                 </Button>
               ) : null}
             </Card>
@@ -409,7 +438,10 @@ export default function ShiftsScreen() {
             >
               {t("shifts.submitApplication")}
             </Button>
-            <Pressable onPress={() => setSelectedJob(null)} style={styles.cancel}>
+            <Pressable
+              onPress={() => setSelectedJob(null)}
+              style={styles.cancel}
+            >
               <Text style={styles.cancelText}>{t("shifts.cancel")}</Text>
             </Pressable>
           </View>

@@ -8,7 +8,9 @@ export default function App() {
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
           <Text style={styles.brand}>SyndeoCare</Text>
-          <Text style={styles.tagline}>Healthcare staffing, built for Yemen</Text>
+          <Text style={styles.tagline}>
+            Healthcare staffing, built for Yemen
+          </Text>
         </View>
 
         <View style={styles.panel}>

@@ -35,7 +35,10 @@ type UploadDescriptor = {
   uploadUrl: string;
 };
 
-async function uploadDocument(documentType: string, uploadFailedMessage: string) {
+async function uploadDocument(
+  documentType: string,
+  uploadFailedMessage: string,
+) {
   const picked = await DocumentPicker.getDocumentAsync({
     copyToCacheDirectory: true,
     multiple: false,
@@ -152,7 +155,9 @@ export default function OnboardingScreen() {
                 {status.verificationStatus.replace("_", " ")}
               </Badge>
             </View>
-            <View style={[styles.track, { backgroundColor: palette.surfaceMuted }]}>
+            <View
+              style={[styles.track, { backgroundColor: palette.surfaceMuted }]}
+            >
               <View style={[styles.fill, { width: `${completion}%` }]} />
             </View>
           </Card>

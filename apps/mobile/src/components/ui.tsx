@@ -313,7 +313,13 @@ export function Screen({
 
   return (
     <LinearGradient
-      colors={isAuth ? gradients.hero : isDark ? gradients.appDark : gradients.appLight}
+      colors={
+        isAuth
+          ? gradients.hero
+          : isDark
+            ? gradients.appDark
+            : gradients.appLight
+      }
       style={styles.root}
     >
       {isAuth || isDark ? (
@@ -372,7 +378,9 @@ export function Screen({
                 ]}
               >
                 <BrandLockup compact onDark={onDark} />
-                {!isAuth ? <PreferenceControls compact onDark={onDark} /> : null}
+                {!isAuth ? (
+                  <PreferenceControls compact onDark={onDark} />
+                ) : null}
               </View>
               <Text
                 style={[
@@ -474,7 +482,12 @@ export function Avatar({
         source={{ uri }}
         style={[
           styles.avatarImage,
-          { borderColor: palette.border, borderRadius: size / 2, height: size, width: size },
+          {
+            borderColor: palette.border,
+            borderRadius: size / 2,
+            height: size,
+            width: size,
+          },
         ]}
       />
     );
@@ -493,7 +506,12 @@ export function Avatar({
         },
       ]}
     >
-      <Text style={[styles.avatarFallbackText, { fontSize: Math.max(14, size * 0.34) }]}>
+      <Text
+        style={[
+          styles.avatarFallbackText,
+          { fontSize: Math.max(14, size * 0.34) },
+        ]}
+      >
         {initials}
       </Text>
     </View>
@@ -524,7 +542,10 @@ export function Button({
         styles.buttonShell,
         tone === "secondary" && [
           styles.buttonSecondary,
-          { backgroundColor: palette.surfaceMuted, borderColor: palette.border },
+          {
+            backgroundColor: palette.surfaceMuted,
+            borderColor: palette.border,
+          },
         ],
         tone === "danger" && styles.buttonDanger,
         (disabled || loading) && styles.buttonDisabled,
@@ -533,7 +554,11 @@ export function Button({
     >
       {isPrimary ? (
         <LinearGradient
-          colors={tone === "accent" ? [colors.accent, colors.accentDark] : gradients.brand}
+          colors={
+            tone === "accent"
+              ? [colors.accent, colors.accentDark]
+              : gradients.brand
+          }
           end={{ x: 1, y: 1 }}
           start={{ x: 0, y: 0 }}
           style={styles.buttonGradient}

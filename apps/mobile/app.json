@@ -36,9 +36,7 @@
     },
     "android": {
       "package": "ai.syndeocare.mobile",
-      "permissions": [
-        "NOTIFICATIONS"
-      ],
+      "permissions": ["NOTIFICATIONS"],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",

@@ -59,7 +59,9 @@ export default function MessagesScreen() {
           >
             <Pressable>
               <Card>
-                <View style={[styles.conversationRow, isRTL && styles.rowReverse]}>
+                <View
+                  style={[styles.conversationRow, isRTL && styles.rowReverse]}
+                >
                   <Avatar label={conversation.displayName} />
                   <View style={styles.grow}>
                     <View style={[styles.row, isRTL && styles.rowReverse]}>
@@ -67,11 +69,14 @@ export default function MessagesScreen() {
                         {conversation.displayName}
                       </Text>
                       <Text style={[styles.time, { color: palette.muted }]}>
-                        {new Date(conversation.lastMessageAt).toLocaleDateString()}
+                        {new Date(
+                          conversation.lastMessageAt,
+                        ).toLocaleDateString()}
                       </Text>
                     </View>
                     <Text numberOfLines={2} style={text.body}>
-                      {conversation.lastMessage ?? t("messages.openConversation")}
+                      {conversation.lastMessage ??
+                        t("messages.openConversation")}
                     </Text>
                     {conversation.unreadCount ? (
                       <Badge tone="warning">

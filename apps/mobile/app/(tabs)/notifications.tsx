@@ -72,7 +72,7 @@ export default function NotificationsScreen() {
                 ? markOneMutation.error.message
                 : deleteMutation.error instanceof Error
                   ? deleteMutation.error.message
-              : undefined
+                  : undefined
         }
       />
 
@@ -105,7 +105,9 @@ export default function NotificationsScreen() {
               </View>
               <View style={styles.grow}>
                 <View style={styles.headerLine}>
-                  <Text style={[text.h2, styles.title]}>{notification.title}</Text>
+                  <Text style={[text.h2, styles.title]}>
+                    {notification.title}
+                  </Text>
                   <Badge tone={notification.isRead ? "neutral" : "warning"}>
                     {notification.isRead
                       ? t("notifications.read")

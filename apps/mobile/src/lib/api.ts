@@ -53,7 +53,10 @@ function base64UrlEncode(bytes: Uint8Array) {
   const binary = Array.from(bytes, (byte) => String.fromCharCode(byte)).join(
     "",
   );
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
 }
 
 function generateOAuthToken(bytes = 32) {
@@ -556,7 +559,10 @@ export async function uploadChatMedia(asset: {
   });
 
   if (!uploaded.ok) {
-    throw new ApiError("File upload failed. Please try again.", uploaded.status);
+    throw new ApiError(
+      "File upload failed. Please try again.",
+      uploaded.status,
+    );
   }
 
   const completed = await authenticatedRequest<ChatMediaUploadResult>(
@@ -603,7 +609,10 @@ export async function uploadProfileImage(asset: {
   });
 
   if (!uploaded.ok) {
-    throw new ApiError("Image upload failed. Please try again.", uploaded.status);
+    throw new ApiError(
+      "Image upload failed. Please try again.",
+      uploaded.status,
+    );
   }
 
   return authenticatedRequest<ProfileImageUploadResult>(
