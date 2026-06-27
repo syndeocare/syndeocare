@@ -179,6 +179,19 @@ function getGoogleIdentityProviderConfig() {
   };
 }
 
+function resolveOAuthPublicClientId(
+  requestedClientId: string | undefined,
+  fallbackClientId: string,
+) {
+  if (!requestedClientId) return fallbackClientId;
+
+  return requestedClientId === fallbackClientId ||
+    requestedClientId === "syndeocare-web" ||
+    requestedClientId === "syndeocare-mobile"
+    ? requestedClientId
+    : fallbackClientId;
+}
+
 interface KeycloakAuthenticationExecution {
   id: string;
   providerId?: string;
@@ -1623,7 +1636,10 @@ async function exchangeOAuthCodeForSession(
   const { payload, response } = await requestKeycloakForm(
     `${config.baseUrl}/realms/${config.realm}/protocol/openid-connect/token`,
     new URLSearchParams({
-      client_id: config.publicClientId,
+      client_id: resolveOAuthPublicClientId(
+        input.clientId,
+        config.publicClientId,
+      ),
       code: input.code,
       code_verifier: input.codeVerifier,
       grant_type: "authorization_code",

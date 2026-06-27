@@ -261,6 +261,19 @@ function getKeycloakOAuthConfig() {
   };
 }
 
+function resolveOAuthPublicClientId(
+  requestedClientId: string | undefined,
+  fallbackClientId: string,
+) {
+  if (!requestedClientId) return fallbackClientId;
+
+  return requestedClientId === fallbackClientId ||
+    requestedClientId === "syndeocare-web" ||
+    requestedClientId === "syndeocare-mobile"
+    ? requestedClientId
+    : fallbackClientId;
+}
+
 function buildOAuthAuthorizationUrl(
   input: z.infer<typeof authOAuthStartInputSchema>,
 ) {
@@ -273,7 +286,10 @@ function buildOAuthAuthorizationUrl(
   const authorizationUrl = new URL(
     `${config.baseUrl}/realms/${config.realm}/protocol/openid-connect/auth`,
   );
-  authorizationUrl.searchParams.set("client_id", config.publicClientId);
+  authorizationUrl.searchParams.set(
+    "client_id",
+    resolveOAuthPublicClientId(input.clientId, config.publicClientId),
+  );
   authorizationUrl.searchParams.set("code_challenge", input.codeChallenge);
   authorizationUrl.searchParams.set("code_challenge_method", "S256");
   authorizationUrl.searchParams.set("kc_idp_hint", input.provider);

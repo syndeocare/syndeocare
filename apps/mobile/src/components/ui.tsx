@@ -1,0 +1,1093 @@
+import { LinearGradient } from "expo-linear-gradient";
+import { Link } from "expo-router";
+import { Languages, Moon, Sun } from "lucide-react-native";
+import React, { useState } from "react";
+import {
+  ActivityIndicator,
+  Image,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+import { usePreferences, useT } from "../lib/preferences";
+
+const brandMark = require("../../assets/syndeocare-mark.png");
+
+export const colors = {
+  accent: "#56849A",
+  accentDark: "#477082",
+  bg: "#F8FAFB",
+  border: "#DDE5E8",
+  danger: "#DC2626",
+  dangerSoft: "#FEE2E2",
+  dark: "#150F1C",
+  darkCard: "#20162A",
+  darkMuted: "#B9A9C4",
+  muted: "#5B6E78",
+  panel: "#FFFFFF",
+  panelSoft: "#F3F6F7",
+  primary: "#663C6D",
+  primaryDark: "#4F2E55",
+  primarySoft: "#F1E8F3",
+  success: "#059669",
+  successSoft: "#DCFCE7",
+  text: "#3B2943",
+  warning: "#D97706",
+  warningSoft: "#FEF3C7",
+};
+
+export const fonts = {
+  body: "Ubuntu_400Regular",
+  bodyMedium: "Ubuntu_500Medium",
+  bodyBold: "Ubuntu_700Bold",
+  arabic: "Cairo_400Regular",
+  arabicMedium: "Cairo_500Medium",
+  arabicBold: "Cairo_700Bold",
+};
+
+export function useThemePalette() {
+  const { theme } = usePreferences();
+  const isDark = theme === "dark";
+
+  return {
+    background: isDark ? colors.dark : colors.bg,
+    border: isDark ? "rgba(255,255,255,0.12)" : colors.border,
+    control: isDark ? "rgba(255,255,255,0.10)" : "rgba(102,60,109,0.08)",
+    controlBorder: isDark ? "rgba(255,255,255,0.16)" : "rgba(102,60,109,0.13)",
+    input: isDark ? "#150F1C" : "#ffffff",
+    muted: isDark ? "#D8CCE0" : colors.muted,
+    placeholder: isDark ? "#9E8EAA" : "#8798A1",
+    shadow: isDark ? "#000000" : "#5B6E78",
+    surface: isDark ? colors.darkCard : colors.panel,
+    surfaceMuted: isDark ? "#2A1B35" : colors.panelSoft,
+    text: isDark ? "#F8FAFB" : colors.text,
+  };
+}
+
+export function useTextStyles() {
+  const { direction, language } = usePreferences();
+  const palette = useThemePalette();
+  const isArabic = language === "ar";
+  const bodyFamily = isArabic ? fonts.arabic : fonts.body;
+  const boldFamily = isArabic ? fonts.arabicBold : fonts.bodyBold;
+  const textAlign = direction === "rtl" ? "right" : "left";
+
+  return {
+    body: {
+      color: palette.muted,
+      fontFamily: bodyFamily,
+      fontSize: 15,
+      lineHeight: 22,
+      textAlign,
+      writingDirection: direction,
+    } as const,
+    h1: {
+      color: palette.text,
+      fontFamily: boldFamily,
+      fontSize: 32,
+      lineHeight: 38,
+      textAlign,
+      writingDirection: direction,
+    } as const,
+    h2: {
+      color: palette.text,
+      fontFamily: boldFamily,
+      fontSize: 22,
+      lineHeight: 28,
+      textAlign,
+      writingDirection: direction,
+    } as const,
+    overline: {
+      color: colors.accentDark,
+      fontFamily: boldFamily,
+      fontSize: 12,
+      letterSpacing: 0.6,
+      textAlign,
+      textTransform: "uppercase",
+      writingDirection: direction,
+    } as const,
+    strong: {
+      color: palette.text,
+      fontFamily: boldFamily,
+      fontSize: 16,
+      textAlign,
+      writingDirection: direction,
+    } as const,
+  };
+}
+
+const gradients = {
+  appDark: ["#150F1C", "#24162E", "#150F1C"] as const,
+  appLight: ["#FAFCFD", "#F2F7F8", "#F8FAFB"] as const,
+  brand: [colors.primary, colors.accent] as const,
+  hero: ["#150F1C", "#2A1B35", "#150F1C"] as const,
+};
+
+type ScreenTone = "app" | "auth";
+
+export function BrandMark({ size = 48 }: { size?: number }) {
+  return (
+    <View
+      style={[
+        styles.brandMark,
+        { borderRadius: size / 2, height: size, width: size },
+      ]}
+    >
+      <Image
+        accessibilityIgnoresInvertColors
+        source={brandMark}
+        style={{ height: size, width: size }}
+      />
+    </View>
+  );
+}
+
+export function BrandLockup({
+  centered,
+  compact,
+  onDark = true,
+}: {
+  centered?: boolean;
+  compact?: boolean;
+  onDark?: boolean;
+}) {
+  const { direction, language } = usePreferences();
+  const palette = useThemePalette();
+  const t = useT();
+  const isRTL = direction === "rtl";
+  const family = language === "ar" ? fonts.arabicBold : fonts.bodyBold;
+  const bodyFamily = language === "ar" ? fonts.arabic : fonts.body;
+
+  return (
+    <View
+      style={[
+        styles.brandLockup,
+        isRTL && !centered && styles.rowReverse,
+        centered && styles.brandLockupCentered,
+        compact && styles.brandLockupCompact,
+      ]}
+    >
+      <BrandMark size={compact ? 38 : 54} />
+      <View style={centered ? styles.brandCopyCentered : undefined}>
+        <Text
+          style={[
+            styles.brandName,
+            {
+              color: onDark ? "#ffffff" : palette.text,
+              fontFamily: family,
+              writingDirection: direction,
+            },
+            compact && styles.brandNameCompact,
+          ]}
+        >
+          SyndeoCare
+        </Text>
+        {!compact ? (
+          <Text
+            style={[
+              styles.brandTagline,
+              {
+                color: onDark ? colors.darkMuted : palette.muted,
+                fontFamily: bodyFamily,
+                writingDirection: direction,
+              },
+            ]}
+          >
+            {t("app.tagline")}
+          </Text>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+export function PreferenceControls({
+  compact,
+  onDark,
+}: {
+  compact?: boolean;
+  onDark?: boolean;
+}) {
+  const { direction, language, theme, toggleLanguage, toggleTheme, t } =
+    usePreferences();
+  const palette = useThemePalette();
+  const isRTL = direction === "rtl";
+  const isOnDark = onDark ?? theme === "dark";
+  const controlColor = isOnDark ? "#ffffff" : colors.primary;
+  const nextLanguageLabel = language === "ar" ? "English" : "العربية";
+  const nextThemeLabel =
+    theme === "dark" ? t("controls.light") : t("controls.dark");
+
+  return (
+    <View style={[styles.preferenceControls, isRTL && styles.rowReverse]}>
+      <Pressable
+        accessibilityLabel={nextLanguageLabel}
+        onPress={toggleLanguage}
+        style={({ pressed }) => [
+          styles.preferenceButton,
+          {
+            backgroundColor: isOnDark
+              ? "rgba(255,255,255,0.10)"
+              : palette.control,
+            borderColor: isOnDark
+              ? "rgba(255,255,255,0.16)"
+              : palette.controlBorder,
+          },
+          compact && styles.preferenceButtonCompact,
+          pressed && styles.buttonPressed,
+        ]}
+      >
+        <Languages color={controlColor} size={16} />
+        <Text
+          style={[
+            styles.preferenceText,
+            { color: controlColor },
+            language === "ar" && styles.preferenceTextArabic,
+          ]}
+        >
+          {nextLanguageLabel}
+        </Text>
+      </Pressable>
+      <Pressable
+        accessibilityLabel={nextThemeLabel}
+        onPress={toggleTheme}
+        style={({ pressed }) => [
+          styles.preferenceButton,
+          {
+            backgroundColor: isOnDark
+              ? "rgba(255,255,255,0.10)"
+              : palette.control,
+            borderColor: isOnDark
+              ? "rgba(255,255,255,0.16)"
+              : palette.controlBorder,
+          },
+          compact && styles.preferenceButtonCompact,
+          pressed && styles.buttonPressed,
+        ]}
+      >
+        {theme === "dark" ? (
+          <Sun color={controlColor} size={16} />
+        ) : (
+          <Moon color={controlColor} size={16} />
+        )}
+        <Text
+          style={[
+            styles.preferenceText,
+            { color: controlColor },
+            language === "ar" && styles.preferenceTextArabic,
+          ]}
+        >
+          {nextThemeLabel}
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
+export function Screen({
+  children,
+  onRefresh,
+  refreshing,
+  subtitle,
+  title,
+  tone = "app",
+}: {
+  children: React.ReactNode;
+  onRefresh?: () => void;
+  refreshing?: boolean;
+  subtitle?: string;
+  title?: string;
+  tone?: ScreenTone;
+}) {
+  const { direction, theme } = usePreferences();
+  const palette = useThemePalette();
+  const isAuth = tone === "auth";
+  const isDark = theme === "dark";
+  const onDark = isAuth || isDark;
+
+  return (
+    <LinearGradient
+      colors={isAuth ? gradients.hero : isDark ? gradients.appDark : gradients.appLight}
+      style={styles.root}
+    >
+      {isAuth || isDark ? (
+        <>
+          <View style={[styles.glow, styles.glowAccent]} />
+          <View style={[styles.glow, styles.glowPrimary]} />
+        </>
+      ) : null}
+      <SafeAreaView style={styles.safe}>
+        <ScrollView
+          contentContainerStyle={[
+            styles.scroll,
+            isAuth && styles.authScroll,
+            direction === "rtl" && styles.rtlContent,
+          ]}
+          keyboardShouldPersistTaps="handled"
+          refreshControl={
+            onRefresh ? (
+              <RefreshControl
+                refreshing={Boolean(refreshing)}
+                onRefresh={onRefresh}
+                tintColor="#ffffff"
+              />
+            ) : undefined
+          }
+        >
+          {isAuth ? (
+            <View
+              style={[
+                styles.authPreferences,
+                direction === "rtl" && styles.alignStart,
+              ]}
+            >
+              <PreferenceControls compact onDark />
+            </View>
+          ) : null}
+          {title ? (
+            <View
+              style={[
+                styles.screenHeader,
+                {
+                  backgroundColor: onDark
+                    ? "rgba(32,22,42,0.72)"
+                    : "rgba(255,255,255,0.82)",
+                  borderColor: onDark
+                    ? "rgba(255,255,255,0.10)"
+                    : "rgba(86,132,154,0.16)",
+                  shadowColor: palette.shadow,
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.screenHeaderTop,
+                  direction === "rtl" && styles.rowReverse,
+                ]}
+              >
+                <BrandLockup compact onDark={onDark} />
+                {!isAuth ? <PreferenceControls compact onDark={onDark} /> : null}
+              </View>
+              <Text
+                style={[
+                  styles.screenTitle,
+                  { color: onDark ? "#ffffff" : palette.text },
+                  direction === "rtl" && styles.textRight,
+                ]}
+              >
+                {title}
+              </Text>
+              {subtitle ? (
+                <Text
+                  style={[
+                    styles.screenSubtitle,
+                    { color: onDark ? colors.darkMuted : palette.muted },
+                    direction === "rtl" && styles.textRight,
+                  ]}
+                >
+                  {subtitle}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
+          {children}
+        </ScrollView>
+      </SafeAreaView>
+    </LinearGradient>
+  );
+}
+
+export function Card({
+  children,
+  tone = "default",
+}: {
+  children: React.ReactNode;
+  tone?: "default" | "muted";
+}) {
+  const { theme } = usePreferences();
+
+  return (
+    <View
+      style={[
+        styles.card,
+        theme === "dark" && styles.cardDark,
+        tone === "muted" && styles.cardMuted,
+        theme === "dark" && tone === "muted" && styles.cardMutedDark,
+      ]}
+    >
+      {children}
+    </View>
+  );
+}
+
+export function SectionHeader({
+  action,
+  onActionPress,
+  title,
+}: {
+  action?: string;
+  onActionPress?: () => void;
+  title: string;
+}) {
+  const { direction } = usePreferences();
+  const textStyles = useTextStyles();
+  const isRTL = direction === "rtl";
+
+  return (
+    <View style={[styles.sectionHeader, isRTL && styles.rowReverse]}>
+      <Text style={textStyles.strong}>{title}</Text>
+      {action ? (
+        <Pressable
+          disabled={!onActionPress}
+          onPress={onActionPress}
+          style={({ pressed }) => pressed && styles.buttonPressed}
+        >
+          <Text style={styles.sectionAction}>{action}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+export function Avatar({
+  label,
+  size = 48,
+  uri,
+}: {
+  label?: string;
+  size?: number;
+  uri?: string;
+}) {
+  const palette = useThemePalette();
+  const initials = (label ?? "SC").slice(0, 2).toUpperCase();
+
+  if (uri) {
+    return (
+      <Image
+        accessibilityIgnoresInvertColors
+        source={{ uri }}
+        style={[
+          styles.avatarImage,
+          { borderColor: palette.border, borderRadius: size / 2, height: size, width: size },
+        ]}
+      />
+    );
+  }
+
+  return (
+    <View
+      style={[
+        styles.avatarFallback,
+        {
+          backgroundColor: palette.surfaceMuted,
+          borderColor: palette.border,
+          borderRadius: size / 2,
+          height: size,
+          width: size,
+        },
+      ]}
+    >
+      <Text style={[styles.avatarFallbackText, { fontSize: Math.max(14, size * 0.34) }]}>
+        {initials}
+      </Text>
+    </View>
+  );
+}
+
+export function Button({
+  children,
+  disabled,
+  loading,
+  onPress,
+  tone = "primary",
+}: {
+  children: React.ReactNode;
+  disabled?: boolean;
+  loading?: boolean;
+  onPress?: () => void;
+  tone?: "accent" | "danger" | "primary" | "secondary";
+}) {
+  const isPrimary = tone === "primary" || tone === "accent";
+  const palette = useThemePalette();
+
+  return (
+    <Pressable
+      disabled={disabled || loading}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.buttonShell,
+        tone === "secondary" && [
+          styles.buttonSecondary,
+          { backgroundColor: palette.surfaceMuted, borderColor: palette.border },
+        ],
+        tone === "danger" && styles.buttonDanger,
+        (disabled || loading) && styles.buttonDisabled,
+        pressed && !disabled && !loading && styles.buttonPressed,
+      ]}
+    >
+      {isPrimary ? (
+        <LinearGradient
+          colors={tone === "accent" ? [colors.accent, colors.accentDark] : gradients.brand}
+          end={{ x: 1, y: 1 }}
+          start={{ x: 0, y: 0 }}
+          style={styles.buttonGradient}
+        >
+          {loading ? <ActivityIndicator color="#ffffff" /> : null}
+          <Text style={styles.buttonText}>{children}</Text>
+        </LinearGradient>
+      ) : (
+        <>
+          {loading ? (
+            <ActivityIndicator
+              color={tone === "danger" ? "#ffffff" : colors.primary}
+            />
+          ) : null}
+          <Text
+            style={[
+              styles.buttonText,
+              tone === "secondary" && { color: palette.text },
+            ]}
+          >
+            {children}
+          </Text>
+        </>
+      )}
+    </Pressable>
+  );
+}
+
+export function Field({
+  autoCapitalize = "none",
+  error,
+  label,
+  leftIcon,
+  multiline,
+  onChangeText,
+  placeholder,
+  secureTextEntry,
+  value,
+}: {
+  autoCapitalize?: "characters" | "none" | "sentences" | "words";
+  error?: string;
+  label: string;
+  leftIcon?: React.ReactNode;
+  multiline?: boolean;
+  onChangeText: (value: string) => void;
+  placeholder?: string;
+  secureTextEntry?: boolean;
+  value: string;
+}) {
+  const [focused, setFocused] = useState(false);
+  const { direction, language } = usePreferences();
+  const palette = useThemePalette();
+  const isRTL = direction === "rtl";
+  const family = language === "ar" ? fonts.arabic : fonts.body;
+  const labelFamily = language === "ar" ? fonts.arabicBold : fonts.bodyBold;
+
+  return (
+    <View style={styles.field}>
+      <Text
+        style={[
+          styles.label,
+          {
+            color: palette.text,
+            fontFamily: labelFamily,
+            textAlign: isRTL ? "right" : "left",
+          },
+        ]}
+      >
+        {label}
+      </Text>
+      <View
+        style={[
+          styles.inputRow,
+          { backgroundColor: palette.input, borderColor: palette.border },
+          isRTL && styles.rowReverse,
+          focused && styles.inputFocused,
+          error && styles.inputError,
+          multiline && styles.textareaRow,
+        ]}
+      >
+        {leftIcon ? <View style={styles.inputIcon}>{leftIcon}</View> : null}
+        <TextInput
+          autoCapitalize={autoCapitalize}
+          multiline={multiline}
+          onBlur={() => setFocused(false)}
+          onChangeText={onChangeText}
+          onFocus={() => setFocused(true)}
+          placeholder={placeholder}
+          placeholderTextColor={palette.placeholder}
+          secureTextEntry={secureTextEntry}
+          style={[
+            styles.input,
+            {
+              color: palette.text,
+              fontFamily: family,
+              textAlign: isRTL ? "right" : "left",
+              writingDirection: direction,
+            },
+            leftIcon ? styles.inputWithIcon : null,
+            multiline && styles.textarea,
+          ]}
+          value={value}
+        />
+      </View>
+      {error ? (
+        <Text style={[styles.error, isRTL && styles.textRight]}>{error}</Text>
+      ) : null}
+    </View>
+  );
+}
+
+export function Badge({
+  children,
+  tone = "neutral",
+}: {
+  children: React.ReactNode;
+  tone?: "danger" | "neutral" | "success" | "warning";
+}) {
+  return (
+    <View
+      style={[
+        styles.badge,
+        tone === "success" && styles.badgeSuccess,
+        tone === "warning" && styles.badgeWarning,
+        tone === "danger" && styles.badgeDanger,
+      ]}
+    >
+      <Text style={styles.badgeText}>{children}</Text>
+    </View>
+  );
+}
+
+export function EmptyState({
+  action,
+  body,
+  title,
+}: {
+  action?: { href: string; label: string };
+  body: string;
+  title: string;
+}) {
+  const themedText = useTextStyles();
+
+  return (
+    <Card>
+      <Text style={themedText.h2}>{title}</Text>
+      <Text style={themedText.body}>{body}</Text>
+      {action ? (
+        <Link href={action.href as never} style={styles.link}>
+          {action.label}
+        </Link>
+      ) : null}
+    </Card>
+  );
+}
+
+export function ErrorBanner({ message }: { message?: string }) {
+  if (!message) return null;
+  return (
+    <View style={styles.errorBanner}>
+      <Text style={styles.errorBannerText}>{message}</Text>
+    </View>
+  );
+}
+
+export function LoadingBlock({ label }: { label?: string }) {
+  const t = useT();
+  const themedText = useTextStyles();
+  return (
+    <View style={styles.loading}>
+      <ActivityIndicator color={colors.primary} />
+      <Text style={themedText.body}>{label ?? t("common.loading")}</Text>
+    </View>
+  );
+}
+
+export const text = StyleSheet.create({
+  body: {
+    color: colors.muted,
+    fontFamily: fonts.body,
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  h1: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 32,
+    lineHeight: 38,
+  },
+  h2: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 22,
+    lineHeight: 28,
+  },
+  overline: {
+    color: colors.accentDark,
+    fontFamily: fonts.bodyBold,
+    fontSize: 12,
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+  },
+  strong: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 16,
+  },
+});
+
+const styles = StyleSheet.create({
+  alignStart: {
+    alignSelf: "flex-start",
+  },
+  avatarFallback: {
+    alignItems: "center",
+    borderWidth: 1,
+    justifyContent: "center",
+  },
+  avatarFallbackText: {
+    color: colors.primaryDark,
+    fontFamily: fonts.bodyBold,
+  },
+  avatarImage: {
+    backgroundColor: colors.panelSoft,
+    borderWidth: 1,
+  },
+  authPreferences: {
+    alignSelf: "flex-end",
+    marginBottom: 8,
+  },
+  authScroll: {
+    justifyContent: "center",
+    minHeight: "100%",
+    paddingBottom: 34,
+    paddingTop: 34,
+  },
+  badge: {
+    alignSelf: "flex-start",
+    backgroundColor: colors.panelSoft,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  badgeDanger: {
+    backgroundColor: colors.dangerSoft,
+  },
+  badgeSuccess: {
+    backgroundColor: colors.successSoft,
+  },
+  badgeText: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  badgeWarning: {
+    backgroundColor: colors.warningSoft,
+  },
+  brandCopyCentered: {
+    alignItems: "center",
+  },
+  brandLockup: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
+  },
+  brandLockupCentered: {
+    flexDirection: "column",
+    gap: 10,
+  },
+  brandLockupCompact: {
+    gap: 10,
+  },
+  brandMark: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  brandName: {
+    color: "#ffffff",
+    fontFamily: fonts.bodyBold,
+    fontSize: 28,
+    letterSpacing: 0,
+  },
+  brandNameCompact: {
+    fontSize: 20,
+  },
+  brandTagline: {
+    color: colors.darkMuted,
+    fontFamily: fonts.body,
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 2,
+  },
+  buttonDanger: {
+    backgroundColor: colors.danger,
+  },
+  buttonDisabled: {
+    opacity: 0.55,
+  },
+  buttonGradient: {
+    alignItems: "center",
+    borderRadius: 12,
+    flex: 1,
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "center",
+    minHeight: 50,
+    paddingHorizontal: 18,
+  },
+  buttonPressed: {
+    transform: [{ scale: 0.99 }],
+  },
+  buttonSecondary: {
+    backgroundColor: colors.panelSoft,
+    borderColor: colors.border,
+    borderWidth: 1,
+  },
+  buttonSecondaryText: {
+    color: colors.text,
+  },
+  buttonShell: {
+    alignItems: "center",
+    borderRadius: 12,
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "center",
+    minHeight: 50,
+    overflow: "hidden",
+    paddingHorizontal: 18,
+  },
+  buttonText: {
+    color: "#ffffff",
+    fontFamily: fonts.bodyBold,
+    fontSize: 16,
+    textAlign: "center",
+  },
+  card: {
+    backgroundColor: colors.panel,
+    borderColor: "rgba(86,132,154,0.16)",
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 12,
+    elevation: 1,
+    padding: 16,
+    shadowColor: "#5B6E78",
+    shadowOffset: { height: 8, width: 0 },
+    shadowOpacity: 0.06,
+    shadowRadius: 18,
+  },
+  cardMuted: {
+    backgroundColor: colors.panelSoft,
+  },
+  cardDark: {
+    backgroundColor: colors.darkCard,
+    borderColor: "rgba(255,255,255,0.10)",
+    shadowColor: "#000000",
+    shadowOpacity: 0.18,
+  },
+  cardMutedDark: {
+    backgroundColor: "#2A1B35",
+  },
+  preferenceButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.10)",
+    borderColor: "rgba(255,255,255,0.16)",
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 6,
+    minHeight: 38,
+    paddingHorizontal: 12,
+  },
+  preferenceButtonCompact: {
+    minHeight: 34,
+    paddingHorizontal: 10,
+  },
+  preferenceControls: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+  preferenceText: {
+    color: "#ffffff",
+    fontFamily: fonts.bodyBold,
+    fontSize: 12,
+  },
+  preferenceTextArabic: {
+    fontFamily: fonts.arabicBold,
+  },
+  emptyTitle: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 18,
+  },
+  error: {
+    color: colors.danger,
+    fontFamily: fonts.body,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  errorBanner: {
+    backgroundColor: colors.dangerSoft,
+    borderColor: "#FCA5A5",
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+  },
+  errorBannerText: {
+    color: "#991B1B",
+    fontFamily: fonts.body,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  field: {
+    gap: 7,
+  },
+  input: {
+    color: colors.text,
+    flex: 1,
+    fontFamily: fonts.body,
+    fontSize: 16,
+    minHeight: 52,
+    paddingHorizontal: 0,
+  },
+  inputError: {
+    borderColor: colors.danger,
+  },
+  inputFocused: {
+    borderColor: colors.accent,
+  },
+  inputIcon: {
+    alignItems: "center",
+    height: 52,
+    justifyContent: "center",
+    width: 42,
+  },
+  inputRow: {
+    alignItems: "center",
+    backgroundColor: "#ffffff",
+    borderColor: colors.border,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: "row",
+    minHeight: 50,
+    paddingHorizontal: 14,
+  },
+  inputWithIcon: {
+    paddingStart: 2,
+  },
+  label: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+  },
+  link: {
+    color: colors.primary,
+    fontFamily: fonts.bodyBold,
+    fontSize: 15,
+    marginTop: 4,
+  },
+  loading: {
+    alignItems: "center",
+    gap: 12,
+    padding: 24,
+  },
+  muted: {
+    color: colors.muted,
+    fontFamily: fonts.body,
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  glow: {
+    borderRadius: 999,
+    height: 260,
+    opacity: 0.25,
+    position: "absolute",
+    width: 260,
+  },
+  glowAccent: {
+    backgroundColor: colors.accent,
+    end: -110,
+    top: 18,
+  },
+  glowPrimary: {
+    backgroundColor: colors.primary,
+    bottom: 50,
+    start: -120,
+  },
+  root: {
+    flex: 1,
+  },
+  rowReverse: {
+    flexDirection: "row-reverse",
+  },
+  rtlContent: {
+    direction: "rtl",
+  },
+  safe: {
+    flex: 1,
+  },
+  screenHeader: {
+    borderRadius: 16,
+    borderWidth: 1,
+    elevation: 1,
+    gap: 8,
+    marginBottom: 2,
+    padding: 14,
+    shadowOffset: { height: 10, width: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+  },
+  screenSubtitle: {
+    color: colors.darkMuted,
+    fontFamily: fonts.body,
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  screenTitle: {
+    color: "#ffffff",
+    fontFamily: fonts.bodyBold,
+    fontSize: 27,
+    lineHeight: 33,
+    marginTop: 6,
+  },
+  scroll: {
+    gap: 14,
+    padding: 14,
+    paddingBottom: 32,
+  },
+  screenHeaderTop: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  sectionAction: {
+    color: colors.accentDark,
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+  },
+  sectionHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 2,
+  },
+  textRight: {
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  textarea: {
+    minHeight: 108,
+    paddingTop: 14,
+    textAlignVertical: "top",
+  },
+  textareaRow: {
+    alignItems: "flex-start",
+  },
+});

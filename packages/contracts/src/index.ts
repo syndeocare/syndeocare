@@ -126,6 +126,7 @@ export const authSignInInputSchema = z.object({
 export const authOAuthProviderSchema = z.enum(["google"]);
 
 export const authOAuthStartInputSchema = z.object({
+  clientId: z.string().min(1).optional(),
   codeChallenge: z.string().min(43),
   provider: authOAuthProviderSchema,
   redirectUri: z.string().url(),
@@ -139,6 +140,7 @@ export const authOAuthStartResponseSchema = z.object({
 });
 
 export const authOAuthCallbackInputSchema = z.object({
+  clientId: z.string().min(1).optional(),
   code: z.string().min(1),
   codeVerifier: z.string().min(43),
   linkAccessToken: z.string().min(1).optional(),
