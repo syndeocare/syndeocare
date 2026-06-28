@@ -8,10 +8,17 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { I18nManager, Platform } from "react-native";
+import {
+  Appearance,
+  I18nManager,
+  Platform,
+  useColorScheme,
+} from "react-native";
 
 export type AppLanguage = "en" | "ar";
+export type AppLanguagePreference = "ar" | "device" | "en";
 export type AppTheme = "light" | "dark";
+export type AppThemePreference = "dark" | "light" | "system";
 export type AppDirection = "ltr" | "rtl";
 
 const STORAGE_KEY = "syndeocare.mobile.preferences";
@@ -69,7 +76,12 @@ const en = {
   "conversation.title": "Conversation",
   "common.loading": "Loading...",
   "controls.dark": "Dark",
+  "controls.deviceLanguage": "Device",
+  "controls.english": "English",
+  "controls.language": "Language",
   "controls.light": "Light",
+  "controls.system": "System",
+  "controls.theme": "Theme",
   "dashboard.bookings": "Bookings",
   "dashboard.clinicBody":
     "Review applicants, publish shifts, and keep conversations moving.",
@@ -218,7 +230,7 @@ const en = {
   "settings.account": "Account",
   "settings.accountBody": "Manage your session and account access.",
   "settings.preferencesBody":
-    "Language and appearance changes apply across the mobile app.",
+    "By default SyndeoCare follows your device language and appearance. You can override either option here.",
   "settings.title": "Settings",
   "tabs.alerts": "Alerts",
   "tabs.home": "Home",
@@ -290,7 +302,12 @@ const ar: Record<TranslationKey, string> = {
   "conversation.title": "المحادثة",
   "common.loading": "جاري التحميل...",
   "controls.dark": "داكن",
+  "controls.deviceLanguage": "الجهاز",
+  "controls.english": "English",
+  "controls.language": "اللغة",
   "controls.light": "فاتح",
+  "controls.system": "النظام",
+  "controls.theme": "المظهر",
   "dashboard.bookings": "الحجوزات",
   "dashboard.clinicBody":
     "راجع المتقدمين، انشر المناوبات، وحافظ على سير المحادثات.",
@@ -434,7 +451,7 @@ const ar: Record<TranslationKey, string> = {
   "settings.account": "الحساب",
   "settings.accountBody": "إدارة الجلسة والوصول إلى الحساب.",
   "settings.preferencesBody":
-    "تغييرات اللغة والمظهر تنطبق على تطبيق الجوال بالكامل.",
+    "يتبع SyndeoCare لغة ومظهر جهازك افتراضياً. يمكنك تغيير أي خيار من هنا.",
   "settings.title": "الإعدادات",
   "tabs.alerts": "التنبيهات",
   "tabs.home": "الرئيسية",
@@ -457,16 +474,20 @@ const dictionary: Record<AppLanguage, Record<TranslationKey, string>> = {
 };
 
 type StoredPreferences = {
-  language?: AppLanguage;
-  theme?: AppTheme;
+  language?: AppLanguagePreference;
+  theme?: AppThemePreference;
 };
 
 type PreferencesContextValue = {
   direction: AppDirection;
   language: AppLanguage;
+  languagePreference: AppLanguagePreference;
   setLanguage: (language: AppLanguage) => void;
+  setLanguagePreference: (language: AppLanguagePreference) => void;
   setTheme: (theme: AppTheme) => void;
+  setThemePreference: (theme: AppThemePreference) => void;
   theme: AppTheme;
+  themePreference: AppThemePreference;
   toggleLanguage: () => void;
   toggleTheme: () => void;
   t: (key: TranslationKey, fallback?: string) => string;
@@ -497,46 +518,104 @@ async function savePreferences(value: StoredPreferences) {
   await SecureStore.setItemAsync(STORAGE_KEY, encoded);
 }
 
+function getDeviceLanguage(): AppLanguage {
+  const locale =
+    Platform.OS === "web"
+      ? globalThis.navigator?.languages?.[0] || globalThis.navigator?.language
+      : Intl.DateTimeFormat().resolvedOptions().locale;
+
+  return locale?.toLowerCase().startsWith("ar") ? "ar" : "en";
+}
+
+function resolveLanguage(preference: AppLanguagePreference): AppLanguage {
+  return preference === "device" ? getDeviceLanguage() : preference;
+}
+
+function resolveTheme(
+  preference: AppThemePreference,
+  systemScheme?: "dark" | "light" | null,
+): AppTheme {
+  if (preference !== "system") return preference;
+  return systemScheme === "dark" ? "dark" : "light";
+}
+
 export function PreferencesProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguageState] = useState<AppLanguage>("en");
-  const [theme, setThemeState] = useState<AppTheme>("light");
+  const systemScheme = useColorScheme();
+  const [languagePreference, setLanguagePreferenceState] =
+    useState<AppLanguagePreference>("device");
+  const [themePreference, setThemePreferenceState] =
+    useState<AppThemePreference>("system");
+  const language = resolveLanguage(languagePreference);
+  const theme = resolveTheme(themePreference, systemScheme);
 
   useEffect(() => {
     I18nManager.allowRTL(true);
     void loadPreferences().then((stored) => {
-      if (stored.language === "ar" || stored.language === "en") {
-        setLanguageState(stored.language);
+      if (
+        stored.language === "ar" ||
+        stored.language === "en" ||
+        stored.language === "device"
+      ) {
+        setLanguagePreferenceState(stored.language);
       }
-      if (stored.theme === "dark" || stored.theme === "light") {
-        setThemeState(stored.theme);
+      if (
+        stored.theme === "dark" ||
+        stored.theme === "light" ||
+        stored.theme === "system"
+      ) {
+        setThemePreferenceState(stored.theme);
       }
     });
   }, []);
 
+  useEffect(() => {
+    const subscription = Appearance.addChangeListener(() => {
+      if (languagePreference === "device") {
+        setLanguagePreferenceState("device");
+      }
+    });
+
+    return () => subscription.remove();
+  }, [languagePreference]);
+
   const persist = useCallback(
     (next: StoredPreferences) => {
       void savePreferences({
-        language: next.language ?? language,
-        theme: next.theme ?? theme,
+        language: next.language ?? languagePreference,
+        theme: next.theme ?? themePreference,
       });
     },
-    [language, theme],
+    [languagePreference, themePreference],
+  );
+
+  const setLanguagePreference = useCallback(
+    (nextLanguage: AppLanguagePreference) => {
+      setLanguagePreferenceState(nextLanguage);
+      persist({ language: nextLanguage });
+    },
+    [persist],
   );
 
   const setLanguage = useCallback(
     (nextLanguage: AppLanguage) => {
-      setLanguageState(nextLanguage);
-      persist({ language: nextLanguage });
+      setLanguagePreference(nextLanguage);
+    },
+    [setLanguagePreference],
+  );
+
+  const setThemePreference = useCallback(
+    (nextTheme: AppThemePreference) => {
+      setThemePreferenceState(nextTheme);
+      persist({ theme: nextTheme });
     },
     [persist],
   );
 
   const setTheme = useCallback(
     (nextTheme: AppTheme) => {
-      setThemeState(nextTheme);
-      persist({ theme: nextTheme });
+      setThemePreference(nextTheme);
     },
-    [persist],
+    [setThemePreference],
   );
 
   const value = useMemo<PreferencesContextValue>(() => {
@@ -544,14 +623,27 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     return {
       direction,
       language,
+      languagePreference,
       setLanguage,
+      setLanguagePreference,
       setTheme,
+      setThemePreference,
       theme,
+      themePreference,
       toggleLanguage: () => setLanguage(language === "ar" ? "en" : "ar"),
       toggleTheme: () => setTheme(theme === "dark" ? "light" : "dark"),
       t: (key, fallback) => dictionary[language][key] ?? fallback ?? key,
     };
-  }, [language, setLanguage, setTheme, theme]);
+  }, [
+    language,
+    languagePreference,
+    setLanguage,
+    setLanguagePreference,
+    setTheme,
+    setThemePreference,
+    theme,
+    themePreference,
+  ]);
 
   return (
     <PreferencesContext.Provider value={value}>

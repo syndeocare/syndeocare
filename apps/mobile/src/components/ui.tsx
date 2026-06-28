@@ -224,88 +224,155 @@ export function PreferenceControls({
   compact?: boolean;
   onDark?: boolean;
 }) {
-  const { direction, language, theme, toggleLanguage, toggleTheme, t } =
-    usePreferences();
+  const {
+    direction,
+    language,
+    languagePreference,
+    setLanguagePreference,
+    setThemePreference,
+    theme,
+    themePreference,
+    t,
+  } = usePreferences();
   const palette = useThemePalette();
   const isRTL = direction === "rtl";
   const isOnDark = onDark ?? theme === "dark";
   const controlColor = isOnDark ? "#ffffff" : colors.primary;
-  const nextLanguageLabel = language === "ar" ? "English" : "العربية";
-  const nextThemeLabel =
-    theme === "dark" ? t("controls.light") : t("controls.dark");
+  const languageOptions = [
+    { label: t("controls.deviceLanguage"), value: "device" as const },
+    { label: t("controls.english"), value: "en" as const },
+    { label: "العربية", value: "ar" as const },
+  ];
+  const themeOptions = [
+    {
+      icon: <Sun color={controlColor} size={16} />,
+      label: t("controls.system"),
+      value: "system" as const,
+    },
+    {
+      icon: <Sun color={controlColor} size={16} />,
+      label: t("controls.light"),
+      value: "light" as const,
+    },
+    {
+      icon: <Moon color={controlColor} size={16} />,
+      label: t("controls.dark"),
+      value: "dark" as const,
+    },
+  ];
+
+  const buttonStyle = (selected: boolean, pressed: boolean) => [
+    styles.preferenceButton,
+    {
+      backgroundColor: selected
+        ? isOnDark
+          ? "rgba(255,255,255,0.18)"
+          : colors.primarySoft
+        : isOnDark
+          ? "rgba(255,255,255,0.10)"
+          : palette.control,
+      borderColor: selected
+        ? colors.primary
+        : isOnDark
+          ? "rgba(255,255,255,0.16)"
+          : palette.controlBorder,
+    },
+    compact && styles.preferenceButtonCompact,
+    pressed && styles.buttonPressed,
+  ];
 
   return (
-    <View style={[styles.preferenceControls, isRTL && styles.rowReverse]}>
-      <Pressable
-        accessibilityLabel={nextLanguageLabel}
-        accessibilityRole="button"
-        hitSlop={6}
-        onPress={() => {
-          pressFeedback();
-          toggleLanguage();
-        }}
-        style={({ pressed }) => [
-          styles.preferenceButton,
-          {
-            backgroundColor: isOnDark
-              ? "rgba(255,255,255,0.10)"
-              : palette.control,
-            borderColor: isOnDark
-              ? "rgba(255,255,255,0.16)"
-              : palette.controlBorder,
-          },
-          compact && styles.preferenceButtonCompact,
-          pressed && styles.buttonPressed,
-        ]}
-      >
+    <View style={styles.preferenceStack}>
+      <View style={[styles.preferenceGroupHeader, isRTL && styles.rowReverse]}>
         <Languages color={controlColor} size={16} />
         <Text
           style={[
-            styles.preferenceText,
+            styles.preferenceGroupTitle,
             { color: controlColor },
             language === "ar" && styles.preferenceTextArabic,
           ]}
         >
-          {nextLanguageLabel}
+          {t("controls.language")}
         </Text>
-      </Pressable>
-      <Pressable
-        accessibilityLabel={nextThemeLabel}
-        accessibilityRole="button"
-        hitSlop={6}
-        onPress={() => {
-          pressFeedback();
-          toggleTheme();
-        }}
-        style={({ pressed }) => [
-          styles.preferenceButton,
-          {
-            backgroundColor: isOnDark
-              ? "rgba(255,255,255,0.10)"
-              : palette.control,
-            borderColor: isOnDark
-              ? "rgba(255,255,255,0.16)"
-              : palette.controlBorder,
-          },
-          compact && styles.preferenceButtonCompact,
-          pressed && styles.buttonPressed,
-        ]}
-      >
+      </View>
+      <View style={[styles.preferenceControls, isRTL && styles.rowReverse]}>
+        {languageOptions.map((option) => (
+          <Pressable
+            accessibilityLabel={option.label}
+            accessibilityRole="radio"
+            accessibilityState={{
+              checked: languagePreference === option.value,
+            }}
+            hitSlop={6}
+            key={option.value}
+            onPress={() => {
+              pressFeedback();
+              setLanguagePreference(option.value);
+            }}
+            style={({ pressed }) =>
+              buttonStyle(languagePreference === option.value, pressed)
+            }
+          >
+            <Text
+              style={[
+                styles.preferenceText,
+                { color: controlColor },
+                language === "ar" && styles.preferenceTextArabic,
+              ]}
+            >
+              {option.label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
+      <View style={[styles.preferenceGroupHeader, isRTL && styles.rowReverse]}>
         {theme === "dark" ? (
-          <Sun color={controlColor} size={16} />
-        ) : (
           <Moon color={controlColor} size={16} />
+        ) : (
+          <Sun color={controlColor} size={16} />
         )}
         <Text
           style={[
-            styles.preferenceText,
+            styles.preferenceGroupTitle,
             { color: controlColor },
             language === "ar" && styles.preferenceTextArabic,
           ]}
         >
-          {nextThemeLabel}
+          {t("controls.theme")}
         </Text>
-      </Pressable>
+      </View>
+      <View style={[styles.preferenceControls, isRTL && styles.rowReverse]}>
+        {themeOptions.map((option) => (
+          <Pressable
+            accessibilityLabel={option.label}
+            accessibilityRole="radio"
+            accessibilityState={{
+              checked: themePreference === option.value,
+            }}
+            hitSlop={6}
+            key={option.value}
+            onPress={() => {
+              pressFeedback();
+              setThemePreference(option.value);
+            }}
+            style={({ pressed }) =>
+              buttonStyle(themePreference === option.value, pressed)
+            }
+          >
+            {option.icon}
+            <Text
+              style={[
+                styles.preferenceText,
+                { color: controlColor },
+                language === "ar" && styles.preferenceTextArabic,
+              ]}
+            >
+              {option.label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
     </View>
   );
 }
@@ -975,6 +1042,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     gap: 8,
+    flexWrap: "wrap",
+  },
+  preferenceGroupHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+  preferenceGroupTitle: {
+    color: "#ffffff",
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+  },
+  preferenceStack: {
+    gap: 10,
   },
   preferenceText: {
     color: "#ffffff",
