@@ -17,6 +17,10 @@ const arabicLabelMap = new Map<string, string>([
   ["healthcare facility", "منشأة صحية"],
   ["healthcare_facility", "منشأة صحية"],
   ["pending onboarding", "البيانات غير مكتملة"],
+  ["tbd", "لم يتم تحديده بعد"],
+  ["platform admin", "إدارة المنصة"],
+  ["new message", "رسالة جديدة"],
+  ["complete your professional onboarding profile", "أكمل ملفك المهني"],
   ["licensed practical nurse (lpn)", "ممرض عملي مرخص"],
   ["licensed practical nurse", "ممرض عملي مرخص"],
   ["registered nurse (rn)", "ممرض مسجل"],
@@ -31,9 +35,15 @@ const arabicLabelMap = new Map<string, string>([
   ["occupational therapist", "أخصائي علاج وظيفي"],
   ["icu/critical care", "العناية المركزة"],
   ["emergency medicine", "طب الطوارئ"],
+  ["general dentist", "طبيب أسنان عام"],
+  ["temporary dental assistant", "مساعد أسنان مؤقت"],
   ["professional license", "رخصة مزاولة المهنة"],
   ["government id", "الهوية الحكومية"],
   ["government_id", "الهوية الحكومية"],
+  ["tax card", "البطاقة الضريبية"],
+  ["tax_card", "البطاقة الضريبية"],
+  ["authorized signatory id", "هوية المفوض بالتوقيع"],
+  ["authorized_signatory_id", "هوية المفوض بالتوقيع"],
   ["certification", "الشهادات"],
   ["certifications", "الشهادات"],
   ["license", "رخصة مزاولة المهنة"],
@@ -47,6 +57,9 @@ const arabicLabelMap = new Map<string, string>([
   ["insurance", "التأمين"],
   ["sana'a", "صنعاء"],
   ["sanaa", "صنعاء"],
+  ["amanat al asimah", "أمانة العاصمة"],
+  ["sana'a, amanat al asimah", "صنعاء، أمانة العاصمة"],
+  ["sana'a, amanat al asimah, yemen", "صنعاء، أمانة العاصمة، اليمن"],
   ["sana'a, yemen", "صنعاء، اليمن"],
   ["sanaa, yemen", "صنعاء، اليمن"],
   ["aden", "عدن"],
@@ -61,6 +74,7 @@ const arabicLabelMap = new Map<string, string>([
   ["ibb, yemen", "إب، اليمن"],
   ["mukalla", "المكلا"],
   ["mukalla, yemen", "المكلا، اليمن"],
+  ["hadhramaut", "حضرموت"],
   ["dhamar", "ذمار"],
   ["dhamar, yemen", "ذمار، اليمن"],
   ["seiyun", "سيئون"],
@@ -71,6 +85,14 @@ const arabicLabelMap = new Map<string, string>([
   ["saada, yemen", "صعدة، اليمن"],
   ["marib", "مأرب"],
   ["marib, yemen", "مأرب، اليمن"],
+  ["zabid", "زبيد"],
+  ["amran", "عمران"],
+  ["al bayda", "البيضاء"],
+  ["ataq", "عتق"],
+  ["shabwah", "شبوة"],
+  ["al ghaydah", "الغيضة"],
+  ["al mahrah", "المهرة"],
+  ["ibn", "إب"],
   ["yemen", "اليمن"],
   ["ar", "العربية"],
   ["arabic", "العربية"],
@@ -92,11 +114,17 @@ const arabicLabelMap = new Map<string, string>([
     "professional must be verification approved before requesting this booking",
     "يجب اعتماد ملف المختص قبل التقديم على هذه المناوبة",
   ],
+  [
+    "google sign-in could not be verified. please try again.",
+    "تعذر التحقق من تسجيل الدخول باستخدام Google. يرجى المحاولة مرة أخرى.",
+  ],
+  ["platform admin sent you a message.", "أرسلت إدارة المنصة رسالة إليك."],
 ]);
 
 const englishLabelMap = new Map<string, string>([
   ["not_started", "Not started"],
   ["pending_review", "Pending review"],
+  ["tbd", "Not set yet"],
   ["healthcare_facility", "Healthcare facility"],
   ["invalid parameter: redirect_uri", "Could not open Google sign-in."],
   [
@@ -114,7 +142,40 @@ export function displayLabel(
   const normalized = trimmed.toLowerCase().replaceAll("_", " ");
   const exact = trimmed.toLowerCase();
   const map = language === "ar" ? arabicLabelMap : englishLabelMap;
-  return map.get(exact) ?? map.get(normalized) ?? trimmed.replaceAll("_", " ");
+  const mapped = map.get(exact) ?? map.get(normalized);
+  if (mapped) return mapped;
+
+  if (language === "ar") {
+    let localized = trimmed.replaceAll("_", " ");
+    const replacements = [
+      ["Platform Admin", "إدارة المنصة"],
+      ["New message", "رسالة جديدة"],
+      ["sent you a message", "أرسل إليك رسالة"],
+      ["Professional License", "رخصة مزاولة المهنة"],
+      ["Government ID", "الهوية الحكومية"],
+      ["Tax Card", "البطاقة الضريبية"],
+      ["Authorized Signatory ID", "هوية المفوض بالتوقيع"],
+      ["General Dentist", "طبيب أسنان عام"],
+      ["Temporary Dental Assistant", "مساعد أسنان مؤقت"],
+      ["Registered Nurse (RN)", "ممرض مسجل"],
+      ["Amanat Al Asimah", "أمانة العاصمة"],
+      ["Hadhramaut", "حضرموت"],
+      ["Yemen", "اليمن"],
+      ["Sana'a", "صنعاء"],
+      ["Sanaa", "صنعاء"],
+      ["Aden", "عدن"],
+      ["Taiz", "تعز"],
+      ["Ibb", "إب"],
+    ] as const;
+
+    for (const [from, to] of replacements) {
+      localized = localized.replaceAll(from, to);
+    }
+
+    return localized.replaceAll(", ", "، ");
+  }
+
+  return trimmed.replaceAll("_", " ");
 }
 
 export function verificationStatusLabel(

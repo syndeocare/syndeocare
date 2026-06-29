@@ -6,18 +6,18 @@ import {
   Screen,
   useTextStyles,
 } from "../../../src/components/ui";
+import { useT } from "../../../src/lib/preferences";
 
 export default function OAuthCallbackScreen() {
+  const t = useT();
   const text = useTextStyles();
 
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
       <Screen tone="auth">
-        <LoadingBlock label="Completing Google sign-in..." />
-        <Text style={text.body}>
-          You can close this window if it does not close automatically.
-        </Text>
+        <LoadingBlock label={t("auth.googleCompleting")} />
+        <Text style={text.body}>{t("auth.googleCloseHint")}</Text>
       </Screen>
     </>
   );

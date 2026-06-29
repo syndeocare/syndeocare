@@ -148,8 +148,9 @@ export default function DashboardScreen() {
             {displayLabel(conversations.data.items[0].displayName, language)}
           </Text>
           <Text style={text.body}>
-            {conversations.data.items[0].lastMessage ??
-              t("dashboard.noRecentMessage")}
+            {conversations.data.items[0].lastMessage
+              ? displayLabel(conversations.data.items[0].lastMessage, language)
+              : t("dashboard.noRecentMessage")}
           </Text>
         </Card>
       ) : (

@@ -21,6 +21,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { displayLabel } from "../lib/format";
 import { usePreferences, useT } from "../lib/preferences";
 
 const brandMark = require("../../assets/syndeocare-mark.png");
@@ -715,6 +716,7 @@ export function Field({
   multiline,
   onChangeText,
   placeholder,
+  rightIcon,
   returnKeyType,
   secureTextEntry,
   textContentType,
@@ -729,6 +731,7 @@ export function Field({
   multiline?: boolean;
   onChangeText: (value: string) => void;
   placeholder?: string;
+  rightIcon?: React.ReactNode;
   returnKeyType?: TextInputProps["returnKeyType"];
   secureTextEntry?: boolean;
   textContentType?: TextInputProps["textContentType"];
@@ -793,6 +796,7 @@ export function Field({
           ]}
           value={value}
         />
+        {rightIcon ? <View style={styles.inputIcon}>{rightIcon}</View> : null}
       </View>
       {error ? (
         <Text style={[styles.error, isRTL && styles.textRight]}>{error}</Text>
@@ -869,6 +873,7 @@ export function EmptyState({
 export function ErrorBanner({ message }: { message?: string }) {
   const { language } = usePreferences();
   if (!message) return null;
+  const localizedMessage = displayLabel(message, language);
   return (
     <View style={styles.errorBanner}>
       <Text
@@ -877,7 +882,7 @@ export function ErrorBanner({ message }: { message?: string }) {
           { fontFamily: language === "ar" ? fonts.arabic : fonts.body },
         ]}
       >
-        {message}
+        {localizedMessage}
       </Text>
     </View>
   );

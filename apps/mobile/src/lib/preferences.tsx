@@ -42,6 +42,9 @@ const en = {
   "auth.googleOpening": "Opening Google...",
   "auth.googleCancelledNeutral":
     "Google sign-in was cancelled. You can continue when ready.",
+  "auth.googleCompleting": "Completing Google sign-in...",
+  "auth.googleCloseHint":
+    "You can close this window if it does not close automatically.",
   "auth.googleSecureHint":
     "A secure Google window will open, then return you to SyndeoCare.",
   "auth.join": "Join SyndeoCare",
@@ -60,6 +63,8 @@ const en = {
   "auth.signInWithEmail": "Sign in with email",
   "auth.signUp": "Sign up",
   "auth.signUpWithEmail": "Sign up with email",
+  "auth.showPassword": "Show password",
+  "auth.hidePassword": "Hide password",
   "auth.startChoice": "Choose how you want to get started",
   "auth.terms":
     "By continuing, you agree to SyndeoCare terms and privacy policy.",
@@ -346,6 +351,8 @@ const ar: Record<TranslationKey, string> = {
   "auth.googleOpening": "جاري فتح Google...",
   "auth.googleCancelledNeutral":
     "تم إلغاء تسجيل الدخول باستخدام Google. يمكنك المتابعة عندما تكون جاهزاً.",
+  "auth.googleCompleting": "جاري إكمال تسجيل الدخول باستخدام Google...",
+  "auth.googleCloseHint": "يمكنك إغلاق هذه النافذة إذا لم تُغلق تلقائياً.",
   "auth.googleSecureHint":
     "ستفتح نافذة Google آمنة ثم تعود تلقائياً إلى SyndeoCare.",
   "auth.join": "انضم إلى SyndeoCare",
@@ -364,6 +371,8 @@ const ar: Record<TranslationKey, string> = {
   "auth.signInWithEmail": "تسجيل الدخول بالبريد الإلكتروني",
   "auth.signUp": "إنشاء حساب",
   "auth.signUpWithEmail": "إنشاء حساب بالبريد الإلكتروني",
+  "auth.showPassword": "إظهار كلمة المرور",
+  "auth.hidePassword": "إخفاء كلمة المرور",
   "auth.startChoice": "اختر طريقة البدء",
   "auth.terms": "بالمتابعة، فإنك توافق على شروط SyndeoCare وسياسة الخصوصية.",
   "auth.welcomeBack": "مرحباً بعودتك",

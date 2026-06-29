@@ -438,7 +438,9 @@ export default function ShiftsScreen() {
                     <Text style={text.h2}>{booking.professionalName}</Text>
                     <Text style={text.body}>{booking.jobTitle}</Text>
                     <Text style={text.body}>
-                      {booking.location.city}, {booking.location.region}
+                      {displayLabel(booking.location.city, language)}
+                      {language === "ar" ? "، " : ", "}
+                      {displayLabel(booking.location.region, language)}
                     </Text>
                     {booking.notes ? (
                       <Text style={text.body}>{booking.notes}</Text>
@@ -513,7 +515,9 @@ export default function ShiftsScreen() {
                       {displayLabel(professional.specialty, language)}
                     </Text>
                     <Text style={text.body}>
-                      {professional.city}, {professional.region}
+                      {displayLabel(professional.city, language)}
+                      {language === "ar" ? "، " : ", "}
+                      {displayLabel(professional.region, language)}
                     </Text>
                   </View>
                   <Badge tone="success">{t("verification.approved")}</Badge>
@@ -568,7 +572,9 @@ export default function ShiftsScreen() {
                   <View style={[styles.metaLine, isRTL && styles.rowReverse]}>
                     <MapPin color={colors.muted} size={16} />
                     <Text style={text.body}>
-                      {job.location.city}, {job.location.region}
+                      {displayLabel(job.location.city, language)}
+                      {language === "ar" ? "، " : ", "}
+                      {displayLabel(job.location.region, language)}
                     </Text>
                   </View>
                   <View style={[styles.metaLine, isRTL && styles.rowReverse]}>
@@ -881,11 +887,14 @@ export default function ShiftsScreen() {
                 <Card tone="muted">
                   <ReviewRow
                     label={t("shifts.specialty")}
-                    value={shiftDraft.role}
+                    value={displayLabel(shiftDraft.role, language)}
                   />
                   <ReviewRow
                     label={t("shifts.shiftTitle")}
-                    value={shiftDraft.title || shiftDraft.role}
+                    value={displayLabel(
+                      shiftDraft.title || shiftDraft.role,
+                      language,
+                    )}
                   />
                   <ReviewRow
                     label={t("shifts.startsAt")}
@@ -897,17 +906,20 @@ export default function ShiftsScreen() {
                   />
                   <ReviewRow
                     label={t("shifts.location")}
-                    value={
+                    value={displayLabel(
                       shiftDraft.locationAddress ||
-                      `${clinicProfileQuery.data?.city ?? ""}, ${
-                        clinicProfileQuery.data?.region ?? ""
-                      }`
-                    }
+                        `${clinicProfileQuery.data?.city ?? ""}, ${
+                          clinicProfileQuery.data?.region ?? ""
+                        }`,
+                      language,
+                    )}
                   />
                   <ReviewRow
                     label={t("shifts.requirements")}
                     value={
-                      shiftDraft.requiredCertifications.join(", ") ||
+                      shiftDraft.requiredCertifications
+                        .map((item) => displayLabel(item, language))
+                        .join(language === "ar" ? "، " : ", ") ||
                       t("shifts.noOptionalRequirements")
                     }
                   />

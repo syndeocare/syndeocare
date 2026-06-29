@@ -226,8 +226,15 @@ export default function ConversationScreen() {
             return (
               <View key={message.id} style={styles.messageGroup}>
                 {showDate ? (
-                  <View style={styles.datePill}>
-                    <Text style={styles.datePillText}>
+                  <View
+                    style={[
+                      styles.datePill,
+                      { backgroundColor: palette.surfaceMuted },
+                    ]}
+                  >
+                    <Text
+                      style={[styles.datePillText, { color: palette.muted }]}
+                    >
                       {formatDateTime(message.createdAt, language)}
                     </Text>
                   </View>
@@ -268,7 +275,9 @@ export default function ConversationScreen() {
                     >
                       {isMine
                         ? t("conversation.you")
-                        : t(`roles.${message.senderRole}`)}
+                        : message.senderRole === "admin"
+                          ? displayLabel("Platform Admin", language)
+                          : t(`roles.${message.senderRole}`)}
                     </Text>
                     <Text
                       style={[
@@ -302,7 +311,7 @@ export default function ConversationScreen() {
                         },
                       ]}
                     >
-                      {message.content}
+                      {displayLabel(message.content, language)}
                     </Text>
                   ) : null}
                   {message.fileName ? (
@@ -365,7 +374,9 @@ export default function ConversationScreen() {
                 isRTL && styles.rowReverse,
               ]}
             >
-              <Text style={text.body}>{attachment.name}</Text>
+              <Text style={text.body}>
+                {displayLabel(attachment.name, language)}
+              </Text>
               <Pressable onPress={() => setAttachment(null)}>
                 <Text style={styles.file}>{t("conversation.removeFile")}</Text>
               </Pressable>
@@ -533,7 +544,6 @@ const styles = StyleSheet.create({
   },
   datePill: {
     alignSelf: "center",
-    backgroundColor: colors.panelSoft,
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 5,

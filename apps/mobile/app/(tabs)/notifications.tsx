@@ -22,7 +22,7 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
 } from "../../src/lib/api";
-import { formatDateTime } from "../../src/lib/format";
+import { displayLabel, formatDateTime } from "../../src/lib/format";
 import { usePreferences, useT } from "../../src/lib/preferences";
 import { queryClient } from "../../src/lib/query";
 
@@ -91,7 +91,10 @@ export default function NotificationsScreen() {
 
       {notificationsQuery.data?.items.length ? (
         notificationsQuery.data.items.map((notification) => (
-          <Card key={notification.id}>
+          <Card
+            key={notification.id}
+            tone={notification.isRead ? "default" : "muted"}
+          >
             <View style={[styles.notificationTop, isRTL && styles.rowReverse]}>
               <View
                 style={[
@@ -111,7 +114,7 @@ export default function NotificationsScreen() {
               <View style={styles.grow}>
                 <View style={styles.headerLine}>
                   <Text style={[text.h2, styles.title]}>
-                    {notification.title}
+                    {displayLabel(notification.title, language)}
                   </Text>
                   <Badge tone={notification.isRead ? "neutral" : "warning"}>
                     {notification.isRead
@@ -119,7 +122,9 @@ export default function NotificationsScreen() {
                       : t("notifications.new")}
                   </Badge>
                 </View>
-                <Text style={text.body}>{notification.message}</Text>
+                <Text style={text.body}>
+                  {displayLabel(notification.message, language)}
+                </Text>
                 <Text style={[styles.time, { color: palette.muted }]}>
                   {formatDateTime(notification.createdAt, language)}
                 </Text>
@@ -138,7 +143,7 @@ export default function NotificationsScreen() {
               <Button
                 loading={deleteMutation.isPending}
                 onPress={() => deleteMutation.mutate(notification.id)}
-                tone="danger"
+                tone="secondary"
               >
                 {t("notifications.delete")}
               </Button>

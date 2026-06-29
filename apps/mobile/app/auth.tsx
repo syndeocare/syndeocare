@@ -5,6 +5,8 @@ import {
   ArrowRight,
   Building2,
   ChevronDown,
+  Eye,
+  EyeOff,
   Lock,
   Mail,
   ShieldCheck,
@@ -717,6 +719,7 @@ function EmailPasswordFields({
 }) {
   const t = useT();
   const palette = useThemePalette();
+  const [passwordVisible, setPasswordVisible] = useState(false);
   return (
     <>
       <Controller
@@ -748,8 +751,26 @@ function EmailPasswordFields({
             leftIcon={<Lock color={palette.placeholder} size={20} />}
             onChangeText={field.onChange}
             placeholder="••••••••"
+            rightIcon={
+              <Pressable
+                accessibilityLabel={
+                  passwordVisible
+                    ? t("auth.hidePassword")
+                    : t("auth.showPassword")
+                }
+                accessibilityRole="button"
+                hitSlop={8}
+                onPress={() => setPasswordVisible((visible) => !visible)}
+              >
+                {passwordVisible ? (
+                  <EyeOff color={palette.placeholder} size={20} />
+                ) : (
+                  <Eye color={palette.placeholder} size={20} />
+                )}
+              </Pressable>
+            }
             returnKeyType="done"
-            secureTextEntry
+            secureTextEntry={!passwordVisible}
             textContentType="password"
             value={field.value}
           />

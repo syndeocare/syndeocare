@@ -566,11 +566,8 @@ export default function ProfileScreen() {
                   returnKeyType="next"
                   value={yearsExperience}
                 />
-                <Field
-                  label={t("profile.languages")}
-                  onChangeText={setLanguagesText}
-                  placeholder="ar, en"
-                  returnKeyType="next"
+                <LanguageChips
+                  onChange={setLanguagesText}
                   value={languagesText}
                 />
                 <Text style={text.strong}>{t("profile.certifications")}</Text>
@@ -641,7 +638,10 @@ export default function ProfileScreen() {
               label={t("profile.location")}
               value={
                 profile?.city || profile?.region
-                  ? [profile.city, profile.region].filter(Boolean).join(", ")
+                  ? [profile.city, profile.region]
+                      .filter(Boolean)
+                      .map((part) => displayLabel(part, language))
+                      .join(language === "ar" ? "، " : ", ")
                   : undefined
               }
             />
@@ -667,7 +667,7 @@ export default function ProfileScreen() {
                     clinicProfile.services.length
                       ? clinicProfile.services
                           .map((service) => displayLabel(service, language))
-                          .join(", ")
+                          .join(language === "ar" ? "، " : ", ")
                       : undefined
                   }
                 />
@@ -950,6 +950,7 @@ function CatalogChips({
   const t = useT();
   const text = useTextStyles();
   const { language } = usePreferences();
+  const palette = useThemePalette();
 
   if (loading) return <LoadingBlock label={t("common.loading")} />;
   if (!items.length) {
@@ -970,11 +971,16 @@ function CatalogChips({
             accessibilityState={{ checked: selected }}
             key={item.id}
             onPress={() => onSelect(item)}
-            style={[styles.chip, selected ? styles.chipSelected : undefined]}
+            style={[
+              styles.chip,
+              { backgroundColor: palette.surface, borderColor: palette.border },
+              selected ? styles.chipSelected : undefined,
+            ]}
           >
             <Text
               style={[
                 styles.chipText,
+                { color: palette.text },
                 selected ? styles.chipTextSelected : undefined,
               ]}
             >
@@ -983,6 +989,65 @@ function CatalogChips({
           </Pressable>
         );
       })}
+    </View>
+  );
+}
+
+function LanguageChips({
+  onChange,
+  value,
+}: {
+  onChange: (value: string) => void;
+  value: string;
+}) {
+  const t = useT();
+  const text = useTextStyles();
+  const palette = useThemePalette();
+  const selectedValues = splitCsv(value);
+  const options = [
+    { label: t("profile.language.ar"), value: "ar" },
+    { label: t("profile.language.en"), value: "en" },
+  ];
+
+  return (
+    <View style={styles.languageGroup}>
+      <Text style={text.strong}>{t("profile.languages")}</Text>
+      <View style={styles.chipGrid}>
+        {options.map((option) => {
+          const selected = selectedValues.includes(option.value);
+          return (
+            <Pressable
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: selected }}
+              key={option.value}
+              onPress={() => {
+                const next = selected
+                  ? selectedValues.filter((item) => item !== option.value)
+                  : [...selectedValues, option.value];
+                onChange(joinUnique(next.length ? next : ["ar"]));
+              }}
+              style={[
+                styles.chip,
+                {
+                  backgroundColor: palette.surface,
+                  borderColor: palette.border,
+                },
+                selected ? styles.chipSelected : undefined,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.chipText,
+                  { color: palette.text },
+                  selected ? styles.chipTextSelected : undefined,
+                ]}
+              >
+                {option.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
     </View>
   );
 }
@@ -1071,6 +1136,9 @@ const styles = StyleSheet.create({
   grow: {
     flex: 1,
     gap: 6,
+  },
+  languageGroup: {
+    gap: 8,
   },
   detailIcon: {
     alignItems: "center",
