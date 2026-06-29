@@ -1,6 +1,19 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
+import {
+  BriefcaseBusiness,
+  Camera,
+  Edit3,
+  Globe2,
+  Languages,
+  MapPin,
+  Phone,
+  ShieldCheck,
+  Stethoscope,
+  X,
+} from "lucide-react-native";
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import {
@@ -22,6 +35,7 @@ import {
   SectionHeader,
   colors,
   useTextStyles,
+  useThemePalette,
 } from "../../src/components/ui";
 import { AppHeaderActions } from "../../src/components/AppHeaderActions";
 import {
@@ -40,7 +54,7 @@ import {
   uploadProfileImage,
 } from "../../src/lib/api";
 import { useAuth } from "../../src/lib/auth";
-import { useT } from "../../src/lib/preferences";
+import { usePreferences, useT } from "../../src/lib/preferences";
 import { queryClient } from "../../src/lib/query";
 import type {
   CatalogItem,
@@ -52,6 +66,12 @@ type MobileProfile = ClinicProfile | ProfessionalProfile;
 
 function isClinicProfile(profile: MobileProfile): profile is ClinicProfile {
   return "organizationName" in profile;
+}
+
+function isProfessionalProfile(
+  profile: MobileProfile,
+): profile is ProfessionalProfile {
+  return "fullName" in profile;
 }
 
 function activeCatalogItems(items?: CatalogItem[]) {
@@ -97,7 +117,9 @@ export default function ProfileScreen() {
   const { logout, session } = useAuth();
   const t = useT();
   const text = useTextStyles();
+  const palette = useThemePalette();
   const isClinic = session?.principal.role === "clinic";
+  const [isEditingDetails, setIsEditingDetails] = useState(false);
   const [displayNameDraft, setDisplayNameDraft] = useState("");
   const [phone, setPhone] = useState("");
   const [description, setDescription] = useState("");
@@ -142,19 +164,21 @@ export default function ProfileScreen() {
   );
 
   const profile = profileQuery.data;
-  const imageUrl =
-    profile && isClinicProfile(profile)
-      ? profile.logoUrl
-      : profile && !isClinicProfile(profile)
-        ? profile.profileImageUrl
-        : session?.principal.profileImageUrl;
+  const clinicProfile: ClinicProfile | undefined =
+    profile && isClinicProfile(profile) ? profile : undefined;
+  const professionalProfile: ProfessionalProfile | undefined =
+    profile && isProfessionalProfile(profile) ? profile : undefined;
+  const imageUrl = clinicProfile
+    ? clinicProfile.logoUrl
+    : professionalProfile
+      ? professionalProfile.profileImageUrl
+      : session?.principal.profileImageUrl;
 
-  const displayName =
-    profile && isClinicProfile(profile)
-      ? profile.organizationName
-      : profile && !isClinicProfile(profile)
-        ? profile.fullName
-        : session?.principal.displayName;
+  const displayName = clinicProfile
+    ? clinicProfile.organizationName
+    : professionalProfile
+      ? professionalProfile.fullName
+      : session?.principal.displayName;
 
   useEffect(() => {
     if (!profile) return;
@@ -243,6 +267,7 @@ export default function ProfileScreen() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["profile"] });
+      setIsEditingDetails(false);
     },
   });
   const imageMutation = useMutation({
@@ -337,157 +362,325 @@ export default function ProfileScreen() {
       />
 
       <Card>
-        <View style={styles.profileHeader}>
-          <Avatar label={displayName} size={76} uri={imageUrl} />
-          <View style={styles.grow}>
+        <View style={styles.profileHero}>
+          <View>
+            <Avatar label={displayName} size={92} uri={imageUrl} />
+            <Pressable
+              accessibilityLabel={
+                isClinic ? t("profile.uploadLogo") : t("profile.uploadPhoto")
+              }
+              accessibilityRole="button"
+              disabled={imageMutation.isPending}
+              hitSlop={8}
+              onPress={() => imageMutation.mutate()}
+              style={[
+                styles.photoAction,
+                {
+                  backgroundColor: palette.surface,
+                  borderColor: palette.border,
+                },
+              ]}
+            >
+              <Camera color={colors.primary} size={17} />
+            </Pressable>
+          </View>
+          <View style={styles.profileHeroCopy}>
             <Text style={text.h2}>{displayName}</Text>
+            {clinicProfile ? (
+              <Text style={text.body}>
+                {cleanFacilityType(clinicProfile.facilityType) ||
+                  t("profile.facilityType")}
+              </Text>
+            ) : professionalProfile ? (
+              <Text style={text.body}>
+                {professionalProfile.headline || professionalProfile.specialty}
+              </Text>
+            ) : null}
             {session?.principal.email ? (
               <Text style={text.body}>{session.principal.email}</Text>
             ) : null}
-            <Badge
-              tone={
-                session?.principal.verificationStatus === "approved"
-                  ? "success"
-                  : "warning"
-              }
-            >
-              {session?.principal.verificationStatus.replace("_", " ")}
-            </Badge>
+            <View style={styles.badgeRow}>
+              <Badge
+                tone={
+                  session?.principal.verificationStatus === "approved"
+                    ? "success"
+                    : "warning"
+                }
+              >
+                {session?.principal.verificationStatus === "approved"
+                  ? t("verification.approved")
+                  : session?.principal.verificationStatus.replace("_", " ")}
+              </Badge>
+              <Badge
+                tone={profile?.onboardingCompleted ? "success" : "warning"}
+              >
+                {profile?.onboardingCompleted
+                  ? t("profile.onboardingComplete")
+                  : t("profile.onboardingIncomplete")}
+              </Badge>
+            </View>
           </View>
         </View>
-        <Button
-          loading={imageMutation.isPending}
-          onPress={() => imageMutation.mutate()}
-          tone="secondary"
-        >
-          {isClinic ? t("profile.uploadLogo") : t("profile.uploadPhoto")}
-        </Button>
       </Card>
 
       <Card>
-        <SectionHeader title={t("profile.profileDetails")} />
-        <Text style={text.body}>{t("profile.yemenFixed")}</Text>
-        <Field
-          autoCapitalize="words"
-          label={
-            isClinic ? t("profile.organizationName") : t("profile.fullName")
-          }
-          onChangeText={setDisplayNameDraft}
-          returnKeyType="next"
-          value={displayNameDraft}
-        />
-        <Field
-          autoComplete="tel"
-          error={phoneError}
-          keyboardType="phone-pad"
-          label={t("profile.yemenPhone")}
-          onChangeText={(value) => {
-            setPhoneTouched(true);
-            setPhone(normalizeYemenPhoneInput(value));
+        <EditableSectionHeader
+          editing={isEditingDetails}
+          onCancel={() => {
+            if (profile) {
+              setSelectedLocation(findProfileLocation(profile));
+              if (isClinicProfile(profile)) {
+                setDisplayNameDraft(profile.organizationName);
+                setPhone(normalizeYemenPhoneInput(profile.contactPhone ?? ""));
+                setDescription(profile.description ?? "");
+                setFacilityType(cleanFacilityType(profile.facilityType));
+                setWebsiteUrl(profile.websiteUrl ?? "");
+              } else {
+                setDisplayNameDraft(profile.fullName);
+                setPhone(normalizeYemenPhoneInput(profile.primaryPhone ?? ""));
+                setDescription(profile.bio ?? "");
+                setHeadline(profile.headline ?? "");
+                setSpecialty(profile.specialty);
+                setLicenseDetails(profile.licenseNumber ?? "");
+                setYearsExperience(String(profile.yearsExperience));
+                setLanguagesText(profile.languages.join(", "));
+                setAvailabilityStatus(profile.availability.status);
+                setLocationRadiusKm(
+                  String(profile.availability.locationRadiusKm),
+                );
+              }
+            }
+            setPhoneTouched(false);
+            setLocationTouched(false);
+            setIsEditingDetails(false);
           }}
-          placeholder="77xxxxxxx"
-          returnKeyType="next"
-          textContentType="telephoneNumber"
-          value={phone}
+          onEdit={() => setIsEditingDetails(true)}
+          title={t("profile.profileDetails")}
         />
-        <LocationField
-          error={locationError}
-          onChange={(location) => {
-            setLocationTouched(true);
-            setSelectedLocation(location);
-          }}
-          value={selectedLocation}
-        />
-        {isClinic ? (
+        {isEditingDetails ? (
           <>
+            <Text style={text.body}>{t("profile.yemenFixed")}</Text>
             <Field
-              autoCapitalize="none"
-              autoComplete="url"
-              keyboardType="url"
-              label={t("profile.website")}
-              onChangeText={setWebsiteUrl}
+              autoCapitalize="words"
+              label={
+                isClinic ? t("profile.organizationName") : t("profile.fullName")
+              }
+              onChangeText={setDisplayNameDraft}
               returnKeyType="next"
-              value={websiteUrl}
+              value={displayNameDraft}
             />
+            <Field
+              autoComplete="tel"
+              error={phoneError}
+              keyboardType="phone-pad"
+              label={t("profile.yemenPhone")}
+              onChangeText={(value) => {
+                setPhoneTouched(true);
+                setPhone(normalizeYemenPhoneInput(value));
+              }}
+              placeholder="77xxxxxxx"
+              returnKeyType="next"
+              textContentType="telephoneNumber"
+              value={phone}
+            />
+            <LocationField
+              error={locationError}
+              onChange={(location) => {
+                setLocationTouched(true);
+                setSelectedLocation(location);
+              }}
+              value={selectedLocation}
+            />
+            {isClinic ? (
+              <>
+                <Field
+                  autoCapitalize="words"
+                  label={t("profile.facilityType")}
+                  onChangeText={setFacilityType}
+                  returnKeyType="next"
+                  value={facilityType}
+                />
+                <Field
+                  autoCapitalize="none"
+                  autoComplete="url"
+                  keyboardType="url"
+                  label={t("profile.website")}
+                  onChangeText={setWebsiteUrl}
+                  returnKeyType="next"
+                  value={websiteUrl}
+                />
+              </>
+            ) : (
+              <>
+                <Field
+                  label={t("profile.headline")}
+                  onChangeText={setHeadline}
+                  returnKeyType="next"
+                  value={headline}
+                />
+                <Text style={text.strong}>{t("profile.specialty")}</Text>
+                <CatalogChips
+                  items={specialtyOptions}
+                  loading={specialtiesQuery.isLoading}
+                  onSelect={(item) => setSpecialty(item.name)}
+                  selectedValues={[specialty]}
+                />
+                <Field
+                  keyboardType="number-pad"
+                  label={t("profile.yearsExperience")}
+                  onChangeText={setYearsExperience}
+                  returnKeyType="next"
+                  value={yearsExperience}
+                />
+                <Field
+                  label={t("profile.languages")}
+                  onChangeText={setLanguagesText}
+                  placeholder="ar, en"
+                  returnKeyType="next"
+                  value={languagesText}
+                />
+                <Text style={text.strong}>{t("profile.certifications")}</Text>
+                <CatalogChips
+                  items={certificationOptions}
+                  loading={certificationsQuery.isLoading}
+                  multiple
+                  onSelect={(item) => {
+                    const values = splitCsv(licenseDetails);
+                    setLicenseDetails(
+                      values.includes(item.name)
+                        ? joinUnique(
+                            values.filter((value) => value !== item.name),
+                          )
+                        : joinUnique([...values, item.name]),
+                    );
+                  }}
+                  selectedValues={splitCsv(licenseDetails)}
+                />
+                <Field
+                  label={t("profile.licenseDetails")}
+                  multiline
+                  onChangeText={setLicenseDetails}
+                  placeholder={t("profile.commaSeparated")}
+                  returnKeyType="default"
+                  value={licenseDetails}
+                />
+                <AvailabilitySelector
+                  onSelect={setAvailabilityStatus}
+                  selected={availabilityStatus}
+                />
+                <Field
+                  keyboardType="number-pad"
+                  label={t("profile.locationRadius")}
+                  onChangeText={setLocationRadiusKm}
+                  returnKeyType="done"
+                  value={locationRadiusKm}
+                />
+              </>
+            )}
+            <Field
+              label={
+                isClinic ? t("profile.facilityDescription") : t("profile.bio")
+              }
+              multiline
+              onChangeText={setDescription}
+              returnKeyType="default"
+              value={description}
+            />
+            <Button
+              loading={saveMutation.isPending}
+              onPress={() => saveMutation.mutate()}
+            >
+              {t("profile.save")}
+            </Button>
           </>
         ) : (
-          <>
-            <Field
-              label={t("profile.headline")}
-              onChangeText={setHeadline}
-              returnKeyType="next"
-              value={headline}
+          <View style={styles.detailsStack}>
+            <DetailRow
+              icon={<Phone color={colors.primary} size={18} />}
+              label={t("profile.yemenPhone")}
+              value={
+                clinicProfile?.contactPhone ?? professionalProfile?.primaryPhone
+              }
             />
-            <Text style={text.strong}>{t("profile.specialty")}</Text>
-            <CatalogChips
-              items={specialtyOptions}
-              loading={specialtiesQuery.isLoading}
-              onSelect={(item) => setSpecialty(item.name)}
-              selectedValues={[specialty]}
+            <DetailRow
+              icon={<MapPin color={colors.primary} size={18} />}
+              label={t("profile.location")}
+              value={
+                profile?.city || profile?.region
+                  ? [profile.city, profile.region].filter(Boolean).join(", ")
+                  : undefined
+              }
             />
-            <Field
-              keyboardType="number-pad"
-              label={t("profile.yearsExperience")}
-              onChangeText={setYearsExperience}
-              returnKeyType="next"
-              value={yearsExperience}
-            />
-            <Field
-              label={t("profile.languages")}
-              onChangeText={setLanguagesText}
-              placeholder="ar, en"
-              returnKeyType="next"
-              value={languagesText}
-            />
-            <Text style={text.strong}>{t("profile.certifications")}</Text>
-            <CatalogChips
-              items={certificationOptions}
-              loading={certificationsQuery.isLoading}
-              multiple
-              onSelect={(item) => {
-                const values = splitCsv(licenseDetails);
-                setLicenseDetails(
-                  values.includes(item.name)
-                    ? joinUnique(values.filter((value) => value !== item.name))
-                    : joinUnique([...values, item.name]),
-                );
-              }}
-              selectedValues={splitCsv(licenseDetails)}
-            />
-            <Field
-              label={t("profile.licenseDetails")}
-              multiline
-              onChangeText={setLicenseDetails}
-              placeholder={t("profile.commaSeparated")}
-              returnKeyType="default"
-              value={licenseDetails}
-            />
-            <AvailabilitySelector
-              onSelect={setAvailabilityStatus}
-              selected={availabilityStatus}
-            />
-            <Field
-              keyboardType="number-pad"
-              label={t("profile.locationRadius")}
-              onChangeText={setLocationRadiusKm}
-              returnKeyType="done"
-              value={locationRadiusKm}
-            />
-          </>
+            {clinicProfile ? (
+              <>
+                <DetailRow
+                  icon={<BriefcaseBusiness color={colors.primary} size={18} />}
+                  label={t("profile.facilityType")}
+                  value={cleanFacilityType(clinicProfile.facilityType)}
+                />
+                <DetailRow
+                  icon={<Globe2 color={colors.primary} size={18} />}
+                  label={t("profile.website")}
+                  value={clinicProfile.websiteUrl}
+                />
+                <DetailRow
+                  icon={<ShieldCheck color={colors.primary} size={18} />}
+                  label={t("profile.services")}
+                  value={
+                    clinicProfile.services.length
+                      ? clinicProfile.services.join(", ")
+                      : undefined
+                  }
+                />
+                <DetailRow
+                  label={t("profile.facilityDescription")}
+                  value={clinicProfile.description}
+                />
+              </>
+            ) : professionalProfile ? (
+              <>
+                <DetailRow
+                  icon={<Stethoscope color={colors.primary} size={18} />}
+                  label={t("profile.specialty")}
+                  value={professionalProfile.specialty}
+                />
+                <DetailRow
+                  label={t("profile.headline")}
+                  value={professionalProfile.headline}
+                />
+                <DetailRow
+                  icon={<BriefcaseBusiness color={colors.primary} size={18} />}
+                  label={t("profile.yearsExperience")}
+                  value={`${professionalProfile.yearsExperience}`}
+                />
+                <DetailRow
+                  icon={<Languages color={colors.primary} size={18} />}
+                  label={t("profile.languages")}
+                  value={professionalProfile.languages.join(", ")}
+                />
+                <DetailRow
+                  icon={<ShieldCheck color={colors.primary} size={18} />}
+                  label={t("profile.licenseDetails")}
+                  value={professionalProfile.licenseNumber}
+                />
+                <DetailRow
+                  label={t("profile.availability")}
+                  value={t(
+                    `profile.availability.${professionalProfile.availability.status}`,
+                  )}
+                />
+                <DetailRow
+                  label={t("profile.locationRadius")}
+                  value={`${professionalProfile.availability.locationRadiusKm} km`}
+                />
+                <DetailRow
+                  label={t("profile.bio")}
+                  value={professionalProfile.bio}
+                />
+              </>
+            ) : null}
+          </View>
         )}
-        <Field
-          label={isClinic ? t("profile.facilityDescription") : t("profile.bio")}
-          multiline
-          onChangeText={setDescription}
-          returnKeyType="default"
-          value={description}
-        />
-        <Button
-          loading={saveMutation.isPending}
-          onPress={() => saveMutation.mutate()}
-        >
-          {t("profile.save")}
-        </Button>
       </Card>
 
       <Card>
@@ -578,6 +771,98 @@ export default function ProfileScreen() {
         </Button>
       </Card>
     </Screen>
+  );
+}
+
+function EditableSectionHeader({
+  editing,
+  onCancel,
+  onEdit,
+  title,
+}: {
+  editing: boolean;
+  onCancel: () => void;
+  onEdit: () => void;
+  title: string;
+}) {
+  const { direction } = usePreferences();
+  const text = useTextStyles();
+  const palette = useThemePalette();
+  const t = useT();
+  const isRTL = direction === "rtl";
+
+  return (
+    <View style={[styles.sectionTop, isRTL && styles.rowReverse]}>
+      <Text style={text.strong}>{title}</Text>
+      <Pressable
+        accessibilityLabel={editing ? t("common.cancel") : t("profile.edit")}
+        accessibilityRole="button"
+        hitSlop={8}
+        onPress={editing ? onCancel : onEdit}
+        style={({ pressed }) => [
+          styles.iconAction,
+          {
+            backgroundColor: palette.surfaceMuted,
+            borderColor: palette.border,
+          },
+          pressed && styles.iconActionPressed,
+        ]}
+      >
+        {editing ? (
+          <X color={colors.primary} size={18} />
+        ) : (
+          <Edit3 color={colors.primary} size={18} />
+        )}
+      </Pressable>
+    </View>
+  );
+}
+
+function DetailRow({
+  icon,
+  label,
+  value,
+}: {
+  icon?: ReactNode;
+  label: string;
+  value?: number | string | null;
+}) {
+  const { direction } = usePreferences();
+  const text = useTextStyles();
+  const palette = useThemePalette();
+  const t = useT();
+  const isRTL = direction === "rtl";
+  const displayValue =
+    value == null || String(value).trim() === ""
+      ? t("profile.notAdded")
+      : String(value);
+
+  return (
+    <View
+      style={[
+        styles.detailRow,
+        {
+          backgroundColor: palette.surfaceMuted,
+          borderColor: palette.border,
+        },
+        isRTL && styles.rowReverse,
+      ]}
+    >
+      {icon ? <View style={styles.detailIcon}>{icon}</View> : null}
+      <View style={styles.grow}>
+        <Text style={[text.body, styles.detailLabel]}>{label}</Text>
+        <Text
+          style={[
+            text.strong,
+            displayValue === t("profile.notAdded") && {
+              color: palette.muted,
+            },
+          ]}
+        >
+          {displayValue}
+        </Text>
+      </View>
+    </View>
   );
 }
 
@@ -681,6 +966,11 @@ const styles = StyleSheet.create({
   actions: {
     gap: 10,
   },
+  badgeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
   chip: {
     borderColor: colors.border,
     borderRadius: 999,
@@ -709,10 +999,66 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 6,
   },
-  profileHeader: {
+  detailIcon: {
+    alignItems: "center",
+    height: 34,
+    justifyContent: "center",
+    width: 34,
+  },
+  detailLabel: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  detailRow: {
+    alignItems: "center",
+    borderRadius: 13,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+  },
+  detailsStack: {
+    gap: 9,
+  },
+  iconAction: {
+    alignItems: "center",
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 38,
+    justifyContent: "center",
+    width: 38,
+  },
+  iconActionPressed: {
+    transform: [{ scale: 0.97 }],
+  },
+  photoAction: {
+    alignItems: "center",
+    borderRadius: 999,
+    borderWidth: 1,
+    bottom: -2,
+    height: 34,
+    justifyContent: "center",
+    position: "absolute",
+    right: -2,
+    width: 34,
+  },
+  profileHero: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 14,
+    gap: 16,
+  },
+  profileHeroCopy: {
+    flex: 1,
+    gap: 7,
+  },
+  rowReverse: {
+    flexDirection: "row-reverse",
+  },
+  sectionTop: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
   success: {
     color: colors.success,
