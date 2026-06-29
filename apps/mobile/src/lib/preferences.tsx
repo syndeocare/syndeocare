@@ -74,6 +74,8 @@ const en = {
   "conversation.send": "Send",
   "conversation.secureThread": "Secure conversation",
   "conversation.title": "Conversation",
+  "conversation.you": "You",
+  "common.cancel": "Cancel",
   "common.clear": "Clear",
   "common.loading": "Loading...",
   "common.optional": "optional",
@@ -181,6 +183,7 @@ const en = {
   "profile.radiusError": "Enter a valid positive travel radius.",
   "profile.quickUpdate": "Quick profile update",
   "profile.save": "Save changes",
+  "profile.savePassword": "Update password",
   "profile.resendVerification": "Resend verification email",
   "profile.services": "Services",
   "profile.specialty": "Specialty",
@@ -224,6 +227,7 @@ const en = {
   "shifts.inviteTitle": "Invite or message professionals",
   "shifts.loading": "Loading shifts...",
   "shifts.loadingCertifications": "Loading certifications...",
+  "shifts.loadingProfessionals": "Loading professionals...",
   "shifts.loadingRoles": "Loading roles...",
   "shifts.location": "Location",
   "shifts.locationPlaceholder": "City, region",
@@ -238,6 +242,9 @@ const en = {
     "Published shifts from approved clinics will appear here.",
   "shifts.noOpenTitle": "No open shifts",
   "shifts.noRoles": "No matching roles.",
+  "shifts.noVerifiedProfessionalsBody":
+    "Only approved and onboarded professionals appear here.",
+  "shifts.noVerifiedProfessionalsTitle": "No verified professionals",
   "shifts.publishShift": "Publish shift",
   "shifts.proposal": "Proposal",
   "shifts.proposalPlaceholder":
@@ -269,6 +276,9 @@ const en = {
   "settings.preferencesBody":
     "By default SyndeoCare follows your device language and appearance. You can override either option here.",
   "settings.title": "Settings",
+  "roles.admin": "Admin",
+  "roles.clinic": "Clinic",
+  "roles.professional": "Professional",
   "tabs.alerts": "Alerts",
   "tabs.home": "Home",
   "tabs.messages": "Messages",
@@ -282,6 +292,7 @@ const en = {
   "validation.ruleLength": "8+ characters",
   "validation.ruleNumber": "Number",
   "validation.ruleUpper": "Uppercase letter",
+  "verification.approved": "Verified",
 } as const;
 
 type TranslationKey = keyof typeof en;
@@ -337,6 +348,8 @@ const ar: Record<TranslationKey, string> = {
   "conversation.send": "إرسال",
   "conversation.secureThread": "محادثة آمنة",
   "conversation.title": "المحادثة",
+  "conversation.you": "أنت",
+  "common.cancel": "إلغاء",
   "common.clear": "مسح",
   "common.loading": "جاري التحميل...",
   "common.optional": "اختياري",
@@ -443,6 +456,7 @@ const ar: Record<TranslationKey, string> = {
   "profile.radiusError": "أدخل نطاق تنقل صحيحاً أكبر من صفر.",
   "profile.quickUpdate": "تحديث سريع للملف",
   "profile.save": "حفظ التغييرات",
+  "profile.savePassword": "تحديث كلمة المرور",
   "profile.resendVerification": "إعادة إرسال رسالة التحقق",
   "profile.services": "الخدمات",
   "profile.specialty": "التخصص",
@@ -483,6 +497,7 @@ const ar: Record<TranslationKey, string> = {
   "shifts.inviteTitle": "دعوة أو مراسلة المختصين",
   "shifts.loading": "جاري تحميل المناوبات...",
   "shifts.loadingCertifications": "جاري تحميل الشهادات...",
+  "shifts.loadingProfessionals": "جاري تحميل المختصين...",
   "shifts.loadingRoles": "جاري تحميل الأدوار...",
   "shifts.location": "الموقع",
   "shifts.locationPlaceholder": "المدينة، المحافظة",
@@ -496,6 +511,9 @@ const ar: Record<TranslationKey, string> = {
   "shifts.noOpenBody": "ستظهر هنا المناوبات المنشورة من المنشآت المعتمدة.",
   "shifts.noOpenTitle": "لا توجد مناوبات مفتوحة",
   "shifts.noRoles": "لا توجد أدوار مطابقة.",
+  "shifts.noVerifiedProfessionalsBody":
+    "يظهر هنا فقط المختصون المعتمدون والمكتملو البيانات.",
+  "shifts.noVerifiedProfessionalsTitle": "لا يوجد مختصون معتمدون",
   "shifts.publishShift": "نشر المناوبة",
   "shifts.proposal": "العرض",
   "shifts.proposalPlaceholder": "شارك تفرغك أو خبرتك أو أسئلتك.",
@@ -526,6 +544,9 @@ const ar: Record<TranslationKey, string> = {
   "settings.preferencesBody":
     "يتبع SyndeoCare لغة ومظهر جهازك افتراضياً. يمكنك تغيير أي خيار من هنا.",
   "settings.title": "الإعدادات",
+  "roles.admin": "مدير",
+  "roles.clinic": "منشأة",
+  "roles.professional": "مختص صحي",
   "tabs.alerts": "التنبيهات",
   "tabs.home": "الرئيسية",
   "tabs.messages": "الرسائل",
@@ -539,6 +560,7 @@ const ar: Record<TranslationKey, string> = {
   "validation.ruleLength": "8 أحرف أو أكثر",
   "validation.ruleNumber": "رقم",
   "validation.ruleUpper": "حرف كبير",
+  "verification.approved": "موثق",
 };
 
 const dictionary: Record<AppLanguage, Record<TranslationKey, string>> = {

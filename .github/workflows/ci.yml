@@ -2,9 +2,17 @@ name: CI
 
 on:
   pull_request:
+    paths-ignore:
+      - "apps/mobile/**"
+      - ".github/workflows/mobile.yml"
+      - "pnpm-lock.yaml"
   push:
     branches:
       - main
+    paths-ignore:
+      - "apps/mobile/**"
+      - ".github/workflows/mobile.yml"
+      - "pnpm-lock.yaml"
 
 jobs:
   validate:

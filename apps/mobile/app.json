@@ -32,11 +32,18 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "ai.syndeocare.mobile"
+      "bundleIdentifier": "ai.syndeocare.mobile",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "SyndeoCare uses your location to save accurate city and coordinates for nearby shift matching."
+      }
     },
     "android": {
       "package": "ai.syndeocare.mobile",
-      "permissions": ["NOTIFICATIONS"],
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "NOTIFICATIONS"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",

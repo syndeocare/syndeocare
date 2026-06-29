@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - "apps/mobile/**"
+      - ".github/workflows/mobile.yml"
+      - "pnpm-lock.yaml"
   workflow_dispatch:
     inputs:
       environment:

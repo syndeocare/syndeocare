@@ -623,6 +623,8 @@ export function Button({
 }) {
   const isPrimary = tone === "primary" || tone === "accent";
   const palette = useThemePalette();
+  const { language } = usePreferences();
+  const buttonFamily = language === "ar" ? fonts.arabicBold : fonts.bodyBold;
 
   return (
     <Pressable
@@ -659,7 +661,9 @@ export function Button({
           style={styles.buttonGradient}
         >
           {loading ? <ActivityIndicator color="#ffffff" /> : null}
-          <Text style={styles.buttonText}>{children}</Text>
+          <Text style={[styles.buttonText, { fontFamily: buttonFamily }]}>
+            {children}
+          </Text>
         </LinearGradient>
       ) : (
         <>
@@ -671,6 +675,7 @@ export function Button({
           <Text
             style={[
               styles.buttonText,
+              { fontFamily: buttonFamily },
               tone === "secondary" && { color: palette.text },
             ]}
           >
@@ -785,6 +790,8 @@ export function Badge({
   children: React.ReactNode;
   tone?: "danger" | "neutral" | "success" | "warning";
 }) {
+  const { language } = usePreferences();
+  const badgeFamily = language === "ar" ? fonts.arabicBold : fonts.bodyBold;
   return (
     <View
       style={[
@@ -794,7 +801,9 @@ export function Badge({
         tone === "danger" && styles.badgeDanger,
       ]}
     >
-      <Text style={styles.badgeText}>{children}</Text>
+      <Text style={[styles.badgeText, { fontFamily: badgeFamily }]}>
+        {children}
+      </Text>
     </View>
   );
 }
@@ -824,10 +833,18 @@ export function EmptyState({
 }
 
 export function ErrorBanner({ message }: { message?: string }) {
+  const { language } = usePreferences();
   if (!message) return null;
   return (
     <View style={styles.errorBanner}>
-      <Text style={styles.errorBannerText}>{message}</Text>
+      <Text
+        style={[
+          styles.errorBannerText,
+          { fontFamily: language === "ar" ? fonts.arabic : fonts.body },
+        ]}
+      >
+        {message}
+      </Text>
     </View>
   );
 }

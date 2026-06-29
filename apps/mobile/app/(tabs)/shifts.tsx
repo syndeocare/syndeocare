@@ -1,4 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
 import {
   AlertCircle,
   CalendarClock,
@@ -102,6 +103,7 @@ function splitLocation(
 }
 
 export default function ShiftsScreen() {
+  const router = useRouter();
   const { session } = useAuth();
   const t = useT();
   const text = useTextStyles();
@@ -172,6 +174,15 @@ export default function ShiftsScreen() {
     () =>
       new Set(bookingsQuery.data?.items.map((booking) => booking.jobId) ?? []),
     [bookingsQuery.data?.items],
+  );
+  const verifiedProfessionals = useMemo(
+    () =>
+      (professionalsQuery.data?.items ?? []).filter(
+        (professional) =>
+          professional.verificationStatus === "approved" &&
+          professional.onboardingCompleted,
+      ),
+    [professionalsQuery.data?.items],
   );
 
   const applyMutation = useMutation({
@@ -298,8 +309,12 @@ export default function ShiftsScreen() {
       if (!clinicId) throw new Error(t("shifts.clinicNotReady"));
       return startConversation({ clinicId, professionalId });
     },
-    onSuccess: async () => {
+    onSuccess: async (conversation) => {
       await queryClient.invalidateQueries({ queryKey: ["conversations"] });
+      router.push({
+        params: { id: conversation.id, name: conversation.displayName },
+        pathname: "/conversation/[id]",
+      });
     },
   });
 
@@ -465,36 +480,38 @@ export default function ShiftsScreen() {
       clinicView === "professionals" ? (
         <>
           <SectionHeader title={t("shifts.inviteTitle")} />
-          {professionalsQuery.data?.items.map((professional) => (
-            <Card key={professional.id}>
-              <View style={styles.row}>
-                <Avatar label={professional.fullName} size={46} />
-                <View style={styles.grow}>
-                  <Text style={text.h2}>{professional.fullName}</Text>
-                  <Text style={text.body}>{professional.specialty}</Text>
-                  <Text style={text.body}>
-                    {professional.city}, {professional.region}
-                  </Text>
+          {professionalsQuery.isLoading ? (
+            <LoadingBlock label={t("shifts.loadingProfessionals")} />
+          ) : null}
+          {!professionalsQuery.isLoading && verifiedProfessionals.length ? (
+            verifiedProfessionals.map((professional) => (
+              <Card key={professional.id}>
+                <View style={styles.row}>
+                  <Avatar label={professional.fullName} size={46} />
+                  <View style={styles.grow}>
+                    <Text style={text.h2}>{professional.fullName}</Text>
+                    <Text style={text.body}>{professional.specialty}</Text>
+                    <Text style={text.body}>
+                      {professional.city}, {professional.region}
+                    </Text>
+                  </View>
+                  <Badge tone="success">{t("verification.approved")}</Badge>
                 </View>
-                <Badge
-                  tone={
-                    professional.verificationStatus === "approved"
-                      ? "success"
-                      : "warning"
-                  }
+                <Button
+                  loading={messageMutation.isPending}
+                  onPress={() => messageMutation.mutate(professional.id)}
+                  tone="secondary"
                 >
-                  {professional.verificationStatus.replace("_", " ")}
-                </Badge>
-              </View>
-              <Button
-                loading={messageMutation.isPending}
-                onPress={() => messageMutation.mutate(professional.id)}
-                tone="secondary"
-              >
-                {t("shifts.startMessage")}
-              </Button>
-            </Card>
-          ))}
+                  {t("shifts.startMessage")}
+                </Button>
+              </Card>
+            ))
+          ) : !professionalsQuery.isLoading ? (
+            <EmptyState
+              body={t("shifts.noVerifiedProfessionalsBody")}
+              title={t("shifts.noVerifiedProfessionalsTitle")}
+            />
+          ) : null}
         </>
       ) : null}
 

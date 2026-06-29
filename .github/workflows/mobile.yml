@@ -1,0 +1,128 @@
+name: Mobile
+
+on:
+  pull_request:
+    paths:
+      - "apps/mobile/**"
+      - "pnpm-lock.yaml"
+      - "package.json"
+      - "pnpm-workspace.yaml"
+      - "turbo.json"
+      - ".github/workflows/mobile.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/mobile/**"
+      - "pnpm-lock.yaml"
+      - "package.json"
+      - "pnpm-workspace.yaml"
+      - "turbo.json"
+      - ".github/workflows/mobile.yml"
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: EAS build platform
+        required: true
+        type: choice
+        default: android
+        options:
+          - android
+          - ios
+          - all
+      profile:
+        description: EAS build profile
+        required: true
+        type: choice
+        default: preview
+        options:
+          - preview
+          - development
+          - production
+      run_eas_build:
+        description: Start EAS cloud build
+        required: true
+        type: boolean
+        default: true
+
+concurrency:
+  group: mobile-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Mobile quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.0.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.20.2
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check Expo SDK compatibility
+        working-directory: apps/mobile
+        run: npx expo install --check
+
+      - name: Typecheck mobile
+        run: pnpm --filter mobile check-types
+
+      - name: Lint mobile
+        run: pnpm --filter mobile exec eslint app src --ext .ts,.tsx
+
+      - name: Export mobile bundles
+        run: pnpm --filter mobile build
+
+  eas-build:
+    name: EAS build
+    needs: quality
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'push'
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EAS_PLATFORM: ${{ github.event_name == 'workflow_dispatch' && inputs.platform || 'android' }}
+      EAS_PROFILE: ${{ github.event_name == 'workflow_dispatch' && inputs.profile || 'preview' }}
+      RUN_EAS_BUILD: ${{ github.event_name != 'workflow_dispatch' || inputs.run_eas_build }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.0.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.20.2
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Skip EAS when token is not configured
+        if: env.EXPO_TOKEN == ''
+        run: |
+          echo "EXPO_TOKEN is not configured. Mobile quality checks passed, but no EAS cloud build was started."
+
+      - name: Start EAS build
+        if: env.EXPO_TOKEN != '' && env.RUN_EAS_BUILD == 'true'
+        working-directory: apps/mobile
+        run: |
+          npx eas-cli@latest build \
+            --platform "$EAS_PLATFORM" \
+            --profile "$EAS_PROFILE" \
+            --non-interactive \
+            --no-wait
+
+      - name: EAS build disabled
+        if: env.EXPO_TOKEN != '' && env.RUN_EAS_BUILD != 'true'
+        run: echo "EAS build was disabled for this workflow run."

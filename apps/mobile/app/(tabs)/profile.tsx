@@ -116,6 +116,7 @@ export default function ProfileScreen() {
   );
   const [phoneTouched, setPhoneTouched] = useState(false);
   const [locationTouched, setLocationTouched] = useState(false);
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
 
@@ -291,6 +292,7 @@ export default function ProfileScreen() {
     onSuccess: () => {
       setCurrentPassword("");
       setNewPassword("");
+      setShowPasswordForm(false);
     },
   });
 
@@ -517,32 +519,52 @@ export default function ProfileScreen() {
             ) : null}
           </>
         ) : null}
-        <Field
-          autoComplete="current-password"
-          label={t("profile.currentPassword")}
-          onChangeText={setCurrentPassword}
-          returnKeyType="next"
-          secureTextEntry
-          textContentType="password"
-          value={currentPassword}
-        />
-        <Field
-          autoComplete="new-password"
-          label={t("profile.newPassword")}
-          onChangeText={setNewPassword}
-          returnKeyType="done"
-          secureTextEntry
-          textContentType="newPassword"
-          value={newPassword}
-        />
-        <Button
-          disabled={currentPassword.length < 8 || newPassword.length < 8}
-          loading={passwordMutation.isPending}
-          onPress={() => passwordMutation.mutate()}
-          tone="secondary"
-        >
-          {t("profile.changePassword")}
-        </Button>
+        {showPasswordForm ? (
+          <>
+            <Field
+              autoComplete="current-password"
+              label={t("profile.currentPassword")}
+              onChangeText={setCurrentPassword}
+              returnKeyType="next"
+              secureTextEntry
+              textContentType="password"
+              value={currentPassword}
+            />
+            <Field
+              autoComplete="new-password"
+              label={t("profile.newPassword")}
+              onChangeText={setNewPassword}
+              returnKeyType="done"
+              secureTextEntry
+              textContentType="newPassword"
+              value={newPassword}
+            />
+            <View style={styles.actions}>
+              <Button
+                disabled={currentPassword.length < 8 || newPassword.length < 8}
+                loading={passwordMutation.isPending}
+                onPress={() => passwordMutation.mutate()}
+                tone="secondary"
+              >
+                {t("profile.savePassword")}
+              </Button>
+              <Button
+                onPress={() => {
+                  setCurrentPassword("");
+                  setNewPassword("");
+                  setShowPasswordForm(false);
+                }}
+                tone="secondary"
+              >
+                {t("common.cancel")}
+              </Button>
+            </View>
+          </>
+        ) : (
+          <Button onPress={() => setShowPasswordForm(true)} tone="secondary">
+            {t("profile.changePassword")}
+          </Button>
+        )}
         {passwordMutation.isSuccess ? (
           <Text style={styles.success}>{t("profile.passwordChanged")}</Text>
         ) : null}
@@ -656,6 +678,9 @@ function AvailabilitySelector({
 }
 
 const styles = StyleSheet.create({
+  actions: {
+    gap: 10,
+  },
   chip: {
     borderColor: colors.border,
     borderRadius: 999,

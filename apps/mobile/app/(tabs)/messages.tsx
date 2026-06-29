@@ -81,7 +81,11 @@ export default function MessagesScreen() {
           <Link
             asChild
             href={{
-              params: { id: conversation.id },
+              params: {
+                id: conversation.id,
+                name: conversation.displayName,
+                role: conversation.counterpartRole,
+              },
               pathname: "/conversation/[id]",
             }}
             key={conversation.id}
@@ -107,7 +111,7 @@ export default function MessagesScreen() {
                       </Text>
                     </View>
                     <Text style={[styles.role, { color: palette.muted }]}>
-                      {conversation.counterpartRole}
+                      {t(`roles.${conversation.counterpartRole}`)}
                     </Text>
                     <Text numberOfLines={2} style={text.body}>
                       {conversation.lastMessage ??

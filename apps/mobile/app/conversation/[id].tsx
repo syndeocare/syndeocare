@@ -28,9 +28,14 @@ import {
 import { useAuth } from "../../src/lib/auth";
 import { usePreferences, useT } from "../../src/lib/preferences";
 import { queryClient } from "../../src/lib/query";
+import type { UserRole } from "../../src/types";
 
 export default function ConversationScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, name, role } = useLocalSearchParams<{
+    id: string;
+    name?: string;
+    role?: UserRole;
+  }>();
   const t = useT();
   const text = useTextStyles();
   const palette = useThemePalette();
@@ -55,9 +60,18 @@ export default function ConversationScreen() {
       ),
     [messagesQuery.data?.items],
   );
+  const currentRole = session?.principal.role;
   const counterpart = messages.find(
-    (message) => message.senderActorId !== session?.principal.sub,
+    (message) => message.senderRole !== currentRole,
   );
+  const counterpartLabel =
+    typeof name === "string" && name.trim()
+      ? name
+      : counterpart?.senderRole
+        ? t(`roles.${counterpart.senderRole}`)
+        : typeof role === "string"
+          ? t(`roles.${role}`)
+          : t("conversation.secureThread");
 
   const sendMutation = useMutation({
     mutationFn: async () => {
@@ -132,14 +146,10 @@ export default function ConversationScreen() {
 
         <Card>
           <View style={[styles.conversationHeader, isRTL && styles.rowReverse]}>
-            <Avatar
-              label={counterpart?.senderRole ?? t("conversation.title")}
-            />
+            <Avatar label={counterpartLabel} />
             <View style={styles.grow}>
-              <Text style={text.h2}>{t("conversation.title")}</Text>
-              <Text style={text.body}>
-                {counterpart?.senderRole ?? t("conversation.secureThread")}
-              </Text>
+              <Text style={text.h2}>{counterpartLabel}</Text>
+              <Text style={text.body}>{t("conversation.secureThread")}</Text>
             </View>
             <MessageCircle color={colors.primary} size={22} />
           </View>
@@ -147,7 +157,7 @@ export default function ConversationScreen() {
 
         {messages.length ? (
           messages.map((message, index) => {
-            const isMine = message.senderActorId === session?.principal.sub;
+            const isMine = message.senderRole === currentRole;
             const previous = messages[index - 1];
             const currentDate = new Date(message.createdAt).toDateString();
             const previousDate = previous
@@ -182,7 +192,11 @@ export default function ConversationScreen() {
                   <View
                     style={[styles.messageHeader, isRTL && styles.rowReverse]}
                   >
-                    <Text style={text.strong}>{message.senderRole}</Text>
+                    <Text style={text.strong}>
+                      {isMine
+                        ? t("conversation.you")
+                        : t(`roles.${message.senderRole}`)}
+                    </Text>
                     <Text style={[styles.time, { color: palette.muted }]}>
                       {new Date(message.createdAt).toLocaleTimeString([], {
                         hour: "2-digit",
@@ -190,7 +204,9 @@ export default function ConversationScreen() {
                       })}
                     </Text>
                   </View>
-                  <Text style={text.body}>{message.content}</Text>
+                  {message.content ? (
+                    <Text style={text.body}>{message.content}</Text>
+                  ) : null}
                   {message.fileName ? (
                     <Pressable
                       disabled={!message.fileUrl || accessMutation.isPending}
