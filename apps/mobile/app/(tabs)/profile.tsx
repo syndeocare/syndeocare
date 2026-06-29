@@ -4,6 +4,12 @@ import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import {
+  createLocationSelection,
+  LocationField,
+  toLocationValue,
+  type LocationSelection,
+} from "../../src/components/LocationField";
+import {
   Avatar,
   Badge,
   Button,
@@ -19,10 +25,9 @@ import {
 } from "../../src/components/ui";
 import { AppHeaderActions } from "../../src/components/AppHeaderActions";
 import {
-  YEMEN_LOCATIONS,
   formatYemenPhone,
+  normalizeYemenPhoneInput,
   validateYemenPhone,
-  type YemenLocation,
 } from "../../src/config";
 import {
   getMyClinicProfile,
@@ -40,7 +45,6 @@ import { queryClient } from "../../src/lib/query";
 import type {
   CatalogItem,
   ClinicProfile,
-  LocationValue,
   ProfessionalProfile,
 } from "../../src/types";
 
@@ -71,29 +75,22 @@ function joinUnique(values: string[]) {
   ).join(", ");
 }
 
-function toLocationValue(location: YemenLocation): LocationValue {
-  return {
-    city: location.city,
-    latitude: location.latitude,
-    longitude: location.longitude,
-    region: location.region,
-  };
+function findProfileLocation(profile?: MobileProfile) {
+  return createLocationSelection(
+    profile
+      ? {
+          city: profile.city,
+          latitude: profile.latitude,
+          longitude: profile.longitude,
+          region: profile.region,
+        }
+      : null,
+  );
 }
 
-function findProfileLocation(profile?: MobileProfile) {
-  if (!profile) return YEMEN_LOCATIONS[0];
-  return (
-    YEMEN_LOCATIONS.find(
-      (location) =>
-        location.city.toLowerCase() === profile.city.toLowerCase() &&
-        location.region.toLowerCase() === profile.region.toLowerCase(),
-    ) ?? {
-      city: profile.city,
-      latitude: profile.latitude ?? YEMEN_LOCATIONS[0].latitude,
-      longitude: profile.longitude ?? YEMEN_LOCATIONS[0].longitude,
-      region: profile.region,
-    }
-  );
+function cleanFacilityType(value?: string) {
+  const trimmed = value?.trim() ?? "";
+  return trimmed.toLowerCase() === "pending onboarding" ? "" : trimmed;
 }
 
 export default function ProfileScreen() {
@@ -114,10 +111,11 @@ export default function ProfileScreen() {
   const [locationRadiusKm, setLocationRadiusKm] = useState("25");
   const [facilityType, setFacilityType] = useState("");
   const [websiteUrl, setWebsiteUrl] = useState("");
-  const [servicesText, setServicesText] = useState("");
-  const [selectedLocation, setSelectedLocation] = useState<YemenLocation>(
-    YEMEN_LOCATIONS[0],
+  const [selectedLocation, setSelectedLocation] = useState<LocationSelection>(
+    createLocationSelection(),
   );
+  const [phoneTouched, setPhoneTouched] = useState(false);
+  const [locationTouched, setLocationTouched] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
 
@@ -162,16 +160,15 @@ export default function ProfileScreen() {
     setSelectedLocation(findProfileLocation(profile));
     if (isClinicProfile(profile)) {
       setDisplayNameDraft(profile.organizationName);
-      setPhone(profile.contactPhone?.replace(/^\+967/, "") ?? "");
+      setPhone(normalizeYemenPhoneInput(profile.contactPhone ?? ""));
       setDescription(profile.description ?? "");
-      setFacilityType(profile.facilityType);
+      setFacilityType(cleanFacilityType(profile.facilityType));
       setWebsiteUrl(profile.websiteUrl ?? "");
-      setServicesText(profile.services.join(", "));
       return;
     }
 
     setDisplayNameDraft(profile.fullName);
-    setPhone(profile.primaryPhone?.replace(/^\+967/, "") ?? "");
+    setPhone(normalizeYemenPhoneInput(profile.primaryPhone ?? ""));
     setDescription(profile.bio ?? "");
     setHeadline(profile.headline ?? "");
     setSpecialty(profile.specialty);
@@ -185,22 +182,30 @@ export default function ProfileScreen() {
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!profile) return;
-      const normalizedPhone = phone ? formatYemenPhone(phone) : undefined;
+      const normalizedPhone = formatYemenPhone(phone);
 
-      if (phone && !validateYemenPhone(phone)) {
+      if (!validateYemenPhone(phone)) {
         throw new Error(t("profile.yemenPhoneError"));
+      }
+      if (
+        selectedLocation.latitude == null ||
+        selectedLocation.longitude == null
+      ) {
+        throw new Error(t("location.mustSelect"));
       }
 
       if (isClinic) {
+        if (!displayNameDraft.trim()) throw new Error(t("validation.name"));
         await updateMyClinicProfile({
           organizationName: displayNameDraft.trim(),
-          facilityType: facilityType.trim() || "Healthcare facility",
+          facilityType:
+            cleanFacilityType(facilityType) || "Healthcare facility",
           contactPhone: normalizedPhone,
           description:
             description ||
             (isClinicProfile(profile) ? profile.description : ""),
           location: toLocationValue(selectedLocation),
-          services: splitCsv(servicesText),
+          services: isClinicProfile(profile) ? profile.services : [],
           websiteUrl: websiteUrl.trim() || undefined,
         });
       } else {
@@ -289,6 +294,16 @@ export default function ProfileScreen() {
     },
   });
 
+  const phoneError =
+    phoneTouched && !validateYemenPhone(phone)
+      ? t("profile.yemenPhoneError")
+      : undefined;
+  const locationError =
+    locationTouched &&
+    (selectedLocation.latitude == null || selectedLocation.longitude == null)
+      ? t("location.mustSelect")
+      : undefined;
+
   return (
     <Screen
       headerEnd={<AppHeaderActions />}
@@ -361,26 +376,28 @@ export default function ProfileScreen() {
         />
         <Field
           autoComplete="tel"
+          error={phoneError}
           keyboardType="phone-pad"
           label={t("profile.yemenPhone")}
-          onChangeText={setPhone}
+          onChangeText={(value) => {
+            setPhoneTouched(true);
+            setPhone(normalizeYemenPhoneInput(value));
+          }}
           placeholder="77xxxxxxx"
           returnKeyType="next"
           textContentType="telephoneNumber"
           value={phone}
         />
-        <LocationSelector
-          onSelect={setSelectedLocation}
-          selectedLocation={selectedLocation}
+        <LocationField
+          error={locationError}
+          onChange={(location) => {
+            setLocationTouched(true);
+            setSelectedLocation(location);
+          }}
+          value={selectedLocation}
         />
         {isClinic ? (
           <>
-            <Field
-              label={t("profile.facilityType")}
-              onChangeText={setFacilityType}
-              returnKeyType="next"
-              value={facilityType}
-            />
             <Field
               autoCapitalize="none"
               autoComplete="url"
@@ -389,14 +406,6 @@ export default function ProfileScreen() {
               onChangeText={setWebsiteUrl}
               returnKeyType="next"
               value={websiteUrl}
-            />
-            <Field
-              label={t("profile.services")}
-              multiline
-              onChangeText={setServicesText}
-              placeholder={t("profile.commaSeparated")}
-              returnKeyType="default"
-              value={servicesText}
             />
           </>
         ) : (
@@ -547,49 +556,6 @@ export default function ProfileScreen() {
         </Button>
       </Card>
     </Screen>
-  );
-}
-
-function LocationSelector({
-  onSelect,
-  selectedLocation,
-}: {
-  onSelect: (location: YemenLocation) => void;
-  selectedLocation: YemenLocation;
-}) {
-  const t = useT();
-  const text = useTextStyles();
-
-  return (
-    <View style={styles.selectorBlock}>
-      <Text style={text.strong}>{t("profile.location")}</Text>
-      <Text style={text.body}>{t("profile.locationHint")}</Text>
-      <View style={styles.chipGrid}>
-        {YEMEN_LOCATIONS.map((location) => {
-          const selected =
-            selectedLocation.city === location.city &&
-            selectedLocation.region === location.region;
-          return (
-            <Pressable
-              accessibilityRole="radio"
-              accessibilityState={{ checked: selected }}
-              key={`${location.city}-${location.region}`}
-              onPress={() => onSelect(location)}
-              style={[styles.chip, selected ? styles.chipSelected : undefined]}
-            >
-              <Text
-                style={[
-                  styles.chipText,
-                  selected ? styles.chipTextSelected : undefined,
-                ]}
-              >
-                {location.city}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-    </View>
   );
 }
 

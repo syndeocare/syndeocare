@@ -74,7 +74,9 @@ const en = {
   "conversation.send": "Send",
   "conversation.secureThread": "Secure conversation",
   "conversation.title": "Conversation",
+  "common.clear": "Clear",
   "common.loading": "Loading...",
+  "common.optional": "optional",
   "controls.dark": "Dark",
   "controls.deviceLanguage": "Device",
   "controls.english": "English",
@@ -111,6 +113,13 @@ const en = {
   "messages.search": "Search conversations",
   "messages.title": "Messages",
   "messages.unread": "{{count}} unread",
+  "location.currentLocationFailed":
+    "Could not detect your current location. Please allow location access and try again.",
+  "location.mustSelect":
+    "Select a location from suggestions or use current location.",
+  "location.popularSuggestions": "Suggested places in Yemen",
+  "location.searchPlaceholder": "Search a city or address in Yemen",
+  "location.useCurrentLocation": "Use current location",
   "notifications.loading": "Loading alerts...",
   "notifications.delete": "Delete",
   "notifications.markAllRead": "Mark all as read",
@@ -159,7 +168,7 @@ const en = {
   "profile.licenseDetails": "License / certification details",
   "profile.location": "Location",
   "profile.locationHint":
-    "Choose the closest Yemeni city. Coordinates are saved for matching.",
+    "Choose a suggested place or use current location. Coordinates are saved for matching.",
   "profile.locationRadius": "Travel radius in km",
   "profile.loading": "Loading profile...",
   "profile.logout": "Log out",
@@ -328,7 +337,9 @@ const ar: Record<TranslationKey, string> = {
   "conversation.send": "إرسال",
   "conversation.secureThread": "محادثة آمنة",
   "conversation.title": "المحادثة",
+  "common.clear": "مسح",
   "common.loading": "جاري التحميل...",
+  "common.optional": "اختياري",
   "controls.dark": "داكن",
   "controls.deviceLanguage": "الجهاز",
   "controls.english": "English",
@@ -365,6 +376,12 @@ const ar: Record<TranslationKey, string> = {
   "messages.search": "البحث في المحادثات",
   "messages.title": "الرسائل",
   "messages.unread": "{{count}} غير مقروءة",
+  "location.currentLocationFailed":
+    "تعذر تحديد موقعك الحالي. يرجى السماح بالوصول للموقع والمحاولة مرة أخرى.",
+  "location.mustSelect": "اختر موقعاً من الاقتراحات أو استخدم موقعك الحالي.",
+  "location.popularSuggestions": "مواقع مقترحة في اليمن",
+  "location.searchPlaceholder": "ابحث عن مدينة أو عنوان في اليمن",
+  "location.useCurrentLocation": "استخدام موقعي الحالي",
   "notifications.loading": "جاري تحميل التنبيهات...",
   "notifications.delete": "حذف",
   "notifications.markAllRead": "تحديد الكل كمقروء",
@@ -413,7 +430,7 @@ const ar: Record<TranslationKey, string> = {
   "profile.licenseDetails": "تفاصيل الترخيص / الشهادات",
   "profile.location": "الموقع",
   "profile.locationHint":
-    "اختر أقرب مدينة يمنية. سيتم حفظ الإحداثيات للمطابقة.",
+    "اختر موقعاً من الاقتراحات أو استخدم موقعك الحالي. سيتم حفظ الإحداثيات للمطابقة.",
   "profile.locationRadius": "نطاق التنقل بالكيلومتر",
   "profile.loading": "جاري تحميل الملف...",
   "profile.logout": "تسجيل الخروج",
@@ -595,12 +612,22 @@ function resolveTheme(
   return systemScheme === "dark" ? "dark" : "light";
 }
 
+function normalizeColorScheme(
+  value: ReturnType<typeof Appearance.getColorScheme>,
+) {
+  return value === "dark" || value === "light" ? value : null;
+}
+
 export function PreferencesProvider({ children }: { children: ReactNode }) {
-  const systemScheme = useColorScheme();
+  const colorScheme = useColorScheme();
+  const [appearanceScheme, setAppearanceScheme] = useState<
+    "dark" | "light" | null
+  >(normalizeColorScheme(Appearance.getColorScheme()));
   const [languagePreference, setLanguagePreferenceState] =
     useState<AppLanguagePreference>("device");
   const [themePreference, setThemePreferenceState] =
     useState<AppThemePreference>("system");
+  const systemScheme = colorScheme ?? appearanceScheme;
   const language = resolveLanguage(languagePreference);
   const theme = resolveTheme(themePreference, systemScheme);
 
@@ -626,6 +653,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const subscription = Appearance.addChangeListener(() => {
+      setAppearanceScheme(normalizeColorScheme(Appearance.getColorScheme()));
       if (languagePreference === "device") {
         setLanguagePreferenceState("device");
       }

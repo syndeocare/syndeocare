@@ -7,6 +7,12 @@ import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import {
+  createLocationSelection,
+  LocationField,
+  toLocationValue,
+  type LocationSelection,
+} from "../src/components/LocationField";
+import {
   Avatar,
   Badge,
   Button,
@@ -22,10 +28,9 @@ import {
   useThemePalette,
 } from "../src/components/ui";
 import {
-  YEMEN_LOCATIONS,
   formatYemenPhone,
+  normalizeYemenPhoneInput,
   validateYemenPhone,
-  type YemenLocation,
 } from "../src/config";
 import {
   authenticatedRequest,
@@ -39,12 +44,16 @@ import {
   uploadProfileImage,
 } from "../src/lib/api";
 import { useAuth } from "../src/lib/auth";
+import {
+  documentTypeMatches,
+  filterDocumentTypesForRole,
+  getGatewayDocumentTypeKey,
+} from "../src/lib/documentTypes";
 import { interpolate, useT } from "../src/lib/preferences";
 import { queryClient } from "../src/lib/query";
 import type {
   CatalogItem,
   ClinicProfile,
-  LocationValue,
   OnboardingStatus,
   ProfessionalProfile,
 } from "../src/types";
@@ -84,29 +93,22 @@ function joinUnique(values: string[]) {
   ).join(", ");
 }
 
-function toLocationValue(location: YemenLocation): LocationValue {
-  return {
-    city: location.city,
-    latitude: location.latitude,
-    longitude: location.longitude,
-    region: location.region,
-  };
+function findProfileLocation(profile?: MobileProfile) {
+  return createLocationSelection(
+    profile
+      ? {
+          city: profile.city,
+          latitude: profile.latitude,
+          longitude: profile.longitude,
+          region: profile.region,
+        }
+      : null,
+  );
 }
 
-function findProfileLocation(profile?: MobileProfile) {
-  if (!profile) return YEMEN_LOCATIONS[0];
-  return (
-    YEMEN_LOCATIONS.find(
-      (location) =>
-        location.city.toLowerCase() === profile.city.toLowerCase() &&
-        location.region.toLowerCase() === profile.region.toLowerCase(),
-    ) ?? {
-      city: profile.city,
-      latitude: profile.latitude ?? YEMEN_LOCATIONS[0].latitude,
-      longitude: profile.longitude ?? YEMEN_LOCATIONS[0].longitude,
-      region: profile.region,
-    }
-  );
+function cleanFacilityType(value?: string) {
+  const trimmed = value?.trim() ?? "";
+  return trimmed.toLowerCase() === "pending onboarding" ? "" : trimmed;
 }
 
 async function uploadDocument(
@@ -165,10 +167,12 @@ export default function OnboardingScreen() {
   const [yearsExperience, setYearsExperience] = useState("0");
   const [languagesText, setLanguagesText] = useState("ar, en");
   const [facilityType, setFacilityType] = useState("");
-  const [servicesText, setServicesText] = useState("");
-  const [selectedLocation, setSelectedLocation] = useState<YemenLocation>(
-    YEMEN_LOCATIONS[0],
+  const [websiteUrl, setWebsiteUrl] = useState("");
+  const [selectedLocation, setSelectedLocation] = useState<LocationSelection>(
+    createLocationSelection(),
   );
+  const [phoneTouched, setPhoneTouched] = useState(false);
+  const [locationTouched, setLocationTouched] = useState(false);
   const statusQuery = useQuery({
     queryFn: getOnboardingStatus,
     queryKey: ["onboarding"],
@@ -189,11 +193,19 @@ export default function OnboardingScreen() {
     queryFn: () => listCatalogItems("certification"),
     queryKey: ["catalog", "certification"],
   });
+  const documentTypesQuery = useQuery({
+    queryFn: () => listCatalogItems("document_type"),
+    queryKey: ["catalog", "document_type", session?.principal.role],
+  });
 
   const profile = profileQuery.data;
   const specialtyOptions = activeCatalogItems(specialtiesQuery.data?.items);
   const certificationOptions = activeCatalogItems(
     certificationsQuery.data?.items,
+  );
+  const configuredDocumentTypes = filterDocumentTypesForRole(
+    documentTypesQuery.data?.items,
+    isClinic ? "clinic" : "professional",
   );
   const imageUrl =
     profile && isClinicProfile(profile)
@@ -207,15 +219,15 @@ export default function OnboardingScreen() {
     setSelectedLocation(findProfileLocation(profile));
     if (isClinicProfile(profile)) {
       setDisplayNameDraft(profile.organizationName);
-      setPhone(profile.contactPhone?.replace(/^\+967/, "") ?? "");
+      setPhone(normalizeYemenPhoneInput(profile.contactPhone ?? ""));
       setDescription(profile.description ?? "");
-      setFacilityType(profile.facilityType);
-      setServicesText(profile.services.join(", "));
+      setFacilityType(cleanFacilityType(profile.facilityType));
+      setWebsiteUrl(profile.websiteUrl ?? "");
       return;
     }
 
     setDisplayNameDraft(profile.fullName);
-    setPhone(profile.primaryPhone?.replace(/^\+967/, "") ?? "");
+    setPhone(normalizeYemenPhoneInput(profile.primaryPhone ?? ""));
     setDescription(profile.bio ?? "");
     setSpecialty(profile.specialty);
     setLicenseDetails(profile.licenseNumber ?? "");
@@ -261,21 +273,29 @@ export default function OnboardingScreen() {
   const saveProfileMutation = useMutation({
     mutationFn: async () => {
       if (!profile) return;
-      const normalizedPhone = phone ? formatYemenPhone(phone) : undefined;
+      const normalizedPhone = formatYemenPhone(phone);
 
       if (!displayNameDraft.trim()) throw new Error(t("validation.name"));
-      if (phone && !validateYemenPhone(phone)) {
+      if (!validateYemenPhone(phone)) {
         throw new Error(t("profile.yemenPhoneError"));
+      }
+      if (
+        selectedLocation.latitude == null ||
+        selectedLocation.longitude == null
+      ) {
+        throw new Error(t("location.mustSelect"));
       }
 
       if (isClinic) {
         await updateMyClinicProfile({
           contactPhone: normalizedPhone,
           description: description.trim() || undefined,
-          facilityType: facilityType.trim() || "Healthcare facility",
+          facilityType:
+            cleanFacilityType(facilityType) || "Healthcare facility",
           location: toLocationValue(selectedLocation),
           organizationName: displayNameDraft.trim(),
-          services: splitCsv(servicesText),
+          services: isClinicProfile(profile) ? profile.services : [],
+          websiteUrl: websiteUrl.trim() || undefined,
         });
         return;
       }
@@ -325,11 +345,42 @@ export default function OnboardingScreen() {
   const uploaded = new Set(
     status?.uploadedDocuments.map((document) => document.documentType) ?? [],
   );
+  const documentSlots =
+    status && configuredDocumentTypes.length
+      ? configuredDocumentTypes.map((docType) => ({
+          key: getGatewayDocumentTypeKey(docType),
+          label: docType.nameAr || docType.name,
+          required: docType.isRequired,
+          uploaded: status.uploadedDocuments.some((document) =>
+            documentTypeMatches(document.documentType, docType),
+          ),
+        }))
+      : (status?.requiredDocuments ?? []).map((documentType) => ({
+          key: documentType,
+          label: documentType,
+          required: true,
+          uploaded: uploaded.has(documentType),
+        }));
+  const requiredDocumentSlots = documentSlots.filter((slot) => slot.required);
+  const missingRequiredDocumentKeys = requiredDocumentSlots
+    .filter((slot) => !slot.uploaded)
+    .map((slot) => slot.key);
   const completion = status
     ? Math.round(
-        (uploaded.size / Math.max(status.requiredDocuments.length, 1)) * 100,
+        ((requiredDocumentSlots.length - missingRequiredDocumentKeys.length) /
+          Math.max(requiredDocumentSlots.length, 1)) *
+          100,
       )
     : 0;
+  const phoneError =
+    phoneTouched && !validateYemenPhone(phone)
+      ? t("profile.yemenPhoneError")
+      : undefined;
+  const locationError =
+    locationTouched &&
+    (selectedLocation.latitude == null || selectedLocation.longitude == null)
+      ? t("location.mustSelect")
+      : undefined;
 
   return (
     <Screen
@@ -352,7 +403,9 @@ export default function OnboardingScreen() {
                     ? uploadMutation.error.message
                     : submitMutation.error instanceof Error
                       ? submitMutation.error.message
-                      : undefined
+                      : documentTypesQuery.error instanceof Error
+                        ? documentTypesQuery.error.message
+                        : undefined
         }
       />
 
@@ -416,33 +469,36 @@ export default function OnboardingScreen() {
             />
             <Field
               autoComplete="tel"
+              error={phoneError}
               keyboardType="phone-pad"
               label={t("profile.yemenPhone")}
-              onChangeText={setPhone}
+              onChangeText={(value) => {
+                setPhoneTouched(true);
+                setPhone(normalizeYemenPhoneInput(value));
+              }}
               placeholder="77xxxxxxx"
               returnKeyType="next"
               textContentType="telephoneNumber"
               value={phone}
             />
-            <LocationSelector
-              onSelect={setSelectedLocation}
-              selectedLocation={selectedLocation}
+            <LocationField
+              error={locationError}
+              onChange={(location) => {
+                setLocationTouched(true);
+                setSelectedLocation(location);
+              }}
+              value={selectedLocation}
             />
             {isClinic ? (
               <>
                 <Field
-                  label={t("profile.facilityType")}
-                  onChangeText={setFacilityType}
+                  autoCapitalize="none"
+                  autoComplete="url"
+                  keyboardType="url"
+                  label={t("profile.website")}
+                  onChangeText={setWebsiteUrl}
                   returnKeyType="next"
-                  value={facilityType}
-                />
-                <Field
-                  label={t("profile.services")}
-                  multiline
-                  onChangeText={setServicesText}
-                  placeholder={t("profile.commaSeparated")}
-                  returnKeyType="default"
-                  value={servicesText}
+                  value={websiteUrl}
                 />
               </>
             ) : (
@@ -512,49 +568,54 @@ export default function OnboardingScreen() {
             </Button>
           </Card>
 
-          {status.requiredDocuments.length ? (
+          {documentSlots.length ? (
             <SectionHeader title={t("onboarding.title")} />
           ) : null}
 
-          {status.requiredDocuments.length ? (
-            status.requiredDocuments.map((documentType) => {
-              const isUploaded = uploaded.has(documentType);
+          {documentSlots.length ? (
+            documentSlots.map((documentSlot) => {
               return (
-                <Card key={documentType}>
+                <Card key={documentSlot.key}>
                   <View style={styles.row}>
                     <View
                       style={[
                         styles.documentIcon,
                         {
-                          backgroundColor: isUploaded
+                          backgroundColor: documentSlot.uploaded
                             ? colors.successSoft
                             : palette.surfaceMuted,
                         },
                       ]}
                     >
                       <FileText
-                        color={isUploaded ? colors.success : colors.accentDark}
+                        color={
+                          documentSlot.uploaded
+                            ? colors.success
+                            : colors.accentDark
+                        }
                         size={20}
                       />
                     </View>
                     <View style={styles.grow}>
-                      <Text style={text.strong}>{documentType}</Text>
+                      <Text style={text.strong}>{documentSlot.label}</Text>
                       <Text style={text.body}>
-                        {isUploaded
+                        {documentSlot.uploaded
                           ? t("onboarding.uploadedReview")
                           : t("onboarding.requiredBeforeSubmit")}
                       </Text>
                     </View>
-                    <Badge tone={isUploaded ? "success" : "warning"}>
-                      {isUploaded
+                    <Badge tone={documentSlot.uploaded ? "success" : "warning"}>
+                      {documentSlot.uploaded
                         ? t("onboarding.uploaded")
-                        : t("onboarding.required")}
+                        : documentSlot.required
+                          ? t("onboarding.required")
+                          : t("common.optional")}
                     </Badge>
                   </View>
-                  {!isUploaded ? (
+                  {!documentSlot.uploaded ? (
                     <Button
                       loading={uploadMutation.isPending}
-                      onPress={() => uploadMutation.mutate(documentType)}
+                      onPress={() => uploadMutation.mutate(documentSlot.key)}
                     >
                       {t("onboarding.uploadDocument")}
                     </Button>
@@ -570,58 +631,23 @@ export default function OnboardingScreen() {
           )}
 
           <Button
-            disabled={status.missingDocuments.length > 0}
+            disabled={missingRequiredDocumentKeys.length > 0}
             loading={submitMutation.isPending}
-            onPress={() => submitMutation.mutate(status)}
+            onPress={() =>
+              submitMutation.mutate({
+                ...status,
+                missingDocuments: missingRequiredDocumentKeys,
+                requiredDocuments: requiredDocumentSlots.map(
+                  (slot) => slot.key,
+                ),
+              })
+            }
           >
             {t("onboarding.submitReview")}
           </Button>
         </>
       ) : null}
     </Screen>
-  );
-}
-
-function LocationSelector({
-  onSelect,
-  selectedLocation,
-}: {
-  onSelect: (location: YemenLocation) => void;
-  selectedLocation: YemenLocation;
-}) {
-  const t = useT();
-  const text = useTextStyles();
-
-  return (
-    <View style={styles.selectorBlock}>
-      <Text style={text.strong}>{t("profile.location")}</Text>
-      <Text style={text.body}>{t("profile.locationHint")}</Text>
-      <View style={styles.chipGrid}>
-        {YEMEN_LOCATIONS.map((location) => {
-          const selected =
-            selectedLocation.city === location.city &&
-            selectedLocation.region === location.region;
-          return (
-            <Pressable
-              accessibilityRole="radio"
-              accessibilityState={{ checked: selected }}
-              key={`${location.city}-${location.region}`}
-              onPress={() => onSelect(location)}
-              style={[styles.chip, selected ? styles.chipSelected : undefined]}
-            >
-              <Text
-                style={[
-                  styles.chipText,
-                  selected ? styles.chipTextSelected : undefined,
-                ]}
-              >
-                {location.city}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-    </View>
   );
 }
 
@@ -728,9 +754,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     gap: 14,
-  },
-  selectorBlock: {
-    gap: 9,
   },
   track: {
     backgroundColor: colors.panelSoft,
