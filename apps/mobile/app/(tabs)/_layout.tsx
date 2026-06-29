@@ -7,6 +7,8 @@ import {
   User,
 } from "lucide-react-native";
 import { useEffect } from "react";
+import { useWindowDimensions } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors, useThemePalette } from "../../src/components/ui";
 import { listConversations, listNotifications } from "../../src/lib/api";
@@ -18,6 +20,12 @@ export default function TabsLayout() {
   const t = useT();
   const { session } = useAuth();
   const palette = useThemePalette();
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const compact = width < 380;
+  const tabBarWidth = Math.min(width - 24, 560);
+  const tabBarSide = Math.max(12, (width - tabBarWidth) / 2);
+  const tabBarHeight = compact ? 68 : 74;
   const notificationsQuery = useQuery({
     enabled: Boolean(session),
     queryFn: listNotifications,
@@ -57,34 +65,42 @@ export default function TabsLayout() {
           minWidth: 18,
         },
         tabBarInactiveTintColor: palette.muted,
+        tabBarHideOnKeyboard: true,
+        tabBarIconStyle: {
+          marginTop: compact ? 2 : 1,
+        },
         tabBarItemStyle: {
-          borderRadius: 18,
-          marginHorizontal: 2,
-          minHeight: 52,
-          paddingVertical: 4,
+          borderRadius: compact ? 16 : 18,
+          marginHorizontal: compact ? 1 : 3,
+          minHeight: compact ? 48 : 52,
+          paddingVertical: compact ? 3 : 5,
         },
         tabBarActiveBackgroundColor:
           palette.background === colors.dark
             ? "rgba(102,60,109,0.34)"
             : colors.primarySoft,
-        tabBarLabelStyle: { fontSize: 10, fontWeight: "800" },
+        tabBarLabelStyle: {
+          fontSize: compact ? 9 : 10,
+          fontWeight: "800",
+          marginTop: 1,
+        },
         tabBarStyle: {
           backgroundColor:
             palette.background === colors.dark
               ? "rgba(32,22,42,0.96)"
               : "rgba(255,255,255,0.96)",
           borderColor: palette.border,
-          borderRadius: 26,
+          borderRadius: compact ? 22 : 26,
           borderWidth: 1,
-          bottom: 10,
+          bottom: Math.max(8, insets.bottom ? insets.bottom - 2 : 8),
           elevation: 8,
-          height: 72,
-          left: 14,
-          paddingBottom: 8,
-          paddingHorizontal: 10,
-          paddingTop: 8,
+          height: tabBarHeight,
+          left: tabBarSide,
+          paddingBottom: compact ? 7 : 9,
+          paddingHorizontal: compact ? 7 : 10,
+          paddingTop: compact ? 7 : 9,
           position: "absolute",
-          right: 14,
+          right: tabBarSide,
           shadowColor: palette.shadow,
           shadowOffset: { height: -8, width: 0 },
           shadowOpacity: 0.08,

@@ -16,6 +16,7 @@ import {
   Text,
   TextInput,
   type TextInputProps,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -399,6 +400,10 @@ export function Screen({
   const isAuth = tone === "auth";
   const isDark = theme === "dark";
   const onDark = isAuth || isDark;
+  const { width } = useWindowDimensions();
+  const isCompact = width < 380;
+  const horizontalPadding = isCompact ? 12 : 18;
+  const contentMaxWidth = isAuth ? 520 : 720;
 
   return (
     <LinearGradient
@@ -426,9 +431,16 @@ export function Screen({
           <ScrollView
             contentContainerStyle={[
               styles.scroll,
+              {
+                maxWidth: contentMaxWidth,
+                paddingHorizontal: horizontalPadding,
+                width: "100%",
+              },
               isAuth && styles.authScroll,
               direction === "rtl" && styles.rtlContent,
             ]}
+            contentInsetAdjustmentBehavior="automatic"
+            decelerationRate="fast"
             keyboardShouldPersistTaps="handled"
             refreshControl={
               onRefresh ? (
@@ -630,6 +642,12 @@ export function Button({
     <Pressable
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="button"
+      android_ripple={{
+        color:
+          tone === "primary" || tone === "accent"
+            ? "rgba(255,255,255,0.16)"
+            : "rgba(102,60,109,0.10)",
+      }}
       disabled={disabled || loading}
       onPress={() => {
         pressFeedback();
@@ -989,7 +1007,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
   },
   buttonPressed: {
-    transform: [{ scale: 0.99 }],
+    opacity: 0.9,
+    transform: [{ scale: 0.985 }],
   },
   buttonSecondary: {
     backgroundColor: colors.panelSoft,
@@ -1005,7 +1024,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
     justifyContent: "center",
-    minHeight: 50,
+    minHeight: 52,
     overflow: "hidden",
     paddingHorizontal: 18,
   },
@@ -1018,11 +1037,11 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.panel,
     borderColor: "rgba(86,132,154,0.16)",
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1,
-    gap: 12,
+    gap: 14,
     elevation: 1,
-    padding: 16,
+    padding: 18,
     shadowColor: "#5B6E78",
     shadowOffset: { height: 8, width: 0 },
     shadowOpacity: 0.06,
@@ -1133,10 +1152,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#ffffff",
     borderColor: colors.border,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
     flexDirection: "row",
-    minHeight: 50,
+    minHeight: 52,
     paddingHorizontal: 14,
   },
   inputWithIcon: {
@@ -1194,12 +1213,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   screenHeader: {
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 1,
     elevation: 1,
-    gap: 8,
-    marginBottom: 2,
-    padding: 14,
+    gap: 10,
+    marginBottom: 4,
+    padding: 16,
     shadowOffset: { height: 10, width: 0 },
     shadowOpacity: 0.08,
     shadowRadius: 18,
@@ -1213,14 +1232,15 @@ const styles = StyleSheet.create({
   screenTitle: {
     color: "#ffffff",
     fontFamily: fonts.bodyBold,
-    fontSize: 27,
-    lineHeight: 33,
+    fontSize: 28,
+    lineHeight: 34,
     marginTop: 6,
   },
   scroll: {
-    gap: 14,
-    padding: 14,
-    paddingBottom: 118,
+    alignSelf: "center",
+    gap: 16,
+    paddingBottom: 124,
+    paddingTop: 14,
   },
   screenHeaderTop: {
     alignItems: "center",

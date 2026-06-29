@@ -14,7 +14,13 @@ import {
 } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
 
 import {
   createLocationSelection,
@@ -118,7 +124,9 @@ export default function ProfileScreen() {
   const t = useT();
   const text = useTextStyles();
   const palette = useThemePalette();
+  const { width } = useWindowDimensions();
   const isClinic = session?.principal.role === "clinic";
+  const compactProfileHero = width < 370;
   const [isEditingDetails, setIsEditingDetails] = useState(false);
   const [displayNameDraft, setDisplayNameDraft] = useState("");
   const [phone, setPhone] = useState("");
@@ -362,7 +370,12 @@ export default function ProfileScreen() {
       />
 
       <Card>
-        <View style={styles.profileHero}>
+        <View
+          style={[
+            styles.profileHero,
+            compactProfileHero && styles.profileHeroCompact,
+          ]}
+        >
           <View>
             <Avatar label={displayName} size={92} uri={imageUrl} />
             <Pressable
@@ -384,7 +397,12 @@ export default function ProfileScreen() {
               <Camera color={colors.primary} size={17} />
             </Pressable>
           </View>
-          <View style={styles.profileHeroCopy}>
+          <View
+            style={[
+              styles.profileHeroCopy,
+              compactProfileHero && styles.profileHeroCopyCompact,
+            ]}
+          >
             <Text style={text.h2}>{displayName}</Text>
             {clinicProfile ? (
               <Text style={text.body}>
@@ -1048,9 +1066,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 16,
   },
+  profileHeroCompact: {
+    alignItems: "flex-start",
+    flexDirection: "column",
+  },
   profileHeroCopy: {
     flex: 1,
     gap: 7,
+  },
+  profileHeroCopyCompact: {
+    width: "100%",
   },
   rowReverse: {
     flexDirection: "row-reverse",

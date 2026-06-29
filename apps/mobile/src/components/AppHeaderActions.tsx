@@ -35,7 +35,7 @@ export function AppHeaderActions() {
             pressed && styles.pressed,
           ]}
         >
-          <Bell color={palette.text} size={19} />
+          <Bell color={palette.text} size={20} />
           {unreadCount > 0 ? (
             <View style={styles.badge}>
               <Text style={styles.badgeText}>
@@ -54,7 +54,7 @@ export function AppHeaderActions() {
         >
           <Avatar
             label={session?.principal.displayName}
-            size={40}
+            size={42}
             uri={session?.principal.profileImageUrl}
           />
         </Pressable>
@@ -92,9 +92,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: 999,
     borderWidth: 1,
-    height: 40,
+    height: 42,
     justifyContent: "center",
-    width: 40,
+    width: 42,
   },
   pressed: {
     opacity: 0.72,
