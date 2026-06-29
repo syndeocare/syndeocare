@@ -14,6 +14,7 @@ import type {
   CatalogKind,
   ChatMediaUploadResult,
   ClinicProfile,
+  ClinicProfileUpdateInput,
   Conversation,
   Job,
   JobCreateInput,
@@ -22,6 +23,7 @@ import type {
   Principal,
   ProfileImageUploadResult,
   ProfessionalProfile,
+  ProfessionalProfileUpdateInput,
   TokenSet,
   UploadDescriptor,
   UserRole,
@@ -664,14 +666,16 @@ export const deleteNotification = (notificationId: string) =>
 
 export const getMyProfessionalProfile = () =>
   authenticatedRequest<ProfessionalProfile>("/profiles/me");
-export const updateMyProfessionalProfile = (input: unknown) =>
+export const updateMyProfessionalProfile = (
+  input: ProfessionalProfileUpdateInput,
+) =>
   authenticatedRequest<ProfessionalProfile>("/profiles/me", {
     body: JSON.stringify(input),
     method: "PATCH",
   });
 export const getMyClinicProfile = () =>
   authenticatedRequest<ClinicProfile>("/clinics/me");
-export const updateMyClinicProfile = (input: unknown) =>
+export const updateMyClinicProfile = (input: ClinicProfileUpdateInput) =>
   authenticatedRequest<ClinicProfile>("/clinics/me", {
     body: JSON.stringify(input),
     method: "PATCH",

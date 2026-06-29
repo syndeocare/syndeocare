@@ -212,6 +212,7 @@ export type ProfessionalProfile = {
   specialty: string;
   headline?: string;
   bio?: string;
+  licenseNumber?: string;
   primaryPhone?: string;
   yearsExperience: number;
   languages: string[];
@@ -221,6 +222,13 @@ export type ProfessionalProfile = {
   profileImageUrl?: string;
   city: string;
   region: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  availability: {
+    status: "available" | "limited" | "unavailable";
+    nextAvailableAt?: string;
+    locationRadiusKm: number;
+  };
 };
 
 export type ClinicProfile = {
@@ -233,9 +241,34 @@ export type ClinicProfile = {
   services: string[];
   city: string;
   region: string;
+  latitude?: number | null;
+  longitude?: number | null;
   verificationStatus: VerificationStatus;
   onboardingCompleted: boolean;
   logoUrl?: string;
   openRoles: number;
   rating: number;
+};
+
+export type ProfessionalProfileUpdateInput = {
+  fullName: string;
+  specialty: string;
+  headline?: string;
+  bio?: string;
+  licenseNumber?: string;
+  primaryPhone?: string;
+  yearsExperience: number;
+  languages: string[];
+  availability: ProfessionalProfile["availability"];
+  location: LocationValue;
+};
+
+export type ClinicProfileUpdateInput = {
+  organizationName: string;
+  facilityType: string;
+  description?: string;
+  contactPhone?: string;
+  websiteUrl?: string;
+  services: string[];
+  location: LocationValue;
 };
