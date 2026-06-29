@@ -19,6 +19,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { AuthProvider, useAuth } from "../src/lib/auth";
 import { registerForPushNotifications } from "../src/lib/notifications";
+import { registerPushToken } from "../src/lib/api";
 import { PreferencesProvider } from "../src/lib/preferences";
 import { queryClient } from "../src/lib/query";
 
@@ -70,7 +71,12 @@ function AppLifecycle() {
 
   useEffect(() => {
     if (!session) return;
-    void registerForPushNotifications();
+    void registerForPushNotifications()
+      .then(async (registration) => {
+        if (!registration) return;
+        await registerPushToken(registration).catch(() => undefined);
+      })
+      .catch(() => undefined);
   }, [session]);
 
   useEffect(() => {

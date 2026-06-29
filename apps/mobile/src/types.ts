@@ -190,6 +190,15 @@ export type AppNotification = {
   createdAt: string;
 };
 
+export type PushTokenRegistrationInput = {
+  appVersion?: string;
+  deviceId?: string;
+  deviceName?: string;
+  platform: "android" | "ios" | "web";
+  provider: "expo";
+  token: string;
+};
+
 export type OnboardingStatus = {
   role: UserRole;
   onboardingCompleted: boolean;

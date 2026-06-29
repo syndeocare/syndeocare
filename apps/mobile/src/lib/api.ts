@@ -24,6 +24,7 @@ import type {
   ProfileImageUploadResult,
   ProfessionalProfile,
   ProfessionalProfileUpdateInput,
+  PushTokenRegistrationInput,
   TokenSet,
   UploadDescriptor,
   UserRole,
@@ -665,6 +666,16 @@ export const deleteNotification = (notificationId: string) =>
     `/notifications/${encodeURIComponent(notificationId)}`,
     { method: "DELETE" },
   );
+export const registerPushToken = (input: PushTokenRegistrationInput) =>
+  authenticatedRequest<{ registered: boolean }>("/notifications/push-tokens", {
+    body: JSON.stringify(input),
+    method: "POST",
+  });
+export const deletePushToken = (token?: string) =>
+  authenticatedRequest<{ deleted: number }>("/notifications/push-tokens", {
+    body: JSON.stringify(token ? { token } : {}),
+    method: "DELETE",
+  });
 
 export const getMyProfessionalProfile = () =>
   authenticatedRequest<ProfessionalProfile>("/profiles/me");

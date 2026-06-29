@@ -4,10 +4,17 @@ on:
   push:
     branches:
       - main
-    paths-ignore:
-      - "apps/mobile/**"
-      - ".github/workflows/mobile.yml"
+    paths:
+      - "apps/web/**"
+      - "services/**"
+      - "packages/**"
+      - "infra/**"
+      - "scripts/**"
+      - "package.json"
       - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "turbo.json"
+      - ".github/workflows/deploy-platform.yml"
   workflow_dispatch:
     inputs:
       environment:
@@ -230,6 +237,12 @@ jobs:
         if: ${{ steps.context.outputs.deploy_backend == 'true' && vars.BACKEND_DEPLOY_MODE == 'ecs' }}
         working-directory: infra/terraform/environments/${{ steps.context.outputs.terraform_env }}
         run: terraform apply -input=false -auto-approve tfplan
+
+      - name: Run database migrations and seeders
+        if: ${{ steps.context.outputs.deploy_backend == 'true' && vars.BACKEND_DEPLOY_MODE == 'ecs' }}
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+        run: infra/scripts/run-db-bootstrap.sh "${{ steps.context.outputs.terraform_env }}"
 
       - name: Smoke test deployed API gateway
         if: ${{ steps.context.outputs.deploy_backend == 'true' && vars.BACKEND_DEPLOY_MODE == 'ecs' }}

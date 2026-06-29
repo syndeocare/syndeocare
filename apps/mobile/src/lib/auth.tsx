@@ -9,12 +9,14 @@ import React, {
 } from "react";
 
 import {
+  deletePushToken,
   logout as apiLogout,
   restoreSession,
   signIn as apiSignIn,
   signInWithGoogle as apiSignInWithGoogle,
   signUp as apiSignUp,
 } from "./api";
+import { clearStoredPushToken, getStoredPushToken } from "./notifications";
 import { queryClient } from "./query";
 import type { AuthSession, UserRole } from "../types";
 
@@ -97,6 +99,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await refresh();
       },
       async logout() {
+        await getStoredPushToken()
+          .then(async (pushToken) => {
+            if (!pushToken) return;
+            await deletePushToken(pushToken).catch(() => undefined);
+            await clearStoredPushToken().catch(() => undefined);
+          })
+          .catch(() => undefined);
         await apiLogout();
         queryClient.clear();
         setSession(null);

@@ -28,18 +28,25 @@ Production App Store and Play Store submission are not enabled yet because Apple
 
 ## Notifications
 
-The mobile app can request Expo push tokens through `expo-notifications`. The AWS backend currently provides in-app notifications through the notifications service and API gateway. Native push fan-out should remain backend-side; do not hardcode AWS, APNs, FCM, or Expo service secrets in the mobile app.
+The mobile app requests Expo push tokens through `expo-notifications` after sign-in and registers them through the authenticated API gateway route `POST /v1/notifications/push-tokens`. Tokens are stored backend-side per actor/device/provider/platform and removed with `DELETE /v1/notifications/push-tokens` during logout. The AWS backend also provides in-app notifications through the notifications service and API gateway.
 
-Production push notification completion requires:
+Native push fan-out must remain backend-side; do not hardcode AWS, APNs, FCM, Expo, or provider secrets in the mobile app.
 
-- Backend endpoint for registering/removing Expo push tokens per authenticated actor and device.
-- Durable push token storage with uniqueness by actor, device, platform, and token.
-- Token cleanup on logout or explicit unregister.
+Implemented:
+
+- Backend endpoint for registering/removing Expo push tokens per authenticated actor.
+- Durable push token storage with uniqueness by actor/device/platform/provider/token.
+- Mobile token registration after sign-in on real devices.
+- Token cleanup on logout.
+
+Production push notification completion still requires:
+
 - Backend fan-out from notification events such as `new_message`.
+- Provider delivery implementation, for example Expo push service now and AWS SNS/Pinpoint later if selected.
 - APNs/FCM credentials configured through EAS/Expo and/or AWS, depending on the chosen push provider.
 - Localized notification titles/bodies generated server-side.
 
-Until token registration exists server-side, the app safely continues to use in-app notifications and app badge syncing without exposing secrets.
+Until provider fan-out is enabled server-side, the app safely continues to use in-app notifications and app badge syncing without exposing secrets.
 
 ## Privacy Prompts
 
@@ -52,3 +59,10 @@ Configured prompts:
 ## CI
 
 The `Mobile` GitHub Actions workflow runs for mobile paths and shared workspace files required by the mobile build. It runs Expo dependency checks, TypeScript, ESLint, and Android/iOS export builds. It starts EAS cloud builds only when `EXPO_TOKEN` is configured.
+
+The platform workflows are path-scoped:
+
+- `Mobile`: mobile app and mobile build metadata.
+- `CI`: web, docs, backend services, shared packages, scripts, infra, and workspace build metadata.
+- `Deploy Platform`: deployable web frontend, backend services, shared packages, scripts, and infrastructure.
+- `Release`: changesets and package/product code, excluding mobile-only changes.

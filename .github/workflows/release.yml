@@ -4,10 +4,17 @@ on:
   push:
     branches:
       - main
-    paths-ignore:
-      - "apps/mobile/**"
-      - ".github/workflows/mobile.yml"
+    paths:
+      - ".changeset/**"
+      - "apps/web/**"
+      - "apps/docs/**"
+      - "services/**"
+      - "packages/**"
+      - "package.json"
       - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "turbo.json"
+      - ".github/workflows/release.yml"
 
 jobs:
   changesets:

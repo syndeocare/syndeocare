@@ -6,6 +6,7 @@ export {
   deleteActorBySubject,
   deleteAllNotificationsForExternalUserId,
   deleteNotificationForExternalUserId,
+  deletePushTokensBySubject,
   ensureActorAccount,
   createJobListingBySubject,
   getAuthPrincipalBySubject,
@@ -33,6 +34,7 @@ export {
   persistClinicLogoBySubject,
   persistProfessionalProfileImageBySubject,
   persistVerificationDocumentBySubject,
+  registerPushTokenBySubject,
   requestBookingBySubject,
   reviewVerificationBySubject,
   saveAdminCatalogItem,
@@ -48,6 +50,7 @@ export {
 } from "./repositories.js";
 export {
   actors,
+  actorPushTokens,
   adminCatalogItems,
   adminCatalogKindEnum,
   appNotifications,

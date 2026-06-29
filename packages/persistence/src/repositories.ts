@@ -16,6 +16,8 @@ import type {
   OnboardingSubmissionInput,
   OnboardingStatus,
   PublicRegistrationRole,
+  PushTokenDeleteInput,
+  PushTokenRegistrationInput,
   ProfessionalProfileListResponse,
   ProfessionalProfileUpdateInput,
   ProfessionalProfileSummary,
@@ -27,6 +29,7 @@ import type {
 import { getDb } from "./client.js";
 import {
   actors,
+  actorPushTokens,
   adminCatalogItems,
   bookings,
   clinicProfiles,
@@ -622,6 +625,74 @@ export async function deleteAllNotificationsForExternalUserId(
     .returning({ id: appNotifications.id });
 
   return rows.length;
+}
+
+export async function registerPushTokenBySubject(
+  subject: string,
+  input: PushTokenRegistrationInput,
+) {
+  const aggregate = await getActorAggregateBySubject(subject);
+
+  if (!aggregate) {
+    throw new Error("Notification recipient could not be resolved.");
+  }
+
+  const db = getDb();
+  const now = new Date();
+  await db
+    .insert(actorPushTokens)
+    .values({
+      actorId: aggregate.actor.id,
+      appVersion: input.appVersion,
+      deviceId: input.deviceId,
+      deviceName: input.deviceName,
+      lastRegisteredAt: now,
+      platform: input.platform,
+      provider: input.provider,
+      token: input.token,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: actorPushTokens.token,
+      set: {
+        actorId: aggregate.actor.id,
+        appVersion: input.appVersion,
+        deviceId: input.deviceId,
+        deviceName: input.deviceName,
+        lastRegisteredAt: now,
+        platform: input.platform,
+        provider: input.provider,
+        updatedAt: now,
+      },
+    });
+
+  return { registered: true };
+}
+
+export async function deletePushTokensBySubject(
+  subject: string,
+  input: PushTokenDeleteInput = {},
+) {
+  const aggregate = await getActorAggregateBySubject(subject);
+
+  if (!aggregate) {
+    throw new Error("Notification recipient could not be resolved.");
+  }
+
+  const db = getDb();
+  const rows = await db
+    .delete(actorPushTokens)
+    .where(
+      input.token
+        ? and(
+            eq(actorPushTokens.actorId, aggregate.actor.id),
+            eq(actorPushTokens.token, input.token),
+          )
+        : eq(actorPushTokens.actorId, aggregate.actor.id),
+    )
+    .returning({ id: actorPushTokens.id });
+
+  return { deleted: rows.length };
 }
 
 export async function getProfessionalProfileBySubject(

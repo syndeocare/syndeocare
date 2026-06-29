@@ -1,7 +1,12 @@
 import Constants from "expo-constants";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
+import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
+
+import type { PushTokenRegistrationInput } from "../types";
+
+const PUSH_TOKEN_KEY = "syndeocare.mobile.push-token";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -14,7 +19,41 @@ Notifications.setNotificationHandler({
   }),
 });
 
-export async function registerForPushNotifications() {
+function getNotificationPlatform(): PushTokenRegistrationInput["platform"] {
+  if (Platform.OS === "android" || Platform.OS === "ios") {
+    return Platform.OS;
+  }
+
+  return "web";
+}
+
+async function storePushToken(token: string) {
+  if (Platform.OS === "web") {
+    globalThis.localStorage?.setItem(PUSH_TOKEN_KEY, token);
+    return;
+  }
+
+  await SecureStore.setItemAsync(PUSH_TOKEN_KEY, token);
+}
+
+export async function getStoredPushToken() {
+  if (Platform.OS === "web") {
+    return globalThis.localStorage?.getItem(PUSH_TOKEN_KEY) ?? null;
+  }
+
+  return SecureStore.getItemAsync(PUSH_TOKEN_KEY);
+}
+
+export async function clearStoredPushToken() {
+  if (Platform.OS === "web") {
+    globalThis.localStorage?.removeItem(PUSH_TOKEN_KEY);
+    return;
+  }
+
+  await SecureStore.deleteItemAsync(PUSH_TOKEN_KEY);
+}
+
+export async function registerForPushNotifications(): Promise<PushTokenRegistrationInput | null> {
   if (!Device.isDevice) return null;
 
   const existing = await Notifications.getPermissionsAsync();
@@ -40,7 +79,15 @@ export async function registerForPushNotifications() {
   if (!projectId) return null;
 
   const token = await Notifications.getExpoPushTokenAsync({ projectId });
-  return token.data;
+  await storePushToken(token.data);
+
+  return {
+    appVersion: Constants.expoConfig?.version,
+    deviceName: Device.deviceName ?? undefined,
+    platform: getNotificationPlatform(),
+    provider: "expo",
+    token: token.data,
+  };
 }
 
 export async function syncAppBadge(count: number) {

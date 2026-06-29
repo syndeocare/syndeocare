@@ -335,6 +335,40 @@ export const appNotifications = pgTable(
   }),
 );
 
+export const actorPushTokens = pgTable(
+  "actor_push_tokens",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    actorId: uuid("actor_id")
+      .notNull()
+      .references(() => actors.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull().default("expo"),
+    platform: text("platform").notNull(),
+    token: text("token").notNull(),
+    deviceId: text("device_id"),
+    deviceName: text("device_name"),
+    appVersion: text("app_version"),
+    lastRegisteredAt: timestamp("last_registered_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    actorIdx: index("actor_push_tokens_actor_idx").on(table.actorId),
+    actorProviderPlatformIdx: index(
+      "actor_push_tokens_actor_provider_platform_idx",
+    ).on(table.actorId, table.provider, table.platform),
+    tokenUniqueIdx: uniqueIndex("actor_push_tokens_token_unique_idx").on(
+      table.token,
+    ),
+  }),
+);
+
 export const adminCatalogItems = pgTable(
   "admin_catalog_items",
   {
@@ -458,6 +492,7 @@ export const conversationMessages = pgTable(
 
 export const schema = {
   actors,
+  actorPushTokens,
   adminCatalogItems,
   adminCatalogKindEnum,
   appNotifications,

@@ -259,6 +259,30 @@ export const notificationDeliveryResponseSchema = z.object({
   providerMessageId: z.string().min(1),
 });
 
+export const pushNotificationProviderSchema = z.enum(["expo"]);
+export const pushNotificationPlatformSchema = z.enum(["android", "ios", "web"]);
+
+export const pushTokenRegistrationInputSchema = z.object({
+  appVersion: z.string().min(1).optional(),
+  deviceId: z.string().min(1).optional(),
+  deviceName: z.string().min(1).optional(),
+  platform: pushNotificationPlatformSchema,
+  provider: pushNotificationProviderSchema.default("expo"),
+  token: z.string().min(16),
+});
+
+export const pushTokenRegistrationResponseSchema = z.object({
+  registered: z.boolean(),
+});
+
+export const pushTokenDeleteInputSchema = z.object({
+  token: z.string().min(16).optional(),
+});
+
+export const pushTokenDeleteResponseSchema = z.object({
+  deleted: z.number().int().nonnegative(),
+});
+
 export const appNotificationTypeSchema = z.enum([
   "booking_request",
   "booking_accepted",
@@ -917,6 +941,18 @@ export const initialV1RouteCatalog = [
     protected: true,
   },
   {
+    method: "POST",
+    path: "/v1/notifications/push-tokens",
+    summary: "Register or refresh a push notification token",
+    protected: true,
+  },
+  {
+    method: "DELETE",
+    path: "/v1/notifications/push-tokens",
+    summary: "Remove push notification tokens for the authenticated actor",
+    protected: true,
+  },
+  {
     method: "PATCH",
     path: "/v1/notifications/read-all",
     summary: "Mark all notifications as read for the authenticated actor",
@@ -1265,6 +1301,22 @@ export type NotificationEmailRequest = z.infer<
 >;
 export type NotificationDeliveryResponse = z.infer<
   typeof notificationDeliveryResponseSchema
+>;
+export type PushNotificationProvider = z.infer<
+  typeof pushNotificationProviderSchema
+>;
+export type PushNotificationPlatform = z.infer<
+  typeof pushNotificationPlatformSchema
+>;
+export type PushTokenRegistrationInput = z.infer<
+  typeof pushTokenRegistrationInputSchema
+>;
+export type PushTokenRegistrationResponse = z.infer<
+  typeof pushTokenRegistrationResponseSchema
+>;
+export type PushTokenDeleteInput = z.infer<typeof pushTokenDeleteInputSchema>;
+export type PushTokenDeleteResponse = z.infer<
+  typeof pushTokenDeleteResponseSchema
 >;
 export type AppNotification = z.infer<typeof appNotificationSchema>;
 export type AppNotificationListResponse = z.infer<

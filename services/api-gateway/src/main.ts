@@ -74,6 +74,10 @@ import {
   verificationStatusResponseSchema,
   markAllNotificationsReadResponseSchema,
   notificationCountResponseSchema,
+  pushTokenDeleteInputSchema,
+  pushTokenDeleteResponseSchema,
+  pushTokenRegistrationInputSchema,
+  pushTokenRegistrationResponseSchema,
   standardConversationStartInputSchema,
   type AuthPrincipal,
   type PlatformMetadata,
@@ -1605,6 +1609,122 @@ void startService({
           appNotificationSchema,
           {
             method: "POST",
+            body: parsedBody.data,
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.post(
+      "/v1/notifications/push-tokens",
+      {
+        schema: {
+          operationId: "registerPushNotificationToken",
+          summary:
+            "Register or refresh a push notification token for the authenticated actor",
+          tags: ["notifications"],
+          security: [{ bearerAuth: [] }],
+          body: toJsonSchema(
+            pushTokenRegistrationInputSchema,
+            "PushTokenRegistrationInput",
+          ),
+          response: {
+            200: toJsonSchema(
+              pushTokenRegistrationResponseSchema,
+              "PushTokenRegistrationResponse",
+            ),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorValidation"),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorized"),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorNotFound"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
+          },
+        },
+        preHandler: auth.requireAccess(),
+      },
+      async (request, reply) => {
+        const actor = request.authContext as AuthPrincipal;
+        const parsedBody = pushTokenRegistrationInputSchema.safeParse(
+          request.body,
+        );
+
+        if (!parsedBody.success) {
+          return reply
+            .code(400)
+            .send(buildValidationError(parsedBody.error.issues));
+        }
+
+        const downstream = await requestDownstreamResource(
+          "notifications",
+          `/internal/actors/${encodeURIComponent(actor.sub)}/push-tokens`,
+          pushTokenRegistrationResponseSchema,
+          {
+            method: "POST",
+            body: parsedBody.data,
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.delete(
+      "/v1/notifications/push-tokens",
+      {
+        schema: {
+          operationId: "deletePushNotificationToken",
+          summary:
+            "Remove one or all push notification tokens for the authenticated actor",
+          tags: ["notifications"],
+          security: [{ bearerAuth: [] }],
+          body: toJsonSchema(
+            pushTokenDeleteInputSchema,
+            "PushTokenDeleteInput",
+          ),
+          response: {
+            200: toJsonSchema(
+              pushTokenDeleteResponseSchema,
+              "PushTokenDeleteResponse",
+            ),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorValidation"),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorized"),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorNotFound"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
+          },
+        },
+        preHandler: auth.requireAccess(),
+      },
+      async (request, reply) => {
+        const actor = request.authContext as AuthPrincipal;
+        const parsedBody = pushTokenDeleteInputSchema.safeParse(
+          request.body ?? {},
+        );
+
+        if (!parsedBody.success) {
+          return reply
+            .code(400)
+            .send(buildValidationError(parsedBody.error.issues));
+        }
+
+        const downstream = await requestDownstreamResource(
+          "notifications",
+          `/internal/actors/${encodeURIComponent(actor.sub)}/push-tokens`,
+          pushTokenDeleteResponseSchema,
+          {
+            method: "DELETE",
             body: parsedBody.data,
           },
         );

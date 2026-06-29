@@ -8,15 +8,21 @@ import {
   notificationCountResponseSchema,
   notificationDeliveryResponseSchema,
   notificationEmailRequestSchema,
+  pushTokenDeleteInputSchema,
+  pushTokenDeleteResponseSchema,
+  pushTokenRegistrationInputSchema,
+  pushTokenRegistrationResponseSchema,
 } from "@repo/contracts";
 import {
   countNotificationsForExternalUserId,
   createNotificationForExternalUserId,
   deleteAllNotificationsForExternalUserId,
   deleteNotificationForExternalUserId,
+  deletePushTokensBySubject,
   listNotificationsForExternalUserId,
   markAllNotificationsReadForExternalUserId,
   markNotificationReadForExternalUserId,
+  registerPushTokenBySubject,
 } from "@repo/persistence";
 import { startService } from "@repo/service-core";
 import { z } from "zod";
@@ -149,6 +155,88 @@ void startService({
         await createNotificationForExternalUserId(parsedBody.data),
       );
     });
+
+    app.post(
+      "/internal/actors/:subject/push-tokens",
+      async (request, reply) => {
+        const parsedParams = actorParamsSchema.safeParse(request.params);
+        const parsedBody = pushTokenRegistrationInputSchema.safeParse(
+          request.body,
+        );
+
+        if (!parsedParams.success) {
+          return reply.code(400).send({
+            code: "VALIDATION_ERROR",
+            message: "A valid actor subject is required.",
+          });
+        }
+
+        if (!parsedBody.success) {
+          return reply.code(400).send({
+            code: "VALIDATION_ERROR",
+            message: "A valid push notification token is required.",
+          });
+        }
+
+        try {
+          return pushTokenRegistrationResponseSchema.parse(
+            await registerPushTokenBySubject(
+              parsedParams.data.subject,
+              parsedBody.data,
+            ),
+          );
+        } catch (error) {
+          return reply.code(404).send({
+            code: "NOTIFICATION_RECIPIENT_NOT_SYNCED",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Notification recipient could not be resolved.",
+          });
+        }
+      },
+    );
+
+    app.delete(
+      "/internal/actors/:subject/push-tokens",
+      async (request, reply) => {
+        const parsedParams = actorParamsSchema.safeParse(request.params);
+        const parsedBody = pushTokenDeleteInputSchema.safeParse(
+          request.body ?? {},
+        );
+
+        if (!parsedParams.success) {
+          return reply.code(400).send({
+            code: "VALIDATION_ERROR",
+            message: "A valid actor subject is required.",
+          });
+        }
+
+        if (!parsedBody.success) {
+          return reply.code(400).send({
+            code: "VALIDATION_ERROR",
+            message: "A valid push notification token is required.",
+          });
+        }
+
+        try {
+          return pushTokenDeleteResponseSchema.parse(
+            await deletePushTokensBySubject(
+              parsedParams.data.subject,
+              parsedBody.data,
+            ),
+          );
+        } catch (error) {
+          return reply.code(404).send({
+            code: "NOTIFICATION_RECIPIENT_NOT_SYNCED",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Notification recipient could not be resolved.",
+          });
+        }
+      },
+    );
 
     app.get(
       "/internal/notifications/recipient/:externalUserId/count",
