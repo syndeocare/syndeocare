@@ -23,6 +23,7 @@ import {
   markNotificationRead,
 } from "../../src/lib/api";
 import { displayLabel, formatDateTime } from "../../src/lib/format";
+import { hapticError, hapticSuccess } from "../../src/lib/haptics";
 import { usePreferences, useT } from "../../src/lib/preferences";
 import { queryClient } from "../../src/lib/query";
 
@@ -40,20 +41,26 @@ export default function NotificationsScreen() {
 
   const markAllMutation = useMutation({
     mutationFn: markAllNotificationsRead,
+    onError: () => hapticError(),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      hapticSuccess();
     },
   });
   const markOneMutation = useMutation({
     mutationFn: markNotificationRead,
+    onError: () => hapticError(),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      hapticSuccess();
     },
   });
   const deleteMutation = useMutation({
     mutationFn: deleteNotification,
+    onError: () => hapticError(),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      hapticSuccess();
     },
   });
 

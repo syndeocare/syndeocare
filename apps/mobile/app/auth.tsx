@@ -31,6 +31,7 @@ import {
   ErrorBanner,
   Field,
   Screen,
+  SuccessBanner,
   colors,
   fonts,
   useTextStyles,
@@ -39,6 +40,7 @@ import {
 import { requestPasswordReset } from "../src/lib/api";
 import { useAuth } from "../src/lib/auth";
 import { displayLabel } from "../src/lib/format";
+import { hapticSelection } from "../src/lib/haptics";
 import { usePreferences, useT } from "../src/lib/preferences";
 import type { UserRole } from "../src/types";
 
@@ -255,7 +257,10 @@ function GoogleButton({
   return (
     <Pressable
       disabled={loading}
-      onPress={onPress}
+      onPress={() => {
+        hapticSelection();
+        onPress();
+      }}
       style={({ pressed }) => [
         styles.googleButton,
         { backgroundColor: palette.input, borderColor: palette.border },
@@ -318,7 +323,13 @@ function EmailToggle({
   const palette = useThemePalette();
   const { language } = usePreferences();
   return (
-    <Pressable onPress={onPress} style={styles.emailToggle}>
+    <Pressable
+      onPress={() => {
+        hapticSelection();
+        onPress();
+      }}
+      style={styles.emailToggle}
+    >
       <Text
         style={[
           styles.emailToggleText,
@@ -343,7 +354,13 @@ function BackButton({ onPress }: { onPress: () => void }) {
   const Icon = direction === "rtl" ? ArrowRight : ArrowLeft;
 
   return (
-    <Pressable onPress={onPress} style={styles.backButton}>
+    <Pressable
+      onPress={() => {
+        hapticSelection();
+        onPress();
+      }}
+      style={styles.backButton}
+    >
       <Icon color={palette.muted} size={17} />
       <Text style={[styles.backText, copy.body]}>{t("auth.back")}</Text>
     </Pressable>
@@ -407,12 +424,18 @@ function SignInContent({
             style={[styles.detailsPanel, { borderTopColor: palette.border }]}
           >
             <EmailPasswordFields form={form} />
-            {resetSuccess ? (
-              <Text style={styles.success}>
-                {t("auth.passwordResetRequested")}
-              </Text>
-            ) : null}
-            <Pressable onPress={onReset} disabled={resetPending}>
+            <SuccessBanner
+              message={
+                resetSuccess ? t("auth.passwordResetRequested") : undefined
+              }
+            />
+            <Pressable
+              disabled={resetPending}
+              onPress={() => {
+                hapticSelection();
+                onReset();
+              }}
+            >
               <Text style={[styles.forgotText, { fontFamily: family }]}>
                 {resetPending
                   ? t("auth.sendingReset")
@@ -434,7 +457,12 @@ function SignInContent({
         <Text style={[styles.footerMuted, copy.body]}>
           {t("auth.noAccount")}{" "}
         </Text>
-        <Pressable onPress={onSwitchToSignup}>
+        <Pressable
+          onPress={() => {
+            hapticSelection();
+            onSwitchToSignup();
+          }}
+        >
           <Text style={styles.footerLink}>{t("auth.signUp")}</Text>
         </Pressable>
       </View>
@@ -485,7 +513,12 @@ function RoleContent({
         <Text style={[styles.footerMuted, copy.body]}>
           {t("auth.alreadyAccount")}{" "}
         </Text>
-        <Pressable onPress={onSwitchToSignin}>
+        <Pressable
+          onPress={() => {
+            hapticSelection();
+            onSwitchToSignin();
+          }}
+        >
           <Text style={styles.footerLink}>{t("auth.signIn")}</Text>
         </Pressable>
       </View>
@@ -515,7 +548,10 @@ function RoleCard({
 
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => {
+        hapticSelection();
+        onPress();
+      }}
       style={[
         styles.roleCard,
         { backgroundColor: palette.surface, borderColor: palette.border },
@@ -588,7 +624,12 @@ function MethodContent({
         <Text style={[styles.footerMuted, copy.body]}>
           {t("auth.alreadyAccount")}{" "}
         </Text>
-        <Pressable onPress={onSwitchToSignin}>
+        <Pressable
+          onPress={() => {
+            hapticSelection();
+            onSwitchToSignin();
+          }}
+        >
           <Text style={styles.footerLink}>{t("auth.signIn")}</Text>
         </Pressable>
       </View>
@@ -702,7 +743,12 @@ function DetailsContent({
         <Text style={[styles.footerMuted, copy.body]}>
           {t("auth.alreadyAccount")}{" "}
         </Text>
-        <Pressable onPress={onSwitchToSignin}>
+        <Pressable
+          onPress={() => {
+            hapticSelection();
+            onSwitchToSignin();
+          }}
+        >
           <Text style={styles.footerLink}>{t("auth.signIn")}</Text>
         </Pressable>
       </View>

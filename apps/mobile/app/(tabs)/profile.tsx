@@ -39,6 +39,7 @@ import {
   PreferenceControls,
   Screen,
   SectionHeader,
+  SuccessBanner,
   colors,
   useTextStyles,
   useThemePalette,
@@ -374,6 +375,9 @@ export default function ProfileScreen() {
                         ? passwordMutation.error.message
                         : undefined
         }
+      />
+      <SuccessBanner
+        message={saveMutation.isSuccess ? t("onboarding.saved") : undefined}
       />
 
       <Card>
@@ -753,11 +757,13 @@ export default function ProfileScreen() {
             >
               {t("profile.resendVerification")}
             </Button>
-            {verificationMutation.isSuccess ? (
-              <Text style={styles.success}>
-                {t("profile.verificationSent")}
-              </Text>
-            ) : null}
+            <SuccessBanner
+              message={
+                verificationMutation.isSuccess
+                  ? t("profile.verificationSent")
+                  : undefined
+              }
+            />
           </>
         ) : null}
         {showPasswordForm ? (
@@ -826,9 +832,13 @@ export default function ProfileScreen() {
             {t("profile.changePassword")}
           </Button>
         )}
-        {passwordMutation.isSuccess ? (
-          <Text style={styles.success}>{t("profile.passwordChanged")}</Text>
-        ) : null}
+        <SuccessBanner
+          message={
+            passwordMutation.isSuccess
+              ? t("profile.passwordChanged")
+              : undefined
+          }
+        />
       </Card>
 
       <Card>

@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Avatar, colors, useThemePalette } from "./ui";
 import { listNotifications } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { hapticSelection } from "../lib/haptics";
 import { usePreferences } from "../lib/preferences";
 
 export function AppHeaderActions() {
@@ -29,6 +30,7 @@ export function AppHeaderActions() {
           accessibilityLabel={t("notifications.title")}
           accessibilityRole="button"
           hitSlop={8}
+          onPressIn={() => hapticSelection()}
           style={({ pressed }) => [
             styles.iconButton,
             {
@@ -53,6 +55,7 @@ export function AppHeaderActions() {
           accessibilityLabel={t("profile.title")}
           accessibilityRole="button"
           hitSlop={8}
+          onPressIn={() => hapticSelection()}
           style={({ pressed }) => pressed && styles.pressed}
         >
           <Avatar

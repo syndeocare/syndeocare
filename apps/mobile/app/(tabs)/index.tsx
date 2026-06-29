@@ -31,6 +31,7 @@ import {
 } from "../../src/lib/api";
 import { useAuth } from "../../src/lib/auth";
 import { displayLabel, verificationStatusLabel } from "../../src/lib/format";
+import { hapticSelection } from "../../src/lib/haptics";
 import { interpolate, usePreferences, useT } from "../../src/lib/preferences";
 
 export default function DashboardScreen() {
@@ -189,7 +190,10 @@ function StatCard({
     <Pressable
       accessibilityRole="button"
       disabled={!onPress}
-      onPress={onPress}
+      onPress={() => {
+        hapticSelection();
+        onPress?.();
+      }}
       style={({ pressed }) => [
         styles.statCard,
         { backgroundColor: palette.surface, borderColor: palette.border },

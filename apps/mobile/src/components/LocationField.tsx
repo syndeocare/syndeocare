@@ -10,6 +10,7 @@ import {
   useThemePalette,
 } from "./ui";
 import { displayLabel } from "../lib/format";
+import { hapticError, hapticSelection, hapticSuccess } from "../lib/haptics";
 import { usePreferences, useT } from "../lib/preferences";
 import type { LocationValue } from "../types";
 
@@ -269,6 +270,7 @@ export function LocationField({
     onChange(next);
     setShowSuggestions(false);
     setSuggestions([]);
+    hapticSelection();
   };
 
   const useCurrentLocation = async () => {
@@ -301,7 +303,9 @@ export function LocationField({
       onChange({ address, city, latitude, longitude, region });
       setShowSuggestions(false);
       setSuggestions([]);
+      hapticSuccess();
     } catch (currentLocationError) {
+      hapticError();
       setLocalError(
         currentLocationError instanceof Error
           ? currentLocationError.message

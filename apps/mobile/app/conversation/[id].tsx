@@ -47,6 +47,11 @@ import {
 } from "../../src/lib/api";
 import { useAuth } from "../../src/lib/auth";
 import { displayLabel, formatDateTime, formatTime } from "../../src/lib/format";
+import {
+  hapticError,
+  hapticSelection,
+  hapticSuccess,
+} from "../../src/lib/haptics";
 import { usePreferences, useT } from "../../src/lib/preferences";
 import { queryClient } from "../../src/lib/query";
 import type { UserRole } from "../../src/types";
@@ -185,16 +190,20 @@ export default function ConversationScreen() {
         fileUrl: uploaded?.fileUrl ?? null,
       });
     },
+    onError: () => hapticError(),
     onSuccess: async () => {
       setContent("");
       setAttachment(null);
       await queryClient.invalidateQueries({ queryKey: ["conversation", id] });
       await queryClient.invalidateQueries({ queryKey: ["conversations"] });
+      hapticSuccess();
     },
   });
   const accessMutation = useMutation({
     mutationFn: (fileUrl: string) => getChatMediaAccessUrl(id, fileUrl),
+    onError: () => hapticError(),
     onSuccess: async (result) => {
+      hapticSelection();
       await Linking.openURL(result.signedUrl);
     },
   });
@@ -208,6 +217,7 @@ export default function ConversationScreen() {
 
     if (!picked.canceled && picked.assets[0]) {
       setAttachment(picked.assets[0]);
+      hapticSelection();
     }
   };
 
@@ -448,7 +458,10 @@ export default function ConversationScreen() {
                 accessibilityRole="button"
                 disabled={sendMutation.isPending}
                 hitSlop={8}
-                onPress={pickAttachment}
+                onPress={() => {
+                  hapticSelection();
+                  void pickAttachment();
+                }}
                 style={({ pressed }) => [
                   styles.composerIconButton,
                   pressed && styles.pressed,
@@ -473,7 +486,10 @@ export default function ConversationScreen() {
                   sendMutation.isPending ||
                   (content.trim().length === 0 && !attachment)
                 }
-                onPress={() => sendMutation.mutate()}
+                onPress={() => {
+                  hapticSelection();
+                  sendMutation.mutate();
+                }}
                 style={({ pressed }) => [
                   styles.sendButton,
                   {

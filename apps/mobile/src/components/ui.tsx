@@ -1,12 +1,18 @@
-import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { Link } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { Languages, Moon, Sun } from "lucide-react-native";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Languages,
+  Moon,
+  Sun,
+} from "lucide-react-native";
 import React, {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useRef,
   useState,
 } from "react";
@@ -28,6 +34,12 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { displayLabel } from "../lib/format";
+import {
+  hapticError,
+  hapticLight,
+  hapticSelection,
+  hapticSuccess,
+} from "../lib/haptics";
 import { usePreferences, useT } from "../lib/preferences";
 
 const brandMark = require("../../assets/syndeocare-mark.png");
@@ -157,8 +169,7 @@ export function useKeyboardAwareInput() {
 }
 
 function pressFeedback() {
-  if (Platform.OS === "web") return;
-  void Haptics.selectionAsync().catch(() => undefined);
+  hapticSelection();
 }
 
 export function BrandMark({ size = 48 }: { size?: number }) {
@@ -513,6 +524,12 @@ export function Screen({
         ) : null}
       </View>
     ) : null;
+  const handleRefresh = onRefresh
+    ? () => {
+        hapticLight();
+        onRefresh();
+      }
+    : undefined;
 
   return (
     <LinearGradient
@@ -545,17 +562,21 @@ export function Screen({
                 contentContainerStyle={contentStyle}
                 contentInsetAdjustmentBehavior="automatic"
                 decelerationRate="fast"
+                indicatorStyle={onDark ? "white" : "black"}
                 keyboardDismissMode="interactive"
                 keyboardShouldPersistTaps="handled"
+                persistentScrollbar
                 refreshControl={
-                  onRefresh ? (
+                  handleRefresh ? (
                     <RefreshControl
                       refreshing={Boolean(refreshing)}
-                      onRefresh={onRefresh}
+                      onRefresh={handleRefresh}
                       tintColor={onDark ? "#ffffff" : colors.primary}
                     />
                   ) : undefined
                 }
+                scrollIndicatorInsets={{ bottom: 126 }}
+                showsVerticalScrollIndicator
               >
                 {headerNode}
                 {children}
@@ -593,6 +614,45 @@ export function Card({
     >
       {children}
     </View>
+  );
+}
+
+export function PressableCard({
+  accessibilityLabel,
+  children,
+  disabled,
+  onPress,
+  tone = "default",
+}: {
+  accessibilityLabel?: string;
+  children: React.ReactNode;
+  disabled?: boolean;
+  onPress?: () => void;
+  tone?: "default" | "muted";
+}) {
+  const { theme } = usePreferences();
+
+  return (
+    <Pressable
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole={onPress ? "button" : undefined}
+      disabled={disabled || !onPress}
+      onPress={() => {
+        hapticSelection();
+        onPress?.();
+      }}
+      style={({ pressed }) => [
+        styles.card,
+        theme === "dark" && styles.cardDark,
+        tone === "muted" && styles.cardMuted,
+        theme === "dark" && tone === "muted" && styles.cardMutedDark,
+        onPress && styles.cardPressable,
+        pressed && onPress && styles.cardPressed,
+        disabled && styles.cardDisabled,
+      ]}
+    >
+      {children}
+    </Pressable>
   );
 }
 
@@ -719,7 +779,11 @@ export function Button({
       }}
       disabled={disabled || loading}
       onPress={() => {
-        pressFeedback();
+        if (tone === "danger") {
+          hapticError();
+        } else {
+          hapticSelection();
+        }
         onPress?.();
       }}
       style={({ pressed }) => [
@@ -944,10 +1008,14 @@ export function EmptyState({
 
 export function ErrorBanner({ message }: { message?: string }) {
   const { language } = usePreferences();
+  useEffect(() => {
+    if (message) hapticError();
+  }, [message]);
   if (!message) return null;
   const localizedMessage = displayLabel(message, language);
   return (
-    <View style={styles.errorBanner}>
+    <View style={styles.errorBanner} accessibilityRole="alert">
+      <AlertCircle color="#991B1B" size={18} />
       <Text
         style={[
           styles.errorBannerText,
@@ -955,6 +1023,27 @@ export function ErrorBanner({ message }: { message?: string }) {
         ]}
       >
         {localizedMessage}
+      </Text>
+    </View>
+  );
+}
+
+export function SuccessBanner({ message }: { message?: string }) {
+  const { language } = usePreferences();
+  useEffect(() => {
+    if (message) hapticSuccess();
+  }, [message]);
+  if (!message) return null;
+  return (
+    <View style={styles.successBanner} accessibilityRole="text">
+      <CheckCircle2 color="#047857" size={18} />
+      <Text
+        style={[
+          styles.successBannerText,
+          { fontFamily: language === "ar" ? fonts.arabic : fonts.body },
+        ]}
+      >
+        {displayLabel(message, language)}
       </Text>
     </View>
   );
@@ -1158,6 +1247,16 @@ const styles = StyleSheet.create({
   cardMutedDark: {
     backgroundColor: "#30203B",
   },
+  cardDisabled: {
+    opacity: 0.58,
+  },
+  cardPressable: {
+    minHeight: 64,
+  },
+  cardPressed: {
+    opacity: 0.88,
+    transform: [{ scale: 0.988 }],
+  },
   preferenceButton: {
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.10)",
@@ -1220,16 +1319,20 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   errorBanner: {
+    alignItems: "flex-start",
     backgroundColor: colors.dangerSoft,
     borderColor: "#FCA5A5",
     borderRadius: 14,
     borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
     padding: 12,
   },
   errorBannerText: {
     color: "#991B1B",
     fontFamily: fonts.body,
     fontSize: 14,
+    flex: 1,
     lineHeight: 20,
   },
   field: {
@@ -1289,6 +1392,23 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 14,
     lineHeight: 21,
+  },
+  successBanner: {
+    alignItems: "flex-start",
+    backgroundColor: colors.successSoft,
+    borderColor: "#86EFAC",
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    padding: 12,
+  },
+  successBannerText: {
+    color: "#047857",
+    flex: 1,
+    fontFamily: fonts.body,
+    fontSize: 14,
+    lineHeight: 20,
   },
   glow: {
     borderRadius: 999,

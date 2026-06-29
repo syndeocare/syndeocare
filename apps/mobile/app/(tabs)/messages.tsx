@@ -1,16 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "expo-router";
+import { useRouter } from "expo-router";
 import { ChevronRight, MessageCircle, Search } from "lucide-react-native";
 import { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
 import {
   Avatar,
-  Card,
   EmptyState,
   ErrorBanner,
   Field,
   LoadingBlock,
+  PressableCard,
   Screen,
   colors,
   useTextStyles,
@@ -22,6 +22,7 @@ import { interpolate, usePreferences, useT } from "../../src/lib/preferences";
 
 export default function MessagesScreen() {
   const t = useT();
+  const router = useRouter();
   const text = useTextStyles();
   const palette = useThemePalette();
   const { direction, language } = usePreferences();
@@ -78,82 +79,76 @@ export default function MessagesScreen() {
 
       {conversations.length ? (
         conversations.map((conversation) => (
-          <Link
-            asChild
-            href={{
-              params: {
-                id: conversation.id,
-                name: conversation.displayName,
-                role: conversation.counterpartRole,
-              },
-              pathname: "/conversation/[id]",
-            }}
+          <PressableCard
+            accessibilityLabel={`${displayLabel(conversation.displayName, language)} ${t("messages.openConversation")}`}
             key={conversation.id}
+            onPress={() =>
+              router.push({
+                params: {
+                  id: conversation.id,
+                  name: conversation.displayName,
+                  role: conversation.counterpartRole,
+                },
+                pathname: "/conversation/[id]",
+              })
+            }
+            tone={conversation.unreadCount ? "muted" : "default"}
           >
-            <Pressable>
-              <Card tone={conversation.unreadCount ? "muted" : "default"}>
-                <View
-                  style={[styles.conversationRow, isRTL && styles.rowReverse]}
-                >
-                  <View>
-                    <Avatar label={conversation.displayName} />
-                    {conversation.unreadCount ? (
-                      <View style={styles.unreadAvatarDot} />
-                    ) : null}
-                  </View>
-                  <View style={styles.grow}>
-                    <View style={[styles.row, isRTL && styles.rowReverse]}>
-                      <Text numberOfLines={1} style={[text.h2, styles.title]}>
-                        {displayLabel(conversation.displayName, language)}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.time,
-                          {
-                            color: conversation.unreadCount
-                              ? colors.primary
-                              : palette.muted,
-                          },
-                        ]}
-                      >
-                        {formatMessageTimestamp(
-                          conversation.lastMessageAt,
-                          language,
-                        )}
-                      </Text>
-                    </View>
-                    <Text style={[styles.role, { color: palette.muted }]}>
-                      {t(`roles.${conversation.counterpartRole}`)}
-                    </Text>
-                    <Text numberOfLines={2} style={text.body}>
-                      {conversation.lastMessage
-                        ? displayLabel(conversation.lastMessage, language)
-                        : t("messages.openConversation")}
-                    </Text>
-                    {conversation.unreadCount ? (
-                      <View
-                        style={[
-                          styles.unreadPill,
-                          isRTL && styles.unreadPillRtl,
-                        ]}
-                      >
-                        <Text style={styles.unreadPillText}>
-                          {interpolate(t("messages.unread"), {
-                            count: conversation.unreadCount,
-                          })}
-                        </Text>
-                      </View>
-                    ) : null}
-                  </View>
-                  <ChevronRight
-                    color={colors.accentDark}
-                    size={20}
-                    style={isRTL ? styles.chevronRtl : undefined}
-                  />
+            <View style={[styles.conversationRow, isRTL && styles.rowReverse]}>
+              <View>
+                <Avatar label={conversation.displayName} />
+                {conversation.unreadCount ? (
+                  <View style={styles.unreadAvatarDot} />
+                ) : null}
+              </View>
+              <View style={styles.grow}>
+                <View style={[styles.row, isRTL && styles.rowReverse]}>
+                  <Text numberOfLines={1} style={[text.h2, styles.title]}>
+                    {displayLabel(conversation.displayName, language)}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.time,
+                      {
+                        color: conversation.unreadCount
+                          ? colors.primary
+                          : palette.muted,
+                      },
+                    ]}
+                  >
+                    {formatMessageTimestamp(
+                      conversation.lastMessageAt,
+                      language,
+                    )}
+                  </Text>
                 </View>
-              </Card>
-            </Pressable>
-          </Link>
+                <Text style={[styles.role, { color: palette.muted }]}>
+                  {t(`roles.${conversation.counterpartRole}`)}
+                </Text>
+                <Text numberOfLines={2} style={text.body}>
+                  {conversation.lastMessage
+                    ? displayLabel(conversation.lastMessage, language)
+                    : t("messages.openConversation")}
+                </Text>
+                {conversation.unreadCount ? (
+                  <View
+                    style={[styles.unreadPill, isRTL && styles.unreadPillRtl]}
+                  >
+                    <Text style={styles.unreadPillText}>
+                      {interpolate(t("messages.unread"), {
+                        count: conversation.unreadCount,
+                      })}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+              <ChevronRight
+                color={colors.accentDark}
+                size={20}
+                style={isRTL ? styles.chevronRtl : undefined}
+              />
+            </View>
+          </PressableCard>
         ))
       ) : (
         <EmptyState

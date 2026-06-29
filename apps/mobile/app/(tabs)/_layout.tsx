@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, fonts, useThemePalette } from "../../src/components/ui";
 import { listConversations, listNotifications } from "../../src/lib/api";
 import { useAuth } from "../../src/lib/auth";
+import { hapticSelection } from "../../src/lib/haptics";
 import { syncAppBadge } from "../../src/lib/notifications";
 import { usePreferences, useT } from "../../src/lib/preferences";
 
@@ -272,6 +273,7 @@ function SyndeoTabBar({
               });
 
               if (!focused && !event.defaultPrevented) {
+                hapticSelection();
                 navigation.navigate(route.name, route.params);
               }
             }}

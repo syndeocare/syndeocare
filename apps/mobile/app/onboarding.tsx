@@ -23,6 +23,7 @@ import {
   LoadingBlock,
   Screen,
   SectionHeader,
+  SuccessBanner,
   colors,
   useTextStyles,
   useThemePalette,
@@ -474,6 +475,17 @@ export default function OnboardingScreen() {
                       : documentTypesQuery.error instanceof Error
                         ? documentTypesQuery.error.message
                         : undefined
+        }
+      />
+      <SuccessBanner
+        message={
+          saveProfileMutation.isSuccess || imageMutation.isSuccess
+            ? t("onboarding.saved")
+            : uploadMutation.isSuccess
+              ? t("onboarding.documentUploaded")
+              : submitMutation.isSuccess
+                ? t("onboarding.submitted")
+                : undefined
         }
       />
 
