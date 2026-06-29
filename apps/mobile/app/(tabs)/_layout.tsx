@@ -6,8 +6,9 @@ import {
   MessageCircle,
   User,
 } from "lucide-react-native";
+import type React from "react";
 import { useEffect } from "react";
-import { useWindowDimensions } from "react-native";
+import { StyleSheet, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors, fonts, useThemePalette } from "../../src/components/ui";
@@ -58,7 +59,7 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: isDark ? "#ffffff" : colors.primary,
+        tabBarActiveTintColor: "#ffffff",
         tabBarBadgeStyle: {
           backgroundColor: colors.danger,
           color: "#ffffff",
@@ -68,18 +69,14 @@ export default function TabsLayout() {
         },
         tabBarInactiveTintColor: palette.muted,
         tabBarHideOnKeyboard: true,
-        tabBarIconStyle: {
-          marginTop: 1,
-        },
+        tabBarIconStyle: styles.tabBarIconSlot,
         tabBarItemStyle: {
           borderRadius: compact ? 16 : 18,
           marginHorizontal: compact ? 2 : 4,
           minHeight: compact ? 46 : 50,
           paddingVertical: compact ? 3 : 4,
         },
-        tabBarActiveBackgroundColor: isDark
-          ? "rgba(161,83,172,0.30)"
-          : colors.primarySoft,
+        tabBarActiveBackgroundColor: "transparent",
         tabBarLabelStyle: {
           fontFamily: language === "ar" ? fonts.arabicBold : fonts.bodyBold,
           fontSize: compact ? 10 : 11,
@@ -113,8 +110,13 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: t("tabs.home"),
-          tabBarIcon: ({ color, size }) => (
-            <LayoutDashboard color={color} size={size} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon focused={focused}>
+              <LayoutDashboard
+                color={focused ? "#ffffff" : color}
+                size={focused ? 23 : 21}
+              />
+            </TabIcon>
           ),
         }}
       />
@@ -122,8 +124,13 @@ export default function TabsLayout() {
         name="shifts"
         options={{
           title: t("tabs.shifts"),
-          tabBarIcon: ({ color, size }) => (
-            <BriefcaseBusiness color={color} size={size} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon focused={focused}>
+              <BriefcaseBusiness
+                color={focused ? "#ffffff" : color}
+                size={focused ? 23 : 21}
+              />
+            </TabIcon>
           ),
         }}
       />
@@ -132,8 +139,13 @@ export default function TabsLayout() {
         options={{
           title: t("tabs.messages"),
           tabBarBadge: unreadMessages > 0 ? unreadMessages : undefined,
-          tabBarIcon: ({ color, size }) => (
-            <MessageCircle color={color} size={size} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon focused={focused}>
+              <MessageCircle
+                color={focused ? "#ffffff" : color}
+                size={focused ? 24 : 21}
+              />
+            </TabIcon>
           ),
         }}
       />
@@ -149,9 +161,53 @@ export default function TabsLayout() {
         name="profile"
         options={{
           title: t("tabs.profile"),
-          tabBarIcon: ({ color, size }) => <User color={color} size={size} />,
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon focused={focused}>
+              <User
+                color={focused ? "#ffffff" : color}
+                size={focused ? 23 : 21}
+              />
+            </TabIcon>
+          ),
         }}
       />
     </Tabs>
   );
 }
+
+function TabIcon({
+  children,
+  focused,
+}: {
+  children: React.ReactNode;
+  focused: boolean;
+}) {
+  return (
+    <View style={[styles.tabIcon, focused && styles.tabIconActive]}>
+      {children}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  tabBarIconSlot: {
+    marginTop: -2,
+  },
+  tabIcon: {
+    alignItems: "center",
+    borderRadius: 999,
+    height: 38,
+    justifyContent: "center",
+    width: 38,
+  },
+  tabIconActive: {
+    backgroundColor: colors.primary,
+    height: 46,
+    shadowColor: colors.primary,
+    shadowOffset: { height: 8, width: 0 },
+    shadowOpacity: 0.28,
+    shadowRadius: 14,
+    transform: [{ translateY: -5 }],
+    width: 46,
+  },
+});

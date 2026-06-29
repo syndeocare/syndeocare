@@ -6,6 +6,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  Clock,
   MapPin,
   Plus,
   Search,
@@ -121,6 +122,16 @@ function splitLocation(
     latitude: 0,
     longitude: 0,
     region: region || fallback?.region || "Yemen",
+  };
+}
+
+const MIN_HOURLY_RATE_YER = 500;
+const MAX_HOURLY_RATE_YER = 100000;
+
+function localShiftCompensation(value: Job["compensation"]) {
+  return {
+    ...value,
+    currency: value.currency === "USD" ? "YER" : value.currency,
   };
 }
 
@@ -268,6 +279,9 @@ export default function ShiftsScreen() {
       if (!Number.isFinite(amount) || amount <= 0) {
         throw new Error(t("shifts.amountInvalid"));
       }
+      if (amount < MIN_HOURLY_RATE_YER || amount > MAX_HOURLY_RATE_YER) {
+        throw new Error(t("shifts.amountRangeInvalid"));
+      }
       if (
         !shiftDraft.locationAddress.trim() &&
         !clinicProfileQuery.data?.city
@@ -290,7 +304,7 @@ export default function ShiftsScreen() {
       const input: JobCreateInput = {
         compensation: {
           amount,
-          currency: "USD",
+          currency: "YER",
           unit: "hour",
         },
         contactPreference: "in_app_chat",
@@ -632,14 +646,33 @@ export default function ShiftsScreen() {
                     </Text>
                   </View>
                   <View style={[styles.metaLine, isRTL && styles.rowReverse]}>
-                    <CalendarClock color={colors.muted} size={16} />
+                    <Clock color={colors.muted} size={16} />
                     <Text style={text.body}>
                       {formatShiftWindow(job, language)}
                     </Text>
                   </View>
-                  <Text style={text.strong}>
-                    {formatMoney(job.compensation, language)}
-                  </Text>
+                  <View
+                    style={[
+                      styles.shiftFooter,
+                      isRTL && styles.rowReverse,
+                      { borderColor: palette.border },
+                    ]}
+                  >
+                    <Text style={[styles.payText, { color: palette.text }]}>
+                      {formatMoney(
+                        localShiftCompensation(job.compensation),
+                        language,
+                      )}
+                    </Text>
+                    {job.verificationRequired ? (
+                      <View style={styles.verificationCompact}>
+                        <Check color={colors.success} size={13} />
+                        <Text style={styles.verificationCompactText}>
+                          {t("verification.approved")}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
                   <Text style={text.body}>
                     {displayLabel(job.summary, language)}
                   </Text>
@@ -823,6 +856,11 @@ export default function ShiftsScreen() {
                           }))
                         }
                         returnKeyType="next"
+                        rightIcon={
+                          <Text style={styles.currencySuffix}>
+                            {language === "ar" ? "ر.ي" : "YER"}
+                          </Text>
+                        }
                         value={shiftDraft.amount}
                       />
                     </View>
@@ -979,6 +1017,17 @@ export default function ShiftsScreen() {
                     <ReviewRow
                       label={t("shifts.endsAt")}
                       value={`${shiftDraft.shiftDate} ${shiftDraft.endTime}`}
+                    />
+                    <ReviewRow
+                      label={t("shifts.hourlyRate")}
+                      value={formatMoney(
+                        {
+                          amount: Number(shiftDraft.amount) || 0,
+                          currency: "YER",
+                          unit: "hour",
+                        },
+                        language,
+                      )}
                     />
                     <ReviewRow
                       label={t("shifts.location")}
@@ -1388,6 +1437,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 12,
   },
+  currencySuffix: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: "900",
+  },
   dateField: {
     flex: 1,
     gap: 7,
@@ -1541,9 +1595,35 @@ const styles = StyleSheet.create({
     gap: 8,
     justifyContent: "center",
   },
+  payText: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "900",
+  },
+  shiftFooter: {
+    alignItems: "center",
+    borderTopWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    paddingTop: 10,
+  },
   twoColumn: {
     flexDirection: "row",
     gap: 10,
+  },
+  verificationCompact: {
+    alignItems: "center",
+    backgroundColor: colors.successSoft,
+    borderRadius: 999,
+    flexDirection: "row",
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+  },
+  verificationCompactText: {
+    color: colors.success,
+    fontSize: 11,
+    fontWeight: "900",
   },
   weekdayGrid: {
     flexDirection: "row",

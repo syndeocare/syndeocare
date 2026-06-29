@@ -403,6 +403,7 @@ export function Screen({
   onRefresh,
   refreshing,
   scrollable = true,
+  showHeader = true,
   subtitle,
   title,
   tone = "app",
@@ -412,6 +413,7 @@ export function Screen({
   onRefresh?: () => void;
   refreshing?: boolean;
   scrollable?: boolean;
+  showHeader?: boolean;
   subtitle?: string;
   title?: string;
   tone?: ScreenTone;
@@ -464,52 +466,53 @@ export function Screen({
     },
     direction === "rtl" && styles.rtlContent,
   ];
-  const headerNode = title ? (
-    <View
-      style={[
-        styles.screenHeader,
-        {
-          backgroundColor: onDark
-            ? "rgba(32,22,42,0.72)"
-            : "rgba(255,255,255,0.82)",
-          borderColor: onDark
-            ? "rgba(255,255,255,0.10)"
-            : "rgba(86,132,154,0.16)",
-          shadowColor: palette.shadow,
-        },
-      ]}
-    >
+  const headerNode =
+    showHeader && title ? (
       <View
         style={[
-          styles.screenHeaderTop,
-          direction === "rtl" && styles.rowReverse,
+          styles.screenHeader,
+          {
+            backgroundColor: onDark
+              ? "rgba(32,22,42,0.72)"
+              : "rgba(255,255,255,0.82)",
+            borderColor: onDark
+              ? "rgba(255,255,255,0.10)"
+              : "rgba(86,132,154,0.16)",
+            shadowColor: palette.shadow,
+          },
         ]}
       >
-        <BrandLockup compact onDark={onDark} />
-        {!isAuth ? headerEnd : null}
-      </View>
-      <Text
-        style={[
-          styles.screenTitle,
-          { color: onDark ? "#ffffff" : palette.text },
-          direction === "rtl" && styles.textRight,
-        ]}
-      >
-        {title}
-      </Text>
-      {subtitle ? (
+        <View
+          style={[
+            styles.screenHeaderTop,
+            direction === "rtl" && styles.rowReverse,
+          ]}
+        >
+          <BrandLockup compact onDark={onDark} />
+          {!isAuth ? headerEnd : null}
+        </View>
         <Text
           style={[
-            styles.screenSubtitle,
-            { color: onDark ? colors.darkMuted : palette.muted },
+            styles.screenTitle,
+            { color: onDark ? "#ffffff" : palette.text },
             direction === "rtl" && styles.textRight,
           ]}
         >
-          {subtitle}
+          {title}
         </Text>
-      ) : null}
-    </View>
-  ) : null;
+        {subtitle ? (
+          <Text
+            style={[
+              styles.screenSubtitle,
+              { color: onDark ? colors.darkMuted : palette.muted },
+              direction === "rtl" && styles.textRight,
+            ]}
+          >
+            {subtitle}
+          </Text>
+        ) : null}
+      </View>
+    ) : null;
 
   return (
     <LinearGradient
@@ -645,6 +648,7 @@ export function Avatar({
         accessibilityIgnoresInvertColors
         source={{ uri }}
         style={[
+          styles.avatar,
           styles.avatarImage,
           {
             borderColor: palette.border,
@@ -660,6 +664,7 @@ export function Avatar({
   return (
     <View
       style={[
+        styles.avatar,
         styles.avatarFallback,
         {
           backgroundColor: palette.surfaceMuted,
@@ -1007,6 +1012,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1,
     justifyContent: "center",
+  },
+  avatar: {
+    shadowColor: "rgba(86, 132, 154, 0.35)",
+    shadowOffset: { height: 8, width: 0 },
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
   },
   avatarFallbackText: {
     color: colors.primaryDark,

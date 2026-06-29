@@ -205,17 +205,44 @@ export function formatTime(value: string, language: AppLanguage) {
   }).format(date);
 }
 
+export function formatMessageTimestamp(value: string, language: AppLanguage) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const locale = language === "ar" ? "ar-YE" : "en";
+  const now = new Date();
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  const startOfMessageDay = new Date(date);
+  startOfMessageDay.setHours(0, 0, 0, 0);
+  const dayDelta =
+    (startOfToday.getTime() - startOfMessageDay.getTime()) /
+    (24 * 60 * 60 * 1000);
+  const time = formatTime(value, language);
+
+  if (dayDelta === 0) return time;
+  if (dayDelta === 1) {
+    return language === "ar" ? `أمس ${time}` : `Yesterday ${time}`;
+  }
+
+  const options: Intl.DateTimeFormatOptions =
+    date.getFullYear() === now.getFullYear()
+      ? { day: "numeric", month: "short" }
+      : { day: "numeric", month: "short", year: "numeric" };
+
+  return `${new Intl.DateTimeFormat(locale, options).format(date)} ${time}`;
+}
+
 export function formatMoney(value: Money, language: AppLanguage) {
   const locale = language === "ar" ? "ar-YE" : "en";
   const amount = new Intl.NumberFormat(locale, {
     maximumFractionDigits: 0,
   }).format(value.amount);
-  const currency =
-    language === "ar"
-      ? value.currency === "USD"
-        ? "دولار"
-        : value.currency
-      : value.currency;
+  const currencyLabels: Record<string, { ar: string; en: string }> = {
+    USD: { ar: "دولار", en: "USD" },
+    YER: { ar: "ر.ي", en: "YER" },
+  };
+  const currency = currencyLabels[value.currency]?.[language] ?? value.currency;
   const unit =
     language === "ar"
       ? {

@@ -4,10 +4,12 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import {
   ArrowLeft,
   ArrowRight,
+  Film,
   FileText,
   Image as ImageIcon,
   MessageCircle,
   Paperclip,
+  PlayCircle,
   Send,
   X,
 } from "lucide-react-native";
@@ -37,7 +39,6 @@ import {
   useTextStyles,
   useThemePalette,
 } from "../../src/components/ui";
-import { AppHeaderActions } from "../../src/components/AppHeaderActions";
 import {
   getChatMediaAccessUrl,
   listMessages,
@@ -62,6 +63,24 @@ function isPdfAttachment(asset: DocumentPicker.DocumentPickerAsset) {
   return (
     asset.mimeType === "application/pdf" ||
     asset.name.toLowerCase().endsWith(".pdf")
+  );
+}
+
+function isVideoAttachment(asset: DocumentPicker.DocumentPickerAsset) {
+  return asset.mimeType?.startsWith("video/") ?? false;
+}
+
+function isImageFile(fileType?: null | string, fileName?: null | string) {
+  return (
+    fileType?.startsWith("image/") ||
+    /\.(gif|jpe?g|png|webp)$/i.test(fileName ?? "")
+  );
+}
+
+function isVideoFile(fileType?: null | string, fileName?: null | string) {
+  return (
+    fileType?.startsWith("video/") ||
+    /\.(mov|mp4|m4v|webm)$/i.test(fileName ?? "")
   );
 }
 
@@ -184,7 +203,7 @@ export default function ConversationScreen() {
     const picked = await DocumentPicker.getDocumentAsync({
       copyToCacheDirectory: true,
       multiple: false,
-      type: ["application/pdf", "image/*"],
+      type: ["application/pdf", "image/*", "video/*"],
     });
 
     if (!picked.canceled && picked.assets[0]) {
@@ -281,28 +300,21 @@ export default function ConversationScreen() {
             </Text>
           ) : null}
           {message.fileName ? (
-            <Pressable
-              disabled={!message.fileUrl || accessMutation.isPending}
-              onPress={() =>
+            <MessageAttachmentPreview
+              conversationId={id}
+              direction={direction}
+              fileName={message.fileName}
+              fileSize={message.fileSize}
+              fileType={message.fileType}
+              fileUrl={message.fileUrl}
+              isMine={isMine}
+              language={language}
+              onOpen={() =>
                 message.fileUrl ? accessMutation.mutate(message.fileUrl) : null
               }
-              style={[styles.fileRow, isRTL && styles.rowReverse]}
-            >
-              <FileText
-                color={
-                  isMine && theme === "dark" ? "#ffffff" : colors.primaryDark
-                }
-                size={16}
-              />
-              <Text
-                style={[
-                  styles.file,
-                  isMine && theme === "dark" && styles.fileMine,
-                ]}
-              >
-                {t("conversation.attachment")} {message.fileName}
-              </Text>
-            </Pressable>
+              palette={palette}
+              theme={theme}
+            />
           ) : null}
         </View>
       </View>
@@ -313,9 +325,9 @@ export default function ConversationScreen() {
     <>
       <Stack.Screen options={{ headerShown: false }} />
       <Screen
-        headerEnd={<AppHeaderActions />}
         onRefresh={() => void messagesQuery.refetch()}
         refreshing={messagesQuery.isFetching}
+        showHeader={false}
         subtitle={
           typeof role === "string"
             ? t(`roles.${role}`)
@@ -538,12 +550,15 @@ function AttachmentPreview({
   const isRTL = direction === "rtl";
   const isImage = isImageAttachment(attachment);
   const isPdf = isPdfAttachment(attachment);
+  const isVideo = isVideoAttachment(attachment);
   const fileSize = formatAttachmentSize(attachment.size);
   const typeLabel = isImage
     ? t("conversation.imagePreview")
-    : isPdf
-      ? t("conversation.pdfPreview")
-      : t("conversation.filePreview");
+    : isVideo
+      ? t("conversation.videoPreview")
+      : isPdf
+        ? t("conversation.pdfPreview")
+        : t("conversation.filePreview");
 
   return (
     <View
@@ -559,6 +574,10 @@ function AttachmentPreview({
           source={{ uri: attachment.uri }}
           style={styles.attachmentImage}
         />
+      ) : isVideo ? (
+        <View style={styles.attachmentVideoPreview}>
+          <PlayCircle color="#ffffff" size={30} />
+        </View>
       ) : (
         <View
           style={[
@@ -619,6 +638,144 @@ function AttachmentPreview({
   );
 }
 
+function MessageAttachmentPreview({
+  conversationId,
+  direction,
+  fileName,
+  fileSize,
+  fileType,
+  fileUrl,
+  isMine,
+  language,
+  onOpen,
+  palette,
+  theme,
+}: {
+  conversationId: string;
+  direction: "ltr" | "rtl";
+  fileName: string;
+  fileSize?: null | number;
+  fileType?: null | string;
+  fileUrl?: null | string;
+  isMine: boolean;
+  language: "ar" | "en";
+  onOpen: () => void;
+  palette: ReturnType<typeof useThemePalette>;
+  theme: "dark" | "light";
+}) {
+  const t = useT();
+  const isRTL = direction === "rtl";
+  const isImage = isImageFile(fileType, fileName);
+  const isVideo = isVideoFile(fileType, fileName);
+  const accessQuery = useQuery({
+    enabled: Boolean(fileUrl && (isImage || isVideo)),
+    queryFn: () => getChatMediaAccessUrl(conversationId, fileUrl as string),
+    queryKey: ["chat-media-preview", conversationId, fileUrl],
+    staleTime: 4 * 60 * 1000,
+  });
+  const signedUrl = accessQuery.data?.signedUrl;
+  const fileColor = isMine && theme === "dark" ? "#ffffff" : colors.primaryDark;
+  const metaColor = isMine && theme === "dark" ? "#F2EAF5" : palette.muted;
+  const fileSizeLabel = formatAttachmentSize(fileSize);
+  const typeLabel = isImage
+    ? t("conversation.imageAttachment")
+    : isVideo
+      ? t("conversation.videoAttachment")
+      : t("conversation.fileAttachment");
+
+  if (isImage && signedUrl) {
+    return (
+      <Pressable
+        accessibilityRole="imagebutton"
+        onPress={onOpen}
+        style={({ pressed }) => [
+          styles.mediaPreview,
+          pressed && styles.pressed,
+        ]}
+      >
+        <Image
+          accessibilityIgnoresInvertColors
+          resizeMode="cover"
+          source={{ uri: signedUrl }}
+          style={styles.messageImage}
+        />
+      </Pressable>
+    );
+  }
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      disabled={!fileUrl}
+      onPress={onOpen}
+      style={({ pressed }) => [
+        styles.mediaCard,
+        {
+          backgroundColor:
+            isMine && theme === "dark"
+              ? "rgba(255,255,255,0.12)"
+              : palette.surfaceMuted,
+          borderColor: isMine ? "rgba(255,255,255,0.16)" : palette.border,
+        },
+        pressed && styles.pressed,
+      ]}
+    >
+      <View
+        style={[
+          styles.mediaHero,
+          {
+            backgroundColor: isVideo
+              ? "rgba(102,60,109,0.88)"
+              : "rgba(86,132,154,0.14)",
+          },
+        ]}
+      >
+        {isVideo ? (
+          <PlayCircle color="#ffffff" size={38} />
+        ) : isImage ? (
+          <ImageIcon color={fileColor} size={34} />
+        ) : (
+          <FileText color={fileColor} size={34} />
+        )}
+      </View>
+      <View style={[styles.mediaMeta, isRTL && styles.rowReverse]}>
+        {isVideo ? (
+          <Film color={fileColor} size={16} />
+        ) : isImage ? (
+          <ImageIcon color={fileColor} size={16} />
+        ) : (
+          <FileText color={fileColor} size={16} />
+        )}
+        <View style={styles.mediaMetaText}>
+          <Text
+            numberOfLines={1}
+            style={[
+              styles.file,
+              { color: fileColor },
+              language === "ar" && { fontFamily: fonts.arabicBold },
+            ]}
+          >
+            {displayLabel(fileName, language)}
+          </Text>
+          <Text
+            numberOfLines={1}
+            style={[
+              styles.mediaType,
+              {
+                color: metaColor,
+                textAlign: isRTL ? "right" : "left",
+                writingDirection: direction,
+              },
+            ]}
+          >
+            {fileSizeLabel ? `${typeLabel} · ${fileSizeLabel}` : typeLabel}
+          </Text>
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   attachmentIconPreview: {
     alignItems: "center",
@@ -630,8 +787,8 @@ const styles = StyleSheet.create({
   attachmentImage: {
     backgroundColor: colors.panelSoft,
     borderRadius: 16,
-    height: 62,
-    width: 62,
+    height: 78,
+    width: 78,
   },
   attachmentMeta: {
     flex: 1,
@@ -647,6 +804,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 12,
     padding: 10,
+  },
+  attachmentVideoPreview: {
+    alignItems: "center",
+    backgroundColor: colors.primary,
+    borderRadius: 16,
+    height: 78,
+    justifyContent: "center",
+    width: 78,
   },
   attachmentType: {
     fontSize: 13,
@@ -700,14 +865,6 @@ const styles = StyleSheet.create({
   file: {
     color: colors.primaryDark,
     fontWeight: "800",
-  },
-  fileMine: {
-    color: "#ffffff",
-  },
-  fileRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 6,
   },
   messageBubble: {
     borderRadius: 18,
@@ -799,5 +956,43 @@ const styles = StyleSheet.create({
   messageListEmpty: {
     flexGrow: 1,
     justifyContent: "center",
+  },
+  mediaCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 8,
+    overflow: "hidden",
+    width: 244,
+  },
+  mediaHero: {
+    alignItems: "center",
+    height: 132,
+    justifyContent: "center",
+    width: "100%",
+  },
+  mediaMeta: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+    paddingBottom: 10,
+    paddingHorizontal: 10,
+  },
+  mediaMetaText: {
+    flex: 1,
+    gap: 2,
+  },
+  mediaPreview: {
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  mediaType: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  messageImage: {
+    backgroundColor: colors.panelSoft,
+    borderRadius: 16,
+    height: 172,
+    width: 244,
   },
 });

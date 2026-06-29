@@ -6,7 +6,6 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import {
   Avatar,
-  Badge,
   Card,
   EmptyState,
   ErrorBanner,
@@ -17,9 +16,8 @@ import {
   useTextStyles,
   useThemePalette,
 } from "../../src/components/ui";
-import { AppHeaderActions } from "../../src/components/AppHeaderActions";
 import { listConversations } from "../../src/lib/api";
-import { displayLabel, formatTime } from "../../src/lib/format";
+import { displayLabel, formatMessageTimestamp } from "../../src/lib/format";
 import { interpolate, usePreferences, useT } from "../../src/lib/preferences";
 
 export default function MessagesScreen() {
@@ -54,9 +52,9 @@ export default function MessagesScreen() {
 
   return (
     <Screen
-      headerEnd={<AppHeaderActions />}
       onRefresh={() => void conversationsQuery.refetch()}
       refreshing={conversationsQuery.isFetching}
+      showHeader={false}
       title={t("messages.title")}
     >
       {conversationsQuery.isLoading && !conversationsQuery.data ? (
@@ -97,14 +95,31 @@ export default function MessagesScreen() {
                 <View
                   style={[styles.conversationRow, isRTL && styles.rowReverse]}
                 >
-                  <Avatar label={conversation.displayName} />
+                  <View>
+                    <Avatar label={conversation.displayName} />
+                    {conversation.unreadCount ? (
+                      <View style={styles.unreadAvatarDot} />
+                    ) : null}
+                  </View>
                   <View style={styles.grow}>
                     <View style={[styles.row, isRTL && styles.rowReverse]}>
                       <Text numberOfLines={1} style={[text.h2, styles.title]}>
                         {displayLabel(conversation.displayName, language)}
                       </Text>
-                      <Text style={[styles.time, { color: palette.muted }]}>
-                        {formatTime(conversation.lastMessageAt, language)}
+                      <Text
+                        style={[
+                          styles.time,
+                          {
+                            color: conversation.unreadCount
+                              ? colors.primary
+                              : palette.muted,
+                          },
+                        ]}
+                      >
+                        {formatMessageTimestamp(
+                          conversation.lastMessageAt,
+                          language,
+                        )}
                       </Text>
                     </View>
                     <Text style={[styles.role, { color: palette.muted }]}>
@@ -116,12 +131,17 @@ export default function MessagesScreen() {
                         : t("messages.openConversation")}
                     </Text>
                     {conversation.unreadCount ? (
-                      <View style={styles.unreadLine}>
-                        <Badge tone="warning">
+                      <View
+                        style={[
+                          styles.unreadPill,
+                          isRTL && styles.unreadPillRtl,
+                        ]}
+                      >
+                        <Text style={styles.unreadPillText}>
                           {interpolate(t("messages.unread"), {
                             count: conversation.unreadCount,
                           })}
-                        </Badge>
+                        </Text>
                       </View>
                     ) : null}
                   </View>
@@ -183,12 +203,36 @@ const styles = StyleSheet.create({
   },
   time: {
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "900",
   },
   title: {
     flex: 1,
   },
-  unreadLine: {
+  unreadAvatarDot: {
+    backgroundColor: colors.danger,
+    borderColor: "#ffffff",
+    borderRadius: 999,
+    borderWidth: 2,
+    bottom: 1,
+    height: 14,
+    position: "absolute",
+    right: 1,
+    width: 14,
+  },
+  unreadPill: {
     alignItems: "flex-start",
+    alignSelf: "flex-start",
+    backgroundColor: colors.warningSoft,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  unreadPillRtl: {
+    alignSelf: "flex-end",
+  },
+  unreadPillText: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: "900",
   },
 });
