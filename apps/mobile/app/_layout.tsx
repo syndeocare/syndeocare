@@ -36,7 +36,8 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    I18nManager.allowRTL(true);
+    I18nManager.allowRTL(false);
+    I18nManager.swapLeftAndRightInRTL(false);
     if (fontsLoaded) {
       void SplashScreen.hideAsync();
     }

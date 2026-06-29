@@ -745,7 +745,8 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   const theme = resolveTheme(themePreference, systemScheme);
 
   useEffect(() => {
-    I18nManager.allowRTL(true);
+    I18nManager.allowRTL(false);
+    I18nManager.swapLeftAndRightInRTL(false);
     void loadPreferences().then((stored) => {
       if (
         stored.language === "ar" ||

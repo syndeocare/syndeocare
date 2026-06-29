@@ -449,22 +449,22 @@ export function Screen({
   }, []);
   const contentStyle = [
     styles.scroll,
+    styles.stableLayoutDirection,
     {
       maxWidth: contentMaxWidth,
       paddingHorizontal: horizontalPadding,
       width: "100%" as const,
     },
     isAuth && styles.authScroll,
-    direction === "rtl" && styles.rtlContent,
   ];
   const staticContentStyle = [
     styles.staticContent,
+    styles.stableLayoutDirection,
     {
       maxWidth: contentMaxWidth,
       paddingHorizontal: horizontalPadding,
       width: "100%" as const,
     },
-    direction === "rtl" && styles.rtlContent,
   ];
   const headerNode =
     showHeader && title ? (
@@ -1313,8 +1313,8 @@ const styles = StyleSheet.create({
   rowReverse: {
     flexDirection: "row-reverse",
   },
-  rtlContent: {
-    direction: "rtl",
+  stableLayoutDirection: {
+    direction: "ltr",
   },
   safe: {
     flex: 1,
