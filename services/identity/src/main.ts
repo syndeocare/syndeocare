@@ -201,6 +201,31 @@ interface KeycloakAuthenticationExecution {
   level?: number;
 }
 
+interface KeycloakClientRepresentation {
+  id?: string;
+  clientId?: string;
+  defaultClientScopes?: string[];
+  directAccessGrantsEnabled?: boolean;
+  enabled?: boolean;
+  name?: string;
+  protocol?: string;
+  publicClient?: boolean;
+  redirectUris?: string[];
+  standardFlowEnabled?: boolean;
+  webOrigins?: string[];
+}
+
+function parseCsvEnv(value: string | undefined) {
+  return (value ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function uniqueStrings(values: string[]) {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
 async function getKeycloakAuthenticationExecutions(
   adminAccessToken: string,
   flowAlias: string,
@@ -768,6 +793,7 @@ async function ensureGoogleIdentityProvider() {
 
   const config = getKeycloakConfig();
   const adminAccessToken = await getAdminAccessToken();
+  await ensureKeycloakOAuthClients(adminAccessToken);
   await ensureKeycloakFirstBrokerAutoLink(adminAccessToken);
   const identityProvider = {
     addReadTokenRoleOnCreate: false,
@@ -1108,6 +1134,125 @@ async function getAdminAccessToken() {
   }
 
   return keycloakAdminResponseSchema.parse(payload).access_token;
+}
+
+async function findKeycloakClient(adminAccessToken: string, clientId: string) {
+  const config = getKeycloakConfig();
+  const response = await fetch(
+    `${config.baseUrl}/admin/realms/${config.realm}/clients?clientId=${encodeURIComponent(clientId)}`,
+    {
+      headers: {
+        authorization: `Bearer ${adminAccessToken}`,
+      },
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Keycloak client ${clientId} lookup failed.`);
+  }
+
+  const clients = (await response.json()) as KeycloakClientRepresentation[];
+  return clients.find((client) => client.clientId === clientId) ?? null;
+}
+
+async function upsertKeycloakPublicClient(
+  adminAccessToken: string,
+  input: {
+    clientId: string;
+    name: string;
+    redirectUris: string[];
+    webOrigins?: string[];
+  },
+) {
+  const config = getKeycloakConfig();
+  const existing = await findKeycloakClient(adminAccessToken, input.clientId);
+  const next: KeycloakClientRepresentation = {
+    ...(existing ?? {}),
+    clientId: input.clientId,
+    defaultClientScopes: uniqueStrings([
+      ...((existing?.defaultClientScopes ?? []).length
+        ? (existing?.defaultClientScopes ?? [])
+        : ["profile", "email", "roles"]),
+    ]),
+    directAccessGrantsEnabled: true,
+    enabled: true,
+    name: existing?.name ?? input.name,
+    protocol: "openid-connect",
+    publicClient: true,
+    redirectUris: uniqueStrings([
+      ...(existing?.redirectUris ?? []),
+      ...input.redirectUris,
+    ]),
+    standardFlowEnabled: true,
+    webOrigins: uniqueStrings([
+      ...(existing?.webOrigins ?? []),
+      ...(input.webOrigins ?? []),
+    ]),
+  };
+
+  const response = await fetch(
+    existing?.id
+      ? `${config.baseUrl}/admin/realms/${config.realm}/clients/${encodeURIComponent(existing.id)}`
+      : `${config.baseUrl}/admin/realms/${config.realm}/clients`,
+    {
+      method: existing?.id ? "PUT" : "POST",
+      headers: {
+        authorization: `Bearer ${adminAccessToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(next),
+    },
+  );
+
+  if (!response.ok && response.status !== 409) {
+    throw new Error(`Keycloak client ${input.clientId} update failed.`);
+  }
+}
+
+async function ensureKeycloakOAuthClients(adminAccessToken: string) {
+  const webRedirectUris = uniqueStrings([
+    "http://localhost:3000/*",
+    "http://127.0.0.1:3000/*",
+    "http://localhost:8080/*",
+    "http://127.0.0.1:8080/*",
+    "http://localhost:8081/*",
+    "http://127.0.0.1:8081/*",
+    "https://syndeocare.ai/*",
+    "https://www.syndeocare.ai/*",
+    ...parseCsvEnv(process.env.KEYCLOAK_WEB_REDIRECT_URIS),
+  ]);
+  const webOrigins = uniqueStrings([
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:8080",
+    "http://127.0.0.1:8080",
+    "http://localhost:8081",
+    "http://127.0.0.1:8081",
+    "https://syndeocare.ai",
+    "https://www.syndeocare.ai",
+    ...parseCsvEnv(process.env.KEYCLOAK_WEB_ORIGINS),
+  ]);
+  const mobileRedirectUris = uniqueStrings([
+    "syndeocare://*",
+    "exp://*",
+    "exp+syndeocareapp-kwuout9l1nnlql9sziyun://*",
+    "http://localhost:8081/*",
+    "http://127.0.0.1:8081/*",
+    "https://auth.expo.io/*",
+    ...parseCsvEnv(process.env.KEYCLOAK_MOBILE_REDIRECT_URIS),
+  ]);
+
+  await upsertKeycloakPublicClient(adminAccessToken, {
+    clientId: "syndeocare-web",
+    name: "Syndeocare Web",
+    redirectUris: webRedirectUris,
+    webOrigins,
+  });
+  await upsertKeycloakPublicClient(adminAccessToken, {
+    clientId: "syndeocare-mobile",
+    name: "Syndeocare Mobile",
+    redirectUris: mobileRedirectUris,
+  });
 }
 
 async function getKeycloakUser(adminAccessToken: string, userId: string) {
