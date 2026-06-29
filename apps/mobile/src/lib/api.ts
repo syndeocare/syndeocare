@@ -27,6 +27,7 @@ import type {
   TokenSet,
   UploadDescriptor,
   UserRole,
+  VerificationStatus,
 } from "../types";
 
 const SESSION_KEY = "syndeocare.mobile.session";
@@ -117,6 +118,7 @@ async function deleteStoredValue(key: string) {
 
 function compactPrincipal(principal: Principal): Principal {
   return {
+    actorId: principal.actorId,
     clinicId: principal.clinicId,
     displayName: principal.displayName,
     email: principal.email,
@@ -680,5 +682,15 @@ export const updateMyClinicProfile = (input: ClinicProfileUpdateInput) =>
     body: JSON.stringify(input),
     method: "PATCH",
   });
-export const listProfessionals = () =>
-  apiRequest<ApiList<ProfessionalProfile>>("/profiles");
+export const listProfessionals = (filters?: {
+  verificationStatus?: VerificationStatus;
+}) => {
+  const params = new URLSearchParams();
+  if (filters?.verificationStatus) {
+    params.set("verificationStatus", filters.verificationStatus);
+  }
+
+  return apiRequest<ApiList<ProfessionalProfile>>(
+    `/profiles${params.size ? `?${params.toString()}` : ""}`,
+  );
+};

@@ -3,18 +3,24 @@ import * as DocumentPicker from "expo-document-picker";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { MessageCircle, Paperclip, Send } from "lucide-react-native";
 import { useMemo, useState } from "react";
-import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Linking,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 
 import {
   Avatar,
-  Button,
   Card,
   EmptyState,
   ErrorBanner,
-  Field,
   LoadingBlock,
   Screen,
   colors,
+  fonts,
   useTextStyles,
   useThemePalette,
 } from "../../src/components/ui";
@@ -39,7 +45,7 @@ export default function ConversationScreen() {
   const t = useT();
   const text = useTextStyles();
   const palette = useThemePalette();
-  const { direction, theme } = usePreferences();
+  const { direction, language, theme } = usePreferences();
   const { session } = useAuth();
   const isRTL = direction === "rtl";
   const [content, setContent] = useState("");
@@ -60,10 +66,25 @@ export default function ConversationScreen() {
       ),
     [messagesQuery.data?.items],
   );
+  const currentActorId = session?.principal.actorId;
+  const currentProfileId =
+    session?.principal.role === "professional"
+      ? session.principal.profileId
+      : session?.principal.role === "clinic"
+        ? session.principal.clinicId
+        : undefined;
   const currentRole = session?.principal.role;
-  const counterpart = messages.find(
-    (message) => message.senderRole !== currentRole,
-  );
+  const isOwnMessage = (message: (typeof messages)[number]) => {
+    if (currentActorId && message.senderActorId === currentActorId) return true;
+    if (currentProfileId && message.senderActorId === currentProfileId) {
+      return true;
+    }
+    if (message.senderActorId === session?.principal.sub) return true;
+    return (
+      !currentActorId && !currentProfileId && message.senderRole === currentRole
+    );
+  };
+  const counterpart = messages.find((message) => !isOwnMessage(message));
   const counterpartLabel =
     typeof name === "string" && name.trim()
       ? name
@@ -157,7 +178,7 @@ export default function ConversationScreen() {
 
         {messages.length ? (
           messages.map((message, index) => {
-            const isMine = message.senderRole === currentRole;
+            const isMine = isOwnMessage(message);
             const previous = messages[index - 1];
             const currentDate = new Date(message.createdAt).toDateString();
             const previousDate = previous
@@ -177,6 +198,9 @@ export default function ConversationScreen() {
                 <View
                   style={[
                     styles.messageBubble,
+                    isMine
+                      ? styles.messageBubbleMine
+                      : styles.messageBubbleOther,
                     {
                       alignSelf: isMine ? "flex-end" : "flex-start",
                       backgroundColor:
@@ -192,7 +216,9 @@ export default function ConversationScreen() {
                   <View
                     style={[styles.messageHeader, isRTL && styles.rowReverse]}
                   >
-                    <Text style={text.strong}>
+                    <Text
+                      style={[text.strong, isMine && styles.messageSenderMine]}
+                    >
                       {isMine
                         ? t("conversation.you")
                         : t(`roles.${message.senderRole}`)}
@@ -205,7 +231,15 @@ export default function ConversationScreen() {
                     </Text>
                   </View>
                   {message.content ? (
-                    <Text style={text.body}>{message.content}</Text>
+                    <Text
+                      style={[
+                        text.body,
+                        styles.messageText,
+                        isMine && styles.messageTextMine,
+                      ]}
+                    >
+                      {message.content}
+                    </Text>
                   ) : null}
                   {message.fileName ? (
                     <Pressable
@@ -234,36 +268,100 @@ export default function ConversationScreen() {
           />
         )}
 
-        <Card>
+        <Card tone="muted">
           <View style={[styles.composerTitle, isRTL && styles.rowReverse]}>
-            <Send color={colors.primary} size={18} />
-            <Text style={text.strong}>{t("conversation.composerTitle")}</Text>
+            <View
+              style={[
+                styles.composerTitleIcon,
+                { borderColor: palette.border },
+              ]}
+            >
+              <Send color={colors.primary} size={17} />
+            </View>
+            <View style={styles.grow}>
+              <Text style={text.strong}>{t("conversation.composerTitle")}</Text>
+              <Text style={text.body}>{t("conversation.composerHint")}</Text>
+            </View>
           </View>
-          <Field
-            label={t("conversation.message")}
-            multiline
-            onChangeText={setContent}
-            returnKeyType="default"
-            value={content}
-          />
           {attachment ? (
-            <View style={styles.attachmentRow}>
+            <View
+              style={[
+                styles.attachmentRow,
+                {
+                  backgroundColor: palette.surface,
+                  borderColor: palette.border,
+                },
+                isRTL && styles.rowReverse,
+              ]}
+            >
               <Text style={text.body}>{attachment.name}</Text>
               <Pressable onPress={() => setAttachment(null)}>
                 <Text style={styles.file}>{t("conversation.removeFile")}</Text>
               </Pressable>
             </View>
           ) : null}
-          <Button onPress={pickAttachment} tone="secondary">
-            {t("conversation.attachFile")}
-          </Button>
-          <Button
-            disabled={content.trim().length === 0 && !attachment}
-            loading={sendMutation.isPending}
-            onPress={() => sendMutation.mutate()}
+          <View
+            style={[
+              styles.composer,
+              {
+                backgroundColor: palette.input,
+                borderColor: palette.border,
+              },
+              isRTL && styles.rowReverse,
+            ]}
           >
-            {t("conversation.send")}
-          </Button>
+            <Pressable
+              accessibilityLabel={t("conversation.attachFile")}
+              accessibilityRole="button"
+              disabled={sendMutation.isPending}
+              hitSlop={8}
+              onPress={pickAttachment}
+              style={({ pressed }) => [
+                styles.composerIconButton,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Paperclip color={colors.primary} size={20} />
+            </Pressable>
+            <Pressable style={styles.composerInputShell}>
+              <TextInput
+                accessibilityLabel={t("conversation.message")}
+                multiline
+                onChangeText={setContent}
+                placeholder={t("conversation.messagePlaceholder")}
+                placeholderTextColor={palette.placeholder}
+                style={[
+                  styles.composerInput,
+                  {
+                    color: palette.text,
+                    fontFamily: language === "ar" ? fonts.arabic : fonts.body,
+                    textAlign: isRTL ? "right" : "left",
+                    writingDirection: direction,
+                  },
+                ]}
+                value={content}
+              />
+            </Pressable>
+            <Pressable
+              accessibilityLabel={t("conversation.send")}
+              accessibilityRole="button"
+              disabled={
+                sendMutation.isPending ||
+                (content.trim().length === 0 && !attachment)
+              }
+              onPress={() => sendMutation.mutate()}
+              style={({ pressed }) => [
+                styles.sendButton,
+                {
+                  opacity:
+                    content.trim().length === 0 && !attachment ? 0.48 : 1,
+                },
+                pressed && styles.pressed,
+              ]}
+            >
+              <Send color="#ffffff" size={18} />
+            </Pressable>
+          </View>
         </Card>
       </Screen>
     </>
@@ -273,13 +371,47 @@ export default function ConversationScreen() {
 const styles = StyleSheet.create({
   attachmentRow: {
     alignItems: "center",
-    borderColor: colors.border,
     borderRadius: 14,
     borderWidth: 1,
     flexDirection: "row",
     gap: 10,
     justifyContent: "space-between",
     padding: 12,
+  },
+  composer: {
+    alignItems: "flex-end",
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 8,
+    padding: 8,
+  },
+  composerIconButton: {
+    alignItems: "center",
+    borderRadius: 999,
+    height: 42,
+    justifyContent: "center",
+    width: 42,
+  },
+  composerInput: {
+    fontSize: 16,
+    lineHeight: 22,
+    maxHeight: 128,
+    minHeight: 42,
+    paddingBottom: 9,
+    paddingHorizontal: 2,
+    paddingTop: 9,
+  },
+  composerInputShell: {
+    flex: 1,
+  },
+  composerTitleIcon: {
+    alignItems: "center",
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 36,
+    justifyContent: "center",
+    width: 36,
   },
   file: {
     color: colors.primaryDark,
@@ -291,11 +423,26 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   messageBubble: {
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 1,
     gap: 8,
-    maxWidth: "88%",
+    maxWidth: "86%",
     padding: 14,
+  },
+  messageBubbleMine: {
+    borderBottomEndRadius: 6,
+  },
+  messageBubbleOther: {
+    borderBottomStartRadius: 6,
+  },
+  messageSenderMine: {
+    color: colors.primaryDark,
+  },
+  messageText: {
+    fontSize: 15,
+  },
+  messageTextMine: {
+    color: colors.text,
   },
   composerTitle: {
     alignItems: "center",
@@ -334,6 +481,18 @@ const styles = StyleSheet.create({
   },
   rowReverse: {
     flexDirection: "row-reverse",
+  },
+  pressed: {
+    opacity: 0.72,
+    transform: [{ scale: 0.98 }],
+  },
+  sendButton: {
+    alignItems: "center",
+    backgroundColor: colors.primary,
+    borderRadius: 999,
+    height: 42,
+    justifyContent: "center",
+    width: 42,
   },
   time: {
     fontSize: 12,

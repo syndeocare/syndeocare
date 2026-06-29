@@ -149,6 +149,7 @@ export default function ProfileScreen() {
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   const profileQuery = useQuery<MobileProfile>({
     queryFn: () =>
@@ -317,6 +318,9 @@ export default function ProfileScreen() {
       if (currentPassword.length < 8 || newPassword.length < 8) {
         throw new Error(t("profile.passwordLength"));
       }
+      if (newPassword !== confirmPassword) {
+        throw new Error(t("profile.passwordMismatch"));
+      }
       return updatePassword({
         currentPassword,
         password: newPassword,
@@ -325,6 +329,7 @@ export default function ProfileScreen() {
     onSuccess: () => {
       setCurrentPassword("");
       setNewPassword("");
+      setConfirmPassword("");
       setShowPasswordForm(false);
     },
   });
@@ -745,14 +750,33 @@ export default function ProfileScreen() {
               autoComplete="new-password"
               label={t("profile.newPassword")}
               onChangeText={setNewPassword}
-              returnKeyType="done"
+              returnKeyType="next"
               secureTextEntry
               textContentType="newPassword"
               value={newPassword}
             />
+            <Field
+              autoComplete="new-password"
+              error={
+                confirmPassword.length > 0 && newPassword !== confirmPassword
+                  ? t("profile.passwordMismatch")
+                  : undefined
+              }
+              label={t("profile.confirmPassword")}
+              onChangeText={setConfirmPassword}
+              returnKeyType="done"
+              secureTextEntry
+              textContentType="newPassword"
+              value={confirmPassword}
+            />
             <View style={styles.actions}>
               <Button
-                disabled={currentPassword.length < 8 || newPassword.length < 8}
+                disabled={
+                  currentPassword.length < 8 ||
+                  newPassword.length < 8 ||
+                  confirmPassword.length < 8 ||
+                  newPassword !== confirmPassword
+                }
                 loading={passwordMutation.isPending}
                 onPress={() => passwordMutation.mutate()}
                 tone="secondary"
@@ -763,6 +787,7 @@ export default function ProfileScreen() {
                 onPress={() => {
                   setCurrentPassword("");
                   setNewPassword("");
+                  setConfirmPassword("");
                   setShowPasswordForm(false);
                 }}
                 tone="secondary"

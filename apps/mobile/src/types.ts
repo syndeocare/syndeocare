@@ -7,6 +7,7 @@ export type VerificationStatus =
 
 export type Principal = {
   sub: string;
+  actorId?: string;
   email?: string;
   emailVerified?: boolean;
   role: UserRole;

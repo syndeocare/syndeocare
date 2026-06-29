@@ -140,8 +140,8 @@ export default function ShiftsScreen() {
   });
   const professionalsQuery = useQuery({
     enabled: session?.principal.role === "clinic",
-    queryFn: listProfessionals,
-    queryKey: ["professionals"],
+    queryFn: () => listProfessionals({ verificationStatus: "approved" }),
+    queryKey: ["professionals", "approved"],
   });
   const clinicProfileQuery = useQuery({
     enabled: session?.principal.role === "clinic",

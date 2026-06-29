@@ -297,6 +297,7 @@ export async function getAuthPrincipalBySubject(
 
   return {
     sub: aggregate.actor.authSubject,
+    actorId: aggregate.actor.id,
     email: aggregate.actor.email ?? undefined,
     role: aggregate.actor.role,
     permissions: [],

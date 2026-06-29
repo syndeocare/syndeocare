@@ -34,7 +34,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "ai.syndeocare.mobile",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "SyndeoCare uses your location to save accurate city and coordinates for nearby shift matching."
+        "NSLocationWhenInUseUsageDescription": "SyndeoCare uses your location to save accurate city and coordinates for nearby shift matching.",
+        "NSPhotoLibraryUsageDescription": "SyndeoCare lets you choose profile images, clinic logos, and document attachments from your photo library."
       }
     },
     "android": {

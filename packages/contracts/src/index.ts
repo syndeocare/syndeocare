@@ -95,6 +95,7 @@ export const locationSchema = z.object({
 
 export const authPrincipalSchema = z.object({
   sub: z.string().min(1),
+  actorId: z.string().uuid().optional(),
   email: z.string().email().optional(),
   emailVerified: z.boolean().optional(),
   role: userRoleSchema,
