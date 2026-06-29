@@ -17,10 +17,12 @@ import {
   Badge,
   Button,
   Card,
+  DisabledReason,
   EmptyState,
   ErrorBanner,
   Field,
   LoadingBlock,
+  RequirementList,
   Screen,
   SectionHeader,
   SuccessBanner,
@@ -445,6 +447,12 @@ export default function OnboardingScreen() {
   const canSubmit =
     missingProfileChecklist.length === 0 &&
     missingRequiredDocumentKeys.length === 0;
+  const submitDisabledReason =
+    missingProfileChecklist.length > 0
+      ? t("onboarding.missingProfileItems")
+      : missingRequiredDocumentKeys.length > 0
+        ? t("onboarding.missingDocuments")
+        : undefined;
   const stepLabels = {
     contact: t("onboarding.stepContact"),
     documents: t("onboarding.stepDocuments"),
@@ -561,21 +569,12 @@ export default function OnboardingScreen() {
               <Text style={text.strong}>
                 {t("onboarding.profileChecklist")}
               </Text>
-              {profileChecklist.map((item) => (
-                <View key={item.label} style={styles.checklistItem}>
-                  <View
-                    style={[
-                      styles.checkDot,
-                      {
-                        backgroundColor: item.complete
-                          ? colors.success
-                          : colors.warning,
-                      },
-                    ]}
-                  />
-                  <Text style={text.body}>{item.label}</Text>
-                </View>
-              ))}
+              <RequirementList
+                items={profileChecklist.map((item) => ({
+                  label: item.label,
+                  met: item.complete,
+                }))}
+              />
             </View>
           </Card>
 
@@ -842,9 +841,7 @@ export default function OnboardingScreen() {
                   {t("onboarding.submitReview")}
                 </Button>
               </View>
-              {!canSubmit ? (
-                <Text style={text.body}>{t("onboarding.reviewBlocked")}</Text>
-              ) : null}
+              <DisabledReason message={submitDisabledReason} />
             </>
           ) : null}
         </>

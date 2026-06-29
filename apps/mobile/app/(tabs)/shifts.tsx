@@ -30,6 +30,7 @@ import {
   Badge,
   Button,
   Card,
+  DisabledReason,
   EmptyState,
   ErrorBanner,
   Field,
@@ -446,6 +447,23 @@ export default function ShiftsScreen() {
     void bookingsQuery.refetch();
     void professionalsQuery.refetch();
   };
+  const getApplyDisabledReason = (job: Job, applied: boolean) => {
+    if (!professionalCanApply) return t("shifts.disabledVerification");
+    if (applied) return t("shifts.disabledAlreadyApplied");
+    if (job.status !== "open") return t("shifts.disabledClosed");
+    return undefined;
+  };
+  const createNextDisabledReason =
+    createStep === "details" &&
+    (!shiftDraft.role ||
+      !parseDateInput(shiftDraft.shiftDate) ||
+      (parseDateInput(shiftDraft.shiftDate) ?? startOfToday()) <
+        startOfToday() ||
+      rolesQuery.isLoading ||
+      rolesQuery.isError ||
+      roleOptions.length === 0)
+      ? t("shifts.createDisabledReason")
+      : undefined;
 
   return (
     <Screen
@@ -706,6 +724,7 @@ export default function ShiftsScreen() {
           {visibleJobs.length ? (
             visibleJobs.map((job) => {
               const applied = appliedJobIds.has(job.id);
+              const applyDisabledReason = getApplyDisabledReason(job, applied);
               return (
                 <Card key={job.id}>
                   <View style={[styles.row, isRTL && styles.rowReverse]}>
@@ -792,23 +811,22 @@ export default function ShiftsScreen() {
                     </View>
                   ) : null}
                   {session?.principal.role === "professional" ? (
-                    <Button
-                      disabled={
-                        !professionalCanApply ||
-                        applied ||
-                        job.status !== "open"
-                      }
-                      onPress={() => {
-                        if (!professionalCanApply) return;
-                        setSelectedJob(job);
-                      }}
-                    >
-                      {!professionalCanApply
-                        ? t("shifts.waitForVerification")
-                        : applied
-                          ? t("shifts.alreadyApplied")
-                          : t("shifts.applyProposal")}
-                    </Button>
+                    <>
+                      <Button
+                        disabled={Boolean(applyDisabledReason)}
+                        onPress={() => {
+                          if (applyDisabledReason) return;
+                          setSelectedJob(job);
+                        }}
+                      >
+                        {!professionalCanApply
+                          ? t("shifts.waitForVerification")
+                          : applied
+                            ? t("shifts.alreadyApplied")
+                            : t("shifts.applyProposal")}
+                      </Button>
+                      <DisabledReason message={applyDisabledReason} />
+                    </>
                   ) : null}
                   {session?.principal.role === "clinic" ? (
                     <View
@@ -1206,16 +1224,7 @@ export default function ShiftsScreen() {
                 ) : null}
                 {createStep !== "review" ? (
                   <Button
-                    disabled={
-                      createStep === "details" &&
-                      (!shiftDraft.role ||
-                        !parseDateInput(shiftDraft.shiftDate) ||
-                        (parseDateInput(shiftDraft.shiftDate) ??
-                          startOfToday()) < startOfToday() ||
-                        rolesQuery.isLoading ||
-                        rolesQuery.isError ||
-                        roleOptions.length === 0)
-                    }
+                    disabled={Boolean(createNextDisabledReason)}
                     onPress={() =>
                       setCreateStep(
                         createStep === "details" ? "requirements" : "review",
@@ -1235,6 +1244,7 @@ export default function ShiftsScreen() {
                   </Button>
                 )}
               </View>
+              <DisabledReason message={createNextDisabledReason} />
               <Pressable
                 onPress={() => {
                   setShowCreateShift(false);

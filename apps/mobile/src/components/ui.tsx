@@ -4,6 +4,7 @@ import { StatusBar } from "expo-status-bar";
 import {
   AlertCircle,
   CheckCircle2,
+  Info,
   Languages,
   Moon,
   Sun,
@@ -1032,6 +1033,87 @@ export function SuccessBanner({ message }: { message?: string }) {
   );
 }
 
+export function DisabledReason({ message }: { message?: string }) {
+  const { direction, language } = usePreferences();
+  const palette = useThemePalette();
+  if (!message) return null;
+
+  return (
+    <View
+      accessibilityRole="text"
+      style={[
+        styles.disabledReason,
+        {
+          backgroundColor: palette.surfaceMuted,
+          borderColor: palette.border,
+        },
+        direction === "rtl" && styles.rowReverse,
+      ]}
+    >
+      <Info color={colors.warning} size={17} />
+      <Text
+        style={[
+          styles.disabledReasonText,
+          {
+            color: palette.muted,
+            fontFamily: language === "ar" ? fonts.arabic : fonts.body,
+            textAlign: direction === "rtl" ? "right" : "left",
+            writingDirection: direction,
+          },
+        ]}
+      >
+        {message}
+      </Text>
+    </View>
+  );
+}
+
+export function RequirementList({
+  items,
+}: {
+  items: { label: string; met: boolean }[];
+}) {
+  const { direction, language } = usePreferences();
+  const palette = useThemePalette();
+
+  return (
+    <View
+      style={[
+        styles.requirementList,
+        { backgroundColor: palette.surfaceMuted, borderColor: palette.border },
+      ]}
+    >
+      {items.map((item) => (
+        <View
+          key={item.label}
+          style={[
+            styles.requirementItem,
+            direction === "rtl" && styles.rowReverse,
+          ]}
+        >
+          <CheckCircle2
+            color={item.met ? colors.success : palette.placeholder}
+            size={16}
+          />
+          <Text
+            style={[
+              styles.requirementText,
+              {
+                color: item.met ? palette.text : palette.muted,
+                fontFamily: language === "ar" ? fonts.arabic : fonts.body,
+                textAlign: direction === "rtl" ? "right" : "left",
+                writingDirection: direction,
+              },
+            ]}
+          >
+            {item.label}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 export function LoadingBlock({ label }: { label?: string }) {
   const t = useT();
   const themedText = useTextStyles();
@@ -1282,6 +1364,22 @@ const styles = StyleSheet.create({
   preferenceTextArabic: {
     fontFamily: fonts.arabicBold,
   },
+  requirementItem: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+  requirementList: {
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 8,
+    padding: 12,
+  },
+  requirementText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 19,
+  },
   emptyTitle: {
     color: colors.text,
     fontFamily: fonts.bodyBold,
@@ -1316,6 +1414,19 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 14,
     flex: 1,
+    lineHeight: 20,
+  },
+  disabledReason: {
+    alignItems: "flex-start",
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    padding: 12,
+  },
+  disabledReasonText: {
+    flex: 1,
+    fontSize: 13,
     lineHeight: 20,
   },
   field: {

@@ -33,10 +33,12 @@ import {
   Badge,
   Button,
   Card,
+  DisabledReason,
   ErrorBanner,
   Field,
   LoadingBlock,
   PreferenceControls,
+  RequirementList,
   Screen,
   SectionHeader,
   SuccessBanner,
@@ -346,6 +348,27 @@ export default function ProfileScreen() {
     (selectedLocation.latitude == null || selectedLocation.longitude == null)
       ? t("location.mustSelect")
       : undefined;
+  const passwordRequirements = [
+    {
+      label: t("profile.passwordRequirementCurrent"),
+      met: currentPassword.length >= 8,
+    },
+    {
+      label: t("profile.passwordRequirementLength"),
+      met: newPassword.length >= 8,
+    },
+    {
+      label: t("profile.passwordRequirementMatch"),
+      met:
+        confirmPassword.length >= 8 &&
+        newPassword.length >= 8 &&
+        newPassword === confirmPassword,
+    },
+  ];
+  const canUpdatePassword = passwordRequirements.every((item) => item.met);
+  const passwordDisabledReason = passwordRequirements.find(
+    (item) => !item.met,
+  )?.label;
 
   return (
     <Screen
@@ -800,14 +823,10 @@ export default function ProfileScreen() {
               textContentType="newPassword"
               value={confirmPassword}
             />
+            <RequirementList items={passwordRequirements} />
             <View style={styles.actions}>
               <Button
-                disabled={
-                  currentPassword.length < 8 ||
-                  newPassword.length < 8 ||
-                  confirmPassword.length < 8 ||
-                  newPassword !== confirmPassword
-                }
+                disabled={!canUpdatePassword}
                 loading={passwordMutation.isPending}
                 onPress={() => passwordMutation.mutate()}
                 tone="secondary"
@@ -826,6 +845,7 @@ export default function ProfileScreen() {
                 {t("common.cancel")}
               </Button>
             </View>
+            <DisabledReason message={passwordDisabledReason} />
           </>
         ) : (
           <Button onPress={() => setShowPasswordForm(true)} tone="secondary">

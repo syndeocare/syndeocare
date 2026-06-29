@@ -160,6 +160,10 @@ const en = {
   "onboarding.requiredBeforeSubmit": "Required before submitting your account.",
   "onboarding.reviewBlocked":
     "Complete the required profile items and documents before submitting for admin review.",
+  "onboarding.missingProfileItems":
+    "Complete the missing profile fields before continuing.",
+  "onboarding.missingDocuments":
+    "Upload the required documents before submitting for review.",
   "onboarding.saveDraft": "Save draft",
   "onboarding.saved": "Changes saved.",
   "onboarding.documentUploaded": "Document uploaded and ready for review.",
@@ -212,6 +216,10 @@ const en = {
   "profile.passwordChanged": "Password updated.",
   "profile.passwordLength": "Use at least 8 characters for both passwords.",
   "profile.passwordMismatch": "The new passwords do not match.",
+  "profile.passwordRequirementCurrent": "Enter your current password.",
+  "profile.passwordRequirementLength": "Use at least 8 characters.",
+  "profile.passwordRequirementMatch":
+    "New password and confirmation must match.",
   "profile.profileDetails": "Profile details",
   "profile.radiusError": "Enter a valid positive travel radius.",
   "profile.quickUpdate": "Quick profile update",
@@ -296,6 +304,12 @@ const en = {
   "shifts.verificationRequiredBody":
     "Your profile must be approved before you can apply for shifts.",
   "shifts.waitForVerification": "Waiting for verification",
+  "shifts.disabledAlreadyApplied": "You have already applied to this shift.",
+  "shifts.disabledClosed": "This shift is not open for new applications.",
+  "shifts.disabledVerification":
+    "Your profile must be approved before you can apply.",
+  "shifts.createDisabledReason":
+    "Select a role and a valid future date before continuing.",
   "shifts.qualifiedFor": "Qualified for",
   "shifts.requirements": "Requirements",
   "shifts.roleRequired": "Select a role for this shift.",
@@ -489,6 +503,9 @@ const ar: Record<TranslationKey, string> = {
   "onboarding.requiredBeforeSubmit": "مطلوب قبل إرسال حسابك.",
   "onboarding.reviewBlocked":
     "أكمل بيانات الملف والمستندات المطلوبة قبل إرسال الحساب لمراجعة الإدارة.",
+  "onboarding.missingProfileItems": "أكمل بيانات الملف الناقصة قبل المتابعة.",
+  "onboarding.missingDocuments":
+    "ارفع المستندات المطلوبة قبل إرسال الملف للمراجعة.",
   "onboarding.saveDraft": "حفظ كمسودة",
   "onboarding.saved": "تم حفظ التغييرات.",
   "onboarding.documentUploaded": "تم رفع المستند وأصبح جاهزاً للمراجعة.",
@@ -541,6 +558,10 @@ const ar: Record<TranslationKey, string> = {
   "profile.passwordChanged": "تم تحديث كلمة المرور.",
   "profile.passwordLength": "استخدم 8 أحرف على الأقل لكلمتي المرور.",
   "profile.passwordMismatch": "كلمتا المرور الجديدتان غير متطابقتين.",
+  "profile.passwordRequirementCurrent": "أدخل كلمة المرور الحالية.",
+  "profile.passwordRequirementLength": "استخدم 8 أحرف على الأقل.",
+  "profile.passwordRequirementMatch":
+    "يجب أن تتطابق كلمة المرور الجديدة مع التأكيد.",
   "profile.profileDetails": "تفاصيل الملف",
   "profile.radiusError": "أدخل نطاق تنقل صحيحاً أكبر من صفر.",
   "profile.quickUpdate": "تحديث سريع للملف",
@@ -619,6 +640,11 @@ const ar: Record<TranslationKey, string> = {
   "shifts.verificationRequiredBody":
     "يجب اعتماد ملفك أولاً قبل التقديم على المناوبات.",
   "shifts.waitForVerification": "بانتظار التحقق",
+  "shifts.disabledAlreadyApplied": "لقد قدمت على هذه المناوبة مسبقاً.",
+  "shifts.disabledClosed": "هذه المناوبة غير مفتوحة للتقديم حالياً.",
+  "shifts.disabledVerification": "يجب اعتماد ملفك قبل التقديم.",
+  "shifts.createDisabledReason":
+    "اختر الدور وتاريخاً مستقبلياً صالحاً قبل المتابعة.",
   "shifts.qualifiedFor": "مؤهل لـ",
   "shifts.requirements": "المتطلبات",
   "shifts.roleRequired": "اختر الدور المطلوب لهذه المناوبة.",
