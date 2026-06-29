@@ -13,6 +13,7 @@ import type {
   FinalizeVerificationDocumentUploadInput,
   JobListingDetail,
   JobListingCreateInput,
+  JobListingUpdateInput,
   OnboardingSubmissionInput,
   OnboardingStatus,
   PublicRegistrationRole,
@@ -1670,6 +1671,29 @@ export async function getJobListingById(
   return row ? mapJobListingDetail(row, { redactClinicIdentity: true }) : null;
 }
 
+export async function listJobListingsBySubject(
+  subject: string,
+): Promise<JobListingDetail[]> {
+  const clinic = await getClinicProfileBySubject(subject);
+
+  if (!clinic) {
+    return [];
+  }
+
+  const db = getDb();
+  const rows = await db
+    .select({
+      clinic: clinicProfiles,
+      job: jobListings,
+    })
+    .from(jobListings)
+    .innerJoin(clinicProfiles, eq(jobListings.clinicId, clinicProfiles.id))
+    .where(eq(jobListings.clinicId, clinic.id))
+    .orderBy(desc(jobListings.startsAt));
+
+  return rows.map((row) => mapJobListingDetail(row));
+}
+
 export async function createJobListingBySubject(
   subject: string,
   input: JobListingCreateInput,
@@ -1736,6 +1760,80 @@ export async function createJobListingBySubject(
     .from(jobListings)
     .innerJoin(clinicProfiles, eq(jobListings.clinicId, clinicProfiles.id))
     .where(eq(jobListings.id, inserted[0].id))
+    .limit(1);
+
+  return rows[0] ? mapJobListingDetail(rows[0]) : null;
+}
+
+export async function updateJobListingBySubject(
+  subject: string,
+  jobId: string,
+  input: JobListingUpdateInput,
+): Promise<JobListingDetail | null> {
+  const clinic = await getClinicProfileBySubject(subject);
+
+  if (!clinic) {
+    return null;
+  }
+
+  const db = getDb();
+  const now = new Date();
+  const updates: Partial<typeof jobListings.$inferInsert> = {
+    updatedAt: now,
+  };
+
+  if (input.title !== undefined) updates.title = input.title;
+  if (input.specialty !== undefined) updates.specialty = input.specialty;
+  if (input.employmentType !== undefined) {
+    updates.employmentType = input.employmentType;
+  }
+  if (input.status !== undefined) updates.status = input.status;
+  if (input.location !== undefined) {
+    updates.city = input.location.city;
+    updates.region = input.location.region;
+    updates.latitude = String(input.location.latitude);
+    updates.longitude = String(input.location.longitude);
+    updates.radiusKm = input.location.radiusKm ?? null;
+  }
+  if (input.startsAt !== undefined) updates.startsAt = new Date(input.startsAt);
+  if (input.endsAt !== undefined) {
+    updates.endsAt = input.endsAt ? new Date(input.endsAt) : null;
+  }
+  if (input.compensation !== undefined) {
+    updates.compensationAmount = String(input.compensation.amount);
+    updates.compensationCurrency = input.compensation.currency;
+    updates.compensationUnit = input.compensation.unit;
+  }
+  if (input.verificationRequired !== undefined) {
+    updates.verificationRequired = input.verificationRequired;
+  }
+  if (input.summary !== undefined) updates.summary = input.summary;
+  if (input.description !== undefined) updates.description = input.description;
+  if (input.requirements !== undefined)
+    updates.requirements = input.requirements;
+  if (input.languages !== undefined) updates.languages = input.languages;
+  if (input.contactPreference !== undefined) {
+    updates.contactPreference = input.contactPreference;
+  }
+
+  const updated = await db
+    .update(jobListings)
+    .set(updates)
+    .where(and(eq(jobListings.id, jobId), eq(jobListings.clinicId, clinic.id)))
+    .returning({ id: jobListings.id });
+
+  if (!updated[0]) {
+    return null;
+  }
+
+  const rows = await db
+    .select({
+      clinic: clinicProfiles,
+      job: jobListings,
+    })
+    .from(jobListings)
+    .innerJoin(clinicProfiles, eq(jobListings.clinicId, clinicProfiles.id))
+    .where(eq(jobListings.id, updated[0].id))
     .limit(1);
 
   return rows[0] ? mapJobListingDetail(rows[0]) : null;

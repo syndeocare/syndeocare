@@ -7,15 +7,18 @@ import {
   jobListingCreateInputSchema,
   jobListingDetailSchema,
   jobListingListResponseSchema,
+  jobListingUpdateInputSchema,
 } from "@repo/contracts";
 import {
   createJobListingBySubject,
   getBookingByIdForSubject,
   getJobListingById,
+  listJobListingsBySubject,
   listBookingsForSubject,
   listJobListings,
   requestBookingBySubject,
   updateBookingStatusBySubject,
+  updateJobListingBySubject,
 } from "@repo/persistence";
 import { publishDomainEvent, startService } from "@repo/service-core";
 import { z } from "zod";
@@ -88,6 +91,24 @@ void startService({
         });
     });
 
+    app.get("/internal/jobs/owned/:subject", async (request, reply) => {
+      const parsedSubject = subjectParamsSchema.safeParse(request.params);
+
+      if (!parsedSubject.success) {
+        return reply.code(400).send({
+          code: "VALIDATION_ERROR",
+          message: "A valid subject is required.",
+        });
+      }
+
+      const items = await listJobListingsBySubject(parsedSubject.data.subject);
+
+      return jobListingListResponseSchema.parse({
+        items,
+        total: items.length,
+      });
+    });
+
     app.get("/internal/jobs/:jobId", async (request, reply) => {
       const parsedParams = jobIdParamsSchema.safeParse(request.params);
 
@@ -104,6 +125,34 @@ void startService({
         return reply.code(404).send({
           code: "JOB_NOT_FOUND",
           message: "No job was found for the requested id.",
+        });
+      }
+
+      return jobListingDetailSchema.parse(job);
+    });
+
+    app.patch("/internal/jobs/:subject/:jobId", async (request, reply) => {
+      const parsedSubject = subjectParamsSchema.safeParse(request.params);
+      const parsedJob = jobIdParamsSchema.safeParse(request.params);
+      const parsedBody = jobListingUpdateInputSchema.safeParse(request.body);
+
+      if (!parsedSubject.success || !parsedJob.success || !parsedBody.success) {
+        return reply.code(400).send({
+          code: "VALIDATION_ERROR",
+          message: "A valid clinic subject, job id, and update are required.",
+        });
+      }
+
+      const job = await updateJobListingBySubject(
+        parsedSubject.data.subject,
+        parsedJob.data.jobId,
+        parsedBody.data,
+      );
+
+      if (!job) {
+        return reply.code(404).send({
+          code: "JOB_NOT_FOUND",
+          message: "No owned job was found for the requested id.",
         });
       }
 

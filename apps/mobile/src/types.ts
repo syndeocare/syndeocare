@@ -115,6 +115,10 @@ export type JobCreateInput = {
   contactPreference: "direct_phone" | "in_app_chat";
 };
 
+export type JobUpdateInput = Partial<JobCreateInput> & {
+  status?: Job["status"];
+};
+
 export type Booking = {
   id: string;
   jobId: string;

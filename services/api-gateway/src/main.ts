@@ -60,6 +60,7 @@ import {
   jobListingCreateInputSchema,
   jobListingDetailSchema,
   jobListingListResponseSchema,
+  jobListingUpdateInputSchema,
   onboardingSubmissionInputSchema,
   onboardingStatusSchema,
   platformMetadataSchema,
@@ -2514,6 +2515,45 @@ void startService({
       },
     );
 
+    app.get(
+      "/v1/jobs/mine",
+      {
+        schema: {
+          operationId: "listMyJobs",
+          summary: "List shifts owned by the authenticated clinic",
+          tags: ["jobs"],
+          security: [{ bearerAuth: [] }],
+          response: {
+            200: toJsonSchema(
+              jobListingListResponseSchema,
+              "MyJobListingListResponse",
+            ),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorizedMyJobs"),
+            403: toJsonSchema(apiErrorSchema, "ApiErrorForbiddenMyJobs"),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorNotFoundMyJobs"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailableMyJobs"),
+          },
+        },
+        preHandler: auth.requireAccess({ roles: ["clinic"] }),
+      },
+      async (request, reply) => {
+        const actor = request.authContext as AuthPrincipal;
+        const downstream = await requestDownstreamResource(
+          "scheduling",
+          `/internal/jobs/owned/${encodeURIComponent(actor.sub)}`,
+          jobListingListResponseSchema,
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
     app.patch(
       "/v1/onboarding/status",
       {
@@ -4001,6 +4041,76 @@ void startService({
 
         if (!downstream.ok) {
           return reply.code(503).send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.patch(
+      "/v1/jobs/:jobId",
+      {
+        schema: {
+          operationId: "updateJob",
+          summary: "Update a shift owned by the authenticated clinic",
+          tags: ["jobs"],
+          security: [{ bearerAuth: [] }],
+          params: {
+            type: "object",
+            required: ["jobId"],
+            properties: {
+              jobId: { type: "string" },
+            },
+          },
+          body: toJsonSchema(
+            jobListingUpdateInputSchema,
+            "JobListingUpdateInput",
+          ),
+          response: {
+            200: toJsonSchema(
+              jobListingDetailSchema,
+              "UpdatedJobListingDetail",
+            ),
+            400: toJsonSchema(apiErrorSchema, "ApiErrorValidationUpdateJob"),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorizedUpdateJob"),
+            403: toJsonSchema(apiErrorSchema, "ApiErrorForbiddenUpdateJob"),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorNotFoundUpdateJob"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailableUpdateJob"),
+          },
+        },
+        preHandler: auth.requireAccess({ roles: ["clinic"] }),
+      },
+      async (request, reply) => {
+        const actor = request.authContext as AuthPrincipal;
+        const parsedParams = jobIdParamsSchema.safeParse(request.params);
+        const parsedBody = jobListingUpdateInputSchema.safeParse(request.body);
+
+        if (!parsedParams.success) {
+          return reply
+            .code(400)
+            .send(buildValidationError(parsedParams.error.issues));
+        }
+
+        if (!parsedBody.success) {
+          return reply
+            .code(400)
+            .send(buildValidationError(parsedBody.error.issues));
+        }
+
+        const downstream = await requestDownstreamResource(
+          "scheduling",
+          `/internal/jobs/${encodeURIComponent(actor.sub)}/${encodeURIComponent(parsedParams.data.jobId)}`,
+          jobListingDetailSchema,
+          {
+            body: parsedBody.data,
+            method: "PATCH",
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(mapDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
         }
 
         return downstream.data;

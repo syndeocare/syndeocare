@@ -18,6 +18,7 @@ import type {
   Conversation,
   Job,
   JobCreateInput,
+  JobUpdateInput,
   Message,
   OnboardingStatus,
   Principal,
@@ -482,6 +483,8 @@ export const submitOnboarding = (status: OnboardingStatus) =>
   });
 
 export const listJobs = () => apiRequest<ApiList<Job>>("/jobs");
+export const listMyClinicJobs = () =>
+  authenticatedRequest<ApiList<Job>>("/jobs/mine");
 export const listCatalogItems = (kind: CatalogKind) =>
   apiRequest<{ items: CatalogItem[] }>(
     `/catalog?${new URLSearchParams({ kind }).toString()}`,
@@ -490,6 +493,11 @@ export const createJob = (input: JobCreateInput) =>
   authenticatedRequest<Job>("/jobs", {
     body: JSON.stringify(input),
     method: "POST",
+  });
+export const updateJob = (jobId: string, input: JobUpdateInput) =>
+  authenticatedRequest<Job>(`/jobs/${encodeURIComponent(jobId)}`, {
+    body: JSON.stringify(input),
+    method: "PATCH",
   });
 export const createBooking = (jobId: string, notes: string) =>
   authenticatedRequest<Booking>("/bookings", {

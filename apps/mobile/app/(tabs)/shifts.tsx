@@ -49,9 +49,11 @@ import {
   listCatalogItems,
   listBookings,
   listJobs,
+  listMyClinicJobs,
   listProfessionals,
   startConversation,
   updateBookingStatus,
+  updateJob,
 } from "../../src/lib/api";
 import { useAuth } from "../../src/lib/auth";
 import {
@@ -61,7 +63,12 @@ import {
 } from "../../src/lib/format";
 import { usePreferences, useT } from "../../src/lib/preferences";
 import { queryClient } from "../../src/lib/query";
-import type { CatalogItem, Job, JobCreateInput } from "../../src/types";
+import type {
+  CatalogItem,
+  Job,
+  JobCreateInput,
+  JobUpdateInput,
+} from "../../src/types";
 
 function activeCatalogItems(items?: CatalogItem[]) {
   return (items ?? [])
@@ -135,6 +142,39 @@ function localShiftCompensation(value: Job["compensation"]) {
   };
 }
 
+function formatLocalTimeInput(value?: string) {
+  if (!value) return "16:00";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "16:00";
+  return `${String(date.getHours()).padStart(2, "0")}:${String(
+    date.getMinutes(),
+  ).padStart(2, "0")}`;
+}
+
+function draftFromJob(job: Job) {
+  const startsAt = new Date(job.startsAt);
+  const compensation = localShiftCompensation(job.compensation);
+
+  return {
+    amount: String(Math.round(compensation.amount)),
+    description: job.description ?? job.summary,
+    endTime: formatLocalTimeInput(job.endsAt),
+    isUrgent:
+      job.requirements?.some((requirement) =>
+        requirement.toLowerCase().includes("urgent"),
+      ) ?? false,
+    locationAddress: `${job.location.city}, ${job.location.region}`,
+    requiredCertifications: job.requirements ?? [],
+    role: job.specialty,
+    shiftDate: Number.isNaN(startsAt.getTime())
+      ? ""
+      : formatDateInput(startsAt),
+    startTime: formatLocalTimeInput(job.startsAt),
+    summary: job.summary,
+    title: job.title,
+  };
+}
+
 export default function ShiftsScreen() {
   const router = useRouter();
   const { session } = useAuth();
@@ -150,6 +190,7 @@ export default function ShiftsScreen() {
     (session.principal.verificationStatus === "approved" &&
       session.principal.onboardingCompleted);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [editingJob, setEditingJob] = useState<Job | null>(null);
   const [proposal, setProposal] = useState("");
   const [showCreateShift, setShowCreateShift] = useState(false);
   const [clinicView, setClinicView] = useState<
@@ -174,7 +215,13 @@ export default function ShiftsScreen() {
     title: "",
   });
 
-  const jobsQuery = useQuery({ queryFn: listJobs, queryKey: ["jobs"] });
+  const jobsQuery = useQuery({
+    queryFn: session?.principal.role === "clinic" ? listMyClinicJobs : listJobs,
+    queryKey: [
+      "jobs",
+      session?.principal.role === "clinic" ? "mine" : "public",
+    ],
+  });
   const bookingsQuery = useQuery({
     queryFn: listBookings,
     queryKey: ["bookings"],
@@ -229,6 +276,7 @@ export default function ShiftsScreen() {
       ),
     [professionalsQuery.data?.items],
   );
+  const visibleJobs = jobsQuery.data?.items ?? [];
 
   const applyMutation = useMutation({
     mutationFn: async () => {
@@ -241,98 +289,103 @@ export default function ShiftsScreen() {
       await queryClient.invalidateQueries({ queryKey: ["bookings"] });
     },
   });
-  const createShiftMutation = useMutation({
+  const buildShiftInput = (): JobCreateInput => {
+    const shiftDate = parseDateInput(shiftDraft.shiftDate);
+    const amount = Number(shiftDraft.amount);
+
+    if (!shiftDraft.role.trim()) throw new Error(t("shifts.roleRequired"));
+    if (!shiftDraft.shiftDate.trim()) {
+      throw new Error(t("shifts.shiftDateRequired"));
+    }
+    if (!shiftDate) {
+      throw new Error(t("shifts.shiftDateRequired"));
+    }
+    if (shiftDate < startOfToday()) {
+      throw new Error(t("shifts.shiftDatePast"));
+    }
+
+    const startsAtIso = dateTimeToIso(
+      shiftDraft.shiftDate,
+      shiftDraft.startTime,
+    );
+    const endsAtIso = dateTimeToIso(shiftDraft.shiftDate, shiftDraft.endTime);
+
+    if (!startsAtIso) {
+      throw new Error(t("shifts.startsAtRequired"));
+    }
+    if (!endsAtIso) {
+      throw new Error(t("shifts.endsAtInvalid"));
+    }
+
+    const startsAt = new Date(startsAtIso);
+    const endsAt = new Date(endsAtIso);
+
+    if (endsAt <= startsAt) {
+      throw new Error(t("shifts.endsAtInvalid"));
+    }
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new Error(t("shifts.amountInvalid"));
+    }
+    if (amount < MIN_HOURLY_RATE_YER || amount > MAX_HOURLY_RATE_YER) {
+      throw new Error(t("shifts.amountRangeInvalid"));
+    }
+    if (!shiftDraft.locationAddress.trim() && !clinicProfileQuery.data?.city) {
+      throw new Error(t("shifts.locationRequired"));
+    }
+
+    const location = splitLocation(shiftDraft.locationAddress, {
+      city: clinicProfileQuery.data?.city,
+      region: clinicProfileQuery.data?.region,
+    });
+    if (!location.city) throw new Error(t("shifts.locationRequired"));
+
+    const requirements = [
+      ...shiftDraft.requiredCertifications,
+      shiftDraft.isUrgent ? t("shifts.urgentCoverage") : null,
+      `${t("shifts.qualifiedFor")} ${shiftDraft.role}`,
+    ].filter(Boolean) as string[];
+
+    const input: JobCreateInput = {
+      compensation: {
+        amount,
+        currency: "YER",
+        unit: "hour",
+      },
+      contactPreference: "in_app_chat",
+      description: shiftDraft.description.trim() || shiftDraft.summary.trim(),
+      employmentType: "temporary_shift",
+      endsAt: endsAt.toISOString(),
+      languages: ["ar", "en"],
+      location,
+      requirements,
+      specialty: shiftDraft.role.trim(),
+      startsAt: startsAtIso,
+      summary: shiftDraft.summary.trim() || shiftDraft.description.trim(),
+      title: shiftDraft.title.trim() || shiftDraft.role.trim(),
+      verificationRequired: true,
+    };
+
+    if (
+      !input.description ||
+      !input.summary ||
+      input.requirements.length === 0
+    ) {
+      throw new Error(t("shifts.detailsRequired"));
+    }
+
+    return input;
+  };
+
+  const saveShiftMutation = useMutation({
     mutationFn: async () => {
-      const shiftDate = parseDateInput(shiftDraft.shiftDate);
-      const amount = Number(shiftDraft.amount);
-
-      if (!shiftDraft.role.trim()) throw new Error(t("shifts.roleRequired"));
-      if (!shiftDraft.shiftDate.trim()) {
-        throw new Error(t("shifts.shiftDateRequired"));
-      }
-      if (!shiftDate) {
-        throw new Error(t("shifts.shiftDateRequired"));
-      }
-      if (shiftDate < startOfToday()) {
-        throw new Error(t("shifts.shiftDatePast"));
-      }
-
-      const startsAtIso = dateTimeToIso(
-        shiftDraft.shiftDate,
-        shiftDraft.startTime,
-      );
-      const endsAtIso = dateTimeToIso(shiftDraft.shiftDate, shiftDraft.endTime);
-
-      if (!startsAtIso) {
-        throw new Error(t("shifts.startsAtRequired"));
-      }
-      if (!endsAtIso) {
-        throw new Error(t("shifts.endsAtInvalid"));
-      }
-
-      const startsAt = new Date(startsAtIso);
-      const endsAt = new Date(endsAtIso);
-
-      if (endsAt <= startsAt) {
-        throw new Error(t("shifts.endsAtInvalid"));
-      }
-      if (!Number.isFinite(amount) || amount <= 0) {
-        throw new Error(t("shifts.amountInvalid"));
-      }
-      if (amount < MIN_HOURLY_RATE_YER || amount > MAX_HOURLY_RATE_YER) {
-        throw new Error(t("shifts.amountRangeInvalid"));
-      }
-      if (
-        !shiftDraft.locationAddress.trim() &&
-        !clinicProfileQuery.data?.city
-      ) {
-        throw new Error(t("shifts.locationRequired"));
-      }
-
-      const location = splitLocation(shiftDraft.locationAddress, {
-        city: clinicProfileQuery.data?.city,
-        region: clinicProfileQuery.data?.region,
-      });
-      if (!location.city) throw new Error(t("shifts.locationRequired"));
-
-      const requirements = [
-        ...shiftDraft.requiredCertifications,
-        shiftDraft.isUrgent ? t("shifts.urgentCoverage") : null,
-        `${t("shifts.qualifiedFor")} ${shiftDraft.role}`,
-      ].filter(Boolean) as string[];
-
-      const input: JobCreateInput = {
-        compensation: {
-          amount,
-          currency: "YER",
-          unit: "hour",
-        },
-        contactPreference: "in_app_chat",
-        description: shiftDraft.description.trim() || shiftDraft.summary.trim(),
-        employmentType: "temporary_shift",
-        endsAt: endsAt.toISOString(),
-        languages: ["ar", "en"],
-        location,
-        requirements,
-        specialty: shiftDraft.role.trim(),
-        startsAt: startsAtIso,
-        summary: shiftDraft.summary.trim() || shiftDraft.description.trim(),
-        title: shiftDraft.title.trim() || shiftDraft.role.trim(),
-        verificationRequired: true,
-      };
-
-      if (
-        !input.description ||
-        !input.summary ||
-        input.requirements.length === 0
-      ) {
-        throw new Error(t("shifts.detailsRequired"));
-      }
-
-      return createJob(input);
+      const input = buildShiftInput();
+      return editingJob
+        ? updateJob(editingJob.id, input as JobUpdateInput)
+        : createJob(input);
     },
     onSuccess: async () => {
       setShowCreateShift(false);
+      setEditingJob(null);
       setCreateStep("details");
       setShiftDraft({
         amount: "",
@@ -348,6 +401,14 @@ export default function ShiftsScreen() {
         title: "",
       });
       await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+    },
+  });
+  const shiftStatusMutation = useMutation({
+    mutationFn: ({ jobId, status }: { jobId: string; status: Job["status"] }) =>
+      updateJob(jobId, { status }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      await queryClient.invalidateQueries({ queryKey: ["bookings"] });
     },
   });
   const bookingStatusMutation = useMutation({
@@ -412,17 +473,22 @@ export default function ShiftsScreen() {
                       ? displayLabel(applyMutation.error.message, language)
                       : messageMutation.error instanceof Error
                         ? displayLabel(messageMutation.error.message, language)
-                        : createShiftMutation.error instanceof Error
+                        : saveShiftMutation.error instanceof Error
                           ? displayLabel(
-                              createShiftMutation.error.message,
+                              saveShiftMutation.error.message,
                               language,
                             )
-                          : bookingStatusMutation.error instanceof Error
+                          : shiftStatusMutation.error instanceof Error
                             ? displayLabel(
-                                bookingStatusMutation.error.message,
+                                shiftStatusMutation.error.message,
                                 language,
                               )
-                            : undefined
+                            : bookingStatusMutation.error instanceof Error
+                              ? displayLabel(
+                                  bookingStatusMutation.error.message,
+                                  language,
+                                )
+                              : undefined
         }
       />
 
@@ -443,13 +509,33 @@ export default function ShiftsScreen() {
                 <Text style={text.body}>{t("shifts.createShiftBody")}</Text>
               </View>
             </View>
-            <Button onPress={() => setShowCreateShift(true)}>
+            <Button
+              onPress={() => {
+                setEditingJob(null);
+                setCreateStep("details");
+                setShiftDraft({
+                  amount: "",
+                  description: "",
+                  endTime: "16:00",
+                  isUrgent: false,
+                  locationAddress: "",
+                  requiredCertifications: [],
+                  role: "",
+                  shiftDate: "",
+                  startTime: "08:00",
+                  summary: "",
+                  title: "",
+                });
+                setShowCreateShift(true);
+              }}
+            >
               {t("shifts.createShift")}
             </Button>
           </Card>
           <View
             style={[
               styles.segmented,
+              isRTL && styles.rowReverse,
               {
                 backgroundColor: palette.surfaceMuted,
                 borderColor: palette.border,
@@ -610,9 +696,15 @@ export default function ShiftsScreen() {
 
       {session?.principal.role !== "clinic" || clinicView === "shifts" ? (
         <>
-          <SectionHeader title={t("dashboard.openShifts")} />
-          {jobsQuery.data?.items.length ? (
-            jobsQuery.data.items.map((job) => {
+          <SectionHeader
+            title={
+              session?.principal.role === "clinic"
+                ? t("shifts.myShifts")
+                : t("dashboard.openShifts")
+            }
+          />
+          {visibleJobs.length ? (
+            visibleJobs.map((job) => {
               const applied = appliedJobIds.has(job.id);
               return (
                 <Card key={job.id}>
@@ -718,13 +810,55 @@ export default function ShiftsScreen() {
                           : t("shifts.applyProposal")}
                     </Button>
                   ) : null}
+                  {session?.principal.role === "clinic" ? (
+                    <View
+                      style={[
+                        styles.managementActions,
+                        isRTL && styles.rowReverse,
+                      ]}
+                    >
+                      <Button
+                        onPress={() => {
+                          setEditingJob(job);
+                          setCreateStep("details");
+                          setShiftDraft(draftFromJob(job));
+                          setShowCreateShift(true);
+                        }}
+                        tone="secondary"
+                      >
+                        {t("shifts.editShift")}
+                      </Button>
+                      <Button
+                        loading={shiftStatusMutation.isPending}
+                        onPress={() =>
+                          shiftStatusMutation.mutate({
+                            jobId: job.id,
+                            status: job.status === "open" ? "closed" : "open",
+                          })
+                        }
+                        tone={job.status === "open" ? "danger" : "secondary"}
+                      >
+                        {job.status === "open"
+                          ? t("shifts.closeShift")
+                          : t("shifts.reopenShift")}
+                      </Button>
+                    </View>
+                  ) : null}
                 </Card>
               );
             })
           ) : (
             <EmptyState
-              body={t("shifts.noOpenBody")}
-              title={t("shifts.noOpenTitle")}
+              body={
+                session?.principal.role === "clinic"
+                  ? t("shifts.noMyShiftsBody")
+                  : t("shifts.noOpenBody")
+              }
+              title={
+                session?.principal.role === "clinic"
+                  ? t("shifts.noMyShiftsTitle")
+                  : t("shifts.noOpenTitle")
+              }
             />
           )}
         </>
@@ -797,8 +931,14 @@ export default function ShiftsScreen() {
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
               >
-                <Text style={text.h2}>{t("shifts.createShift")}</Text>
-                <Text style={text.body}>{t("shifts.createShiftBody")}</Text>
+                <Text style={text.h2}>
+                  {editingJob ? t("shifts.editShift") : t("shifts.createShift")}
+                </Text>
+                <Text style={text.body}>
+                  {editingJob
+                    ? t("shifts.editShiftBody")
+                    : t("shifts.createShiftBody")}
+                </Text>
                 <StepDots current={createStep} />
                 {createStep === "details" ? (
                   <>
@@ -1086,15 +1226,20 @@ export default function ShiftsScreen() {
                   </Button>
                 ) : (
                   <Button
-                    loading={createShiftMutation.isPending}
-                    onPress={() => createShiftMutation.mutate()}
+                    loading={saveShiftMutation.isPending}
+                    onPress={() => saveShiftMutation.mutate()}
                   >
-                    {t("shifts.publishShift")}
+                    {editingJob
+                      ? t("shifts.saveShift")
+                      : t("shifts.publishShift")}
                   </Button>
                 )}
               </View>
               <Pressable
-                onPress={() => setShowCreateShift(false)}
+                onPress={() => {
+                  setShowCreateShift(false);
+                  setEditingJob(null);
+                }}
                 style={styles.cancel}
               >
                 <Text style={styles.cancelText}>{t("shifts.cancel")}</Text>
@@ -1501,6 +1646,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     gap: 8,
+  },
+  managementActions: {
+    flexDirection: "row",
+    gap: 10,
   },
   modal: {
     borderWidth: 1,

@@ -767,6 +767,15 @@ export const jobListingCreateInputSchema = z.object({
   contactPreference: z.enum(["in_app_chat", "direct_phone"]),
 });
 
+export const jobListingUpdateInputSchema = jobListingCreateInputSchema
+  .partial()
+  .extend({
+    status: jobStatusSchema.optional(),
+  })
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "At least one job field is required.",
+  });
+
 export const jobListingListResponseSchema = z.object({
   items: z.array(jobListingSchema),
   total: z.number().int().nonnegative(),
@@ -1178,9 +1187,21 @@ export const initialV1RouteCatalog = [
   },
   {
     method: "GET",
+    path: "/v1/jobs/mine",
+    summary: "List shifts owned by the authenticated clinic",
+    protected: true,
+  },
+  {
+    method: "GET",
     path: "/v1/jobs/:jobId",
     summary: "Read job or shift details",
     protected: false,
+  },
+  {
+    method: "PATCH",
+    path: "/v1/jobs/:jobId",
+    summary: "Update a shift owned by the authenticated clinic",
+    protected: true,
   },
   {
     method: "POST",
@@ -1433,6 +1454,7 @@ export type VerificationReviewInput = z.infer<
 export type JobListing = z.infer<typeof jobListingSchema>;
 export type JobListingDetail = z.infer<typeof jobListingDetailSchema>;
 export type JobListingCreateInput = z.infer<typeof jobListingCreateInputSchema>;
+export type JobListingUpdateInput = z.infer<typeof jobListingUpdateInputSchema>;
 export type BookingSummary = z.infer<typeof bookingSummarySchema>;
 export type BookingDetail = z.infer<typeof bookingDetailSchema>;
 export type BookingRequestInput = z.infer<typeof bookingRequestInputSchema>;
