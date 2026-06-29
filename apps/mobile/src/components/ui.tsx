@@ -31,8 +31,13 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
+import { useDirectionalLayout } from "../design/rtl";
+import { colors, fonts, layout, spacing } from "../design/tokens";
 import { displayLabel } from "../lib/format";
 import {
   hapticError,
@@ -41,40 +46,11 @@ import {
   hapticSuccess,
 } from "../lib/haptics";
 import { usePreferences, useT } from "../lib/preferences";
+import { toUserMessage } from "../services/errorMessages";
+
+export { colors, fonts } from "../design/tokens";
 
 const brandMark = require("../../assets/syndeocare-mark.png");
-
-export const colors = {
-  accent: "#56849A",
-  accentDark: "#477082",
-  bg: "#F8FAFB",
-  border: "#DDE5E8",
-  danger: "#DC2626",
-  dangerSoft: "#FEE2E2",
-  dark: "#150F1C",
-  darkCard: "#20162A",
-  darkMuted: "#B9A9C4",
-  muted: "#5B6E78",
-  panel: "#FFFFFF",
-  panelSoft: "#F3F6F7",
-  primary: "#663C6D",
-  primaryDark: "#4F2E55",
-  primarySoft: "#F1E8F3",
-  success: "#059669",
-  successSoft: "#DCFCE7",
-  text: "#3B2943",
-  warning: "#D97706",
-  warningSoft: "#FEF3C7",
-};
-
-export const fonts = {
-  body: "Ubuntu_400Regular",
-  bodyMedium: "Ubuntu_500Medium",
-  bodyBold: "Ubuntu_700Bold",
-  arabic: "Cairo_400Regular",
-  arabicMedium: "Cairo_500Medium",
-  arabicBold: "Cairo_700Bold",
-};
 
 export function useThemePalette() {
   const { theme } = usePreferences();
@@ -429,15 +405,23 @@ export function Screen({
   title?: string;
   tone?: ScreenTone;
 }) {
-  const { direction, theme } = usePreferences();
+  const { theme } = usePreferences();
+  const directional = useDirectionalLayout();
   const palette = useThemePalette();
+  const insets = useSafeAreaInsets();
   const isAuth = tone === "auth";
   const isDark = theme === "dark";
   const onDark = isAuth || isDark;
   const { width } = useWindowDimensions();
-  const isCompact = width < 380;
-  const horizontalPadding = isCompact ? 12 : 18;
-  const contentMaxWidth = isAuth ? 520 : 720;
+  const isCompact = width < layout.compactWidth;
+  const horizontalPadding = isCompact ? spacing[12] : spacing[20];
+  const contentMaxWidth = isAuth
+    ? layout.authContentMaxWidth
+    : layout.contentMaxWidth;
+  const bottomContentPadding =
+    (isAuth ? spacing[40] : layout.tabBarHeight) +
+    insets.bottom +
+    layout.scrollBottomGap;
   const scrollRef = useRef<ScrollView | null>(null);
   const ensureInputVisible = useCallback((target?: null | number) => {
     if (!target) return;
@@ -453,16 +437,16 @@ export function Screen({
         | null;
       responder?.scrollResponderScrollNativeHandleToKeyboard?.(
         target,
-        132,
+        layout.keyboardInputOffset,
         true,
       );
     }, 80);
   }, []);
   const contentStyle = [
     styles.scroll,
-    styles.stableLayoutDirection,
     {
       maxWidth: contentMaxWidth,
+      paddingBottom: bottomContentPadding,
       paddingHorizontal: horizontalPadding,
       width: "100%" as const,
     },
@@ -470,7 +454,6 @@ export function Screen({
   ];
   const staticContentStyle = [
     styles.staticContent,
-    styles.stableLayoutDirection,
     {
       maxWidth: contentMaxWidth,
       paddingHorizontal: horizontalPadding,
@@ -496,7 +479,7 @@ export function Screen({
         <View
           style={[
             styles.screenHeaderTop,
-            direction === "rtl" && styles.rowReverse,
+            directional.isRTL && styles.rowReverse,
           ]}
         >
           <BrandLockup compact onDark={onDark} />
@@ -506,7 +489,7 @@ export function Screen({
           style={[
             styles.screenTitle,
             { color: onDark ? "#ffffff" : palette.text },
-            direction === "rtl" && styles.textRight,
+            directional.isRTL && styles.textRight,
           ]}
         >
           {title}
@@ -516,7 +499,7 @@ export function Screen({
             style={[
               styles.screenSubtitle,
               { color: onDark ? colors.darkMuted : palette.muted },
-              direction === "rtl" && styles.textRight,
+              directional.isRTL && styles.textRight,
             ]}
           >
             {subtitle}
@@ -1012,7 +995,7 @@ export function ErrorBanner({ message }: { message?: string }) {
     if (message) hapticError();
   }, [message]);
   if (!message) return null;
-  const localizedMessage = displayLabel(message, language);
+  const localizedMessage = toUserMessage(message, language);
   return (
     <View style={styles.errorBanner} accessibilityRole="alert">
       <AlertCircle color="#991B1B" size={18} />
@@ -1433,9 +1416,6 @@ const styles = StyleSheet.create({
   rowReverse: {
     flexDirection: "row-reverse",
   },
-  stableLayoutDirection: {
-    direction: "ltr",
-  },
   safe: {
     flex: 1,
   },
@@ -1466,7 +1446,6 @@ const styles = StyleSheet.create({
   scroll: {
     alignSelf: "center",
     gap: 16,
-    paddingBottom: 142,
     paddingTop: 14,
   },
   staticContent: {

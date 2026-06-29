@@ -13,7 +13,7 @@ import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
-import { AppState, I18nManager } from "react-native";
+import { AppState } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
@@ -36,8 +36,6 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    I18nManager.allowRTL(false);
-    I18nManager.swapLeftAndRightInRTL(false);
     if (fontsLoaded) {
       void SplashScreen.hideAsync();
     }

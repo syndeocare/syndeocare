@@ -8,12 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import {
-  Appearance,
-  I18nManager,
-  Platform,
-  useColorScheme,
-} from "react-native";
+import { Appearance, Platform, useColorScheme } from "react-native";
 
 export type AppLanguage = "en" | "ar";
 export type AppLanguagePreference = "ar" | "device" | "en";
@@ -766,8 +761,6 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   const theme = resolveTheme(themePreference, systemScheme);
 
   useEffect(() => {
-    I18nManager.allowRTL(false);
-    I18nManager.swapLeftAndRightInRTL(false);
     void loadPreferences().then((stored) => {
       if (
         stored.language === "ar" ||

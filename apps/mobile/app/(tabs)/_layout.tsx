@@ -18,6 +18,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors, fonts, useThemePalette } from "../../src/components/ui";
+import { layout } from "../../src/design/tokens";
 import { listConversations, listNotifications } from "../../src/lib/api";
 import { useAuth } from "../../src/lib/auth";
 import { hapticSelection } from "../../src/lib/haptics";
@@ -31,10 +32,12 @@ export default function TabsLayout() {
   const palette = useThemePalette();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const compact = width < 380;
+  const compact = width < layout.compactWidth;
   const tabBarWidth = Math.min(width - 28, 520);
   const tabBarSide = Math.max(14, (width - tabBarWidth) / 2);
-  const tabBarHeight = compact ? 66 : 70;
+  const tabBarHeight = compact
+    ? layout.tabBarCompactHeight
+    : layout.tabBarHeight;
   const isDark = theme === "dark";
   const notificationsQuery = useQuery({
     enabled: Boolean(session),
@@ -109,7 +112,10 @@ export default function TabsLayout() {
           borderColor: palette.border,
           borderRadius: compact ? 22 : 26,
           borderWidth: 1,
-          bottom: Math.max(14, insets.bottom + 8),
+          bottom: Math.max(
+            layout.minBottomInset,
+            insets.bottom + layout.tabBarSafeGap,
+          ),
           elevation: 10,
           height: tabBarHeight,
           left: tabBarSide,
@@ -237,7 +243,10 @@ function SyndeoTabBar({
             ? "rgba(32,22,42,0.96)"
             : "rgba(255,255,255,0.96)",
           borderColor: palette.border,
-          bottom: Math.max(14, insets.bottom + 8),
+          bottom: Math.max(
+            layout.minBottomInset,
+            insets.bottom + layout.tabBarSafeGap,
+          ),
           height: tabBarHeight,
           left: tabBarSide,
           paddingBottom: compact ? 7 : 9,
