@@ -36,6 +36,7 @@ import {
 } from "../src/components/ui";
 import { requestPasswordReset } from "../src/lib/api";
 import { useAuth } from "../src/lib/auth";
+import { displayLabel } from "../src/lib/format";
 import { usePreferences, useT } from "../src/lib/preferences";
 import type { UserRole } from "../src/types";
 
@@ -79,6 +80,7 @@ export default function AuthScreen() {
   const [role, setRole] = useState<Exclude<UserRole, "admin">>("professional");
   const { signIn, signInWithGoogle, signUp } = useAuth();
   const t = useT();
+  const { language } = usePreferences();
 
   const resolver = useMemo(() => {
     const signInSchema = z.object({
@@ -147,13 +149,18 @@ export default function AuthScreen() {
     [password, t],
   );
 
+  const googleErrorMessage =
+    googleMutation.error instanceof Error ? googleMutation.error.message : "";
+  const googleCancelled = googleErrorMessage
+    .toLowerCase()
+    .includes("cancelled");
   const errorMessage =
     authMutation.error instanceof Error
-      ? authMutation.error.message
-      : googleMutation.error instanceof Error
-        ? googleMutation.error.message
+      ? displayLabel(authMutation.error.message, language)
+      : googleMutation.error instanceof Error && !googleCancelled
+        ? displayLabel(googleMutation.error.message, language)
         : resetMutation.error instanceof Error
-          ? resetMutation.error.message
+          ? displayLabel(resetMutation.error.message, language)
           : undefined;
 
   const switchMode = (nextMode: AuthMode) => {

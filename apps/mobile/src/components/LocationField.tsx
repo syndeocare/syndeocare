@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { colors, useTextStyles, useThemePalette } from "./ui";
-import { useT } from "../lib/preferences";
+import { displayLabel } from "../lib/format";
+import { usePreferences, useT } from "../lib/preferences";
 import type { LocationValue } from "../types";
 
 export type LocationSelection = {
@@ -41,6 +42,14 @@ const FALLBACK_LOCATION_SUGGESTIONS: SearchResult[] = [
   { display_name: "Saada, Yemen", lat: "16.9402", lon: "43.7639" },
   { display_name: "Marib, Yemen", lat: "15.4701", lon: "45.3258" },
 ];
+
+function localizeLocationLabel(value: string, language: "ar" | "en") {
+  return value
+    .split(",")
+    .map((part) => displayLabel(part.trim(), language))
+    .filter(Boolean)
+    .join(language === "ar" ? "، " : ", ");
+}
 
 const cleanCityLabel = (value: string) =>
   value
@@ -103,20 +112,14 @@ export function createLocationSelection(
       })
     | null,
 ): LocationSelection {
-  const fallback = FALLBACK_LOCATION_SUGGESTIONS[0]!;
-  const city = location?.city?.trim() || cleanCityLabel(fallback.display_name);
-  const region = location?.region?.trim() || "Yemen";
+  const city = location?.city?.trim() || "";
+  const region = location?.region?.trim() || "";
   return {
     address: [city, region].filter(Boolean).join(", "),
     city,
-    latitude:
-      typeof location?.latitude === "number"
-        ? location.latitude
-        : Number(fallback.lat),
+    latitude: typeof location?.latitude === "number" ? location.latitude : null,
     longitude:
-      typeof location?.longitude === "number"
-        ? location.longitude
-        : Number(fallback.lon),
+      typeof location?.longitude === "number" ? location.longitude : null,
     region,
   };
 }
@@ -146,9 +149,13 @@ export function LocationField({
   value: LocationSelection;
 }) {
   const t = useT();
+  const { direction, language } = usePreferences();
   const text = useTextStyles();
   const palette = useThemePalette();
-  const [inputValue, setInputValue] = useState(cleanCityLabel(value.address));
+  const isRTL = direction === "rtl";
+  const [inputValue, setInputValue] = useState(
+    localizeLocationLabel(cleanCityLabel(value.address), language),
+  );
   const [suggestions, setSuggestions] = useState<SearchResult[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
@@ -162,8 +169,10 @@ export function LocationField({
   );
 
   useEffect(() => {
-    setInputValue(cleanCityLabel(value.address));
-  }, [value.address]);
+    setInputValue(
+      localizeLocationLabel(cleanCityLabel(value.address), language),
+    );
+  }, [language, value.address]);
 
   useEffect(() => {
     let mounted = true;
@@ -247,7 +256,9 @@ export function LocationField({
       latitude: Number(suggestion.lat),
       longitude: Number(suggestion.lon),
     };
-    setInputValue(cleanCityLabel(next.address));
+    setInputValue(
+      localizeLocationLabel(cleanCityLabel(next.address), language),
+    );
     setLocalError(null);
     onChange(next);
     setShowSuggestions(false);
@@ -277,10 +288,10 @@ export function LocationField({
         first?.city ||
         first?.district ||
         first?.subregion ||
-        "Current location";
+        t("location.currentLocation");
       const region = first?.region || "Yemen";
       const address = [city, region].filter(Boolean).join(", ");
-      setInputValue(cleanCityLabel(address));
+      setInputValue(localizeLocationLabel(cleanCityLabel(address), language));
       onChange({ address, city, latitude, longitude, region });
       setShowSuggestions(false);
       setSuggestions([]);
@@ -299,7 +310,7 @@ export function LocationField({
     <View style={styles.field}>
       <Text style={text.strong}>{t("profile.location")}</Text>
       <Text style={text.body}>{t("profile.locationHint")}</Text>
-      <View style={styles.locationRow}>
+      <View style={[styles.locationRow, isRTL && styles.rowReverse]}>
         <View
           style={[
             styles.inputShell,
@@ -331,7 +342,14 @@ export function LocationField({
             }}
             placeholder={t("location.searchPlaceholder")}
             placeholderTextColor={palette.placeholder}
-            style={[styles.input, { color: palette.text }]}
+            style={[
+              styles.input,
+              {
+                color: palette.text,
+                textAlign: isRTL ? "right" : "left",
+                writingDirection: direction,
+              },
+            ]}
             value={inputValue}
           />
           {inputValue ? (
@@ -390,11 +408,11 @@ export function LocationField({
               accessibilityRole="button"
               key={`${suggestion.display_name}-${suggestion.lat}-${suggestion.lon}`}
               onPress={() => selectSuggestion(suggestion)}
-              style={styles.suggestionItem}
+              style={[styles.suggestionItem, isRTL && styles.rowReverse]}
             >
               <MapPin color={palette.placeholder} size={16} />
               <Text style={[styles.suggestionText, { color: palette.text }]}>
-                {suggestion.display_name}
+                {localizeLocationLabel(suggestion.display_name, language)}
               </Text>
             </Pressable>
           ))}
@@ -404,9 +422,29 @@ export function LocationField({
         <Text style={text.body}>{t("common.loading")}</Text>
       ) : null}
       {value.latitude != null && value.longitude != null ? (
-        <Text style={text.body}>
-          {value.latitude.toFixed(4)}, {value.longitude.toFixed(4)}
-        </Text>
+        <View
+          style={[
+            styles.selectedLocation,
+            {
+              backgroundColor: palette.surfaceMuted,
+              borderColor: palette.border,
+            },
+            isRTL && styles.rowReverse,
+          ]}
+        >
+          <MapPin color={colors.success} size={17} />
+          <View style={styles.selectedLocationCopy}>
+            <Text style={text.strong}>
+              {localizeLocationLabel(
+                value.city || cleanCityLabel(value.address),
+                language,
+              )}
+            </Text>
+            <Text style={text.body}>
+              {localizeLocationLabel(value.region || "Yemen", language)}
+            </Text>
+          </View>
+        </View>
       ) : (
         <Text style={[styles.warning, { color: colors.warning }]}>
           {t("location.mustSelect")}
@@ -455,6 +493,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     gap: 8,
+  },
+  rowReverse: {
+    flexDirection: "row-reverse",
+  },
+  selectedLocation: {
+    alignItems: "center",
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  selectedLocationCopy: {
+    flex: 1,
+    gap: 2,
   },
   suggestionItem: {
     alignItems: "flex-start",

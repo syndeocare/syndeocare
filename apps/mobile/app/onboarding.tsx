@@ -49,7 +49,8 @@ import {
   filterDocumentTypesForRole,
   getGatewayDocumentTypeKey,
 } from "../src/lib/documentTypes";
-import { interpolate, useT } from "../src/lib/preferences";
+import { displayLabel } from "../src/lib/format";
+import { interpolate, usePreferences, useT } from "../src/lib/preferences";
 import { queryClient } from "../src/lib/query";
 import type {
   CatalogItem,
@@ -111,6 +112,12 @@ function cleanFacilityType(value?: string) {
   return trimmed.toLowerCase() === "pending onboarding" ? "" : trimmed;
 }
 
+function catalogItemLabel(item: CatalogItem, language: "ar" | "en") {
+  return language === "ar"
+    ? item.nameAr || displayLabel(item.name, language)
+    : displayLabel(item.name, language);
+}
+
 async function uploadDocument(
   documentType: string,
   uploadFailedMessage: string,
@@ -156,6 +163,7 @@ export default function OnboardingScreen() {
   const router = useRouter();
   const { refresh, session } = useAuth();
   const t = useT();
+  const { language } = usePreferences();
   const text = useTextStyles();
   const palette = useThemePalette();
   const isClinic = session?.principal.role === "clinic";
@@ -164,7 +172,7 @@ export default function OnboardingScreen() {
   const [description, setDescription] = useState("");
   const [specialty, setSpecialty] = useState("");
   const [licenseDetails, setLicenseDetails] = useState("");
-  const [yearsExperience, setYearsExperience] = useState("0");
+  const [yearsExperience, setYearsExperience] = useState("");
   const [languagesText, setLanguagesText] = useState("ar, en");
   const [facilityType, setFacilityType] = useState("");
   const [websiteUrl, setWebsiteUrl] = useState("");
@@ -231,7 +239,9 @@ export default function OnboardingScreen() {
     setDescription(profile.bio ?? "");
     setSpecialty(profile.specialty);
     setLicenseDetails(profile.licenseNumber ?? "");
-    setYearsExperience(String(profile.yearsExperience));
+    setYearsExperience(
+      profile.yearsExperience > 0 ? String(profile.yearsExperience) : "",
+    );
     setLanguagesText(profile.languages.join(", "));
   }, [profile]);
 
@@ -291,7 +301,7 @@ export default function OnboardingScreen() {
           contactPhone: normalizedPhone,
           description: description.trim() || undefined,
           facilityType:
-            cleanFacilityType(facilityType) || "Healthcare facility",
+            cleanFacilityType(facilityType) || "healthcare_facility",
           location: toLocationValue(selectedLocation),
           organizationName: displayNameDraft.trim(),
           services: isClinicProfile(profile) ? profile.services : [],
@@ -300,7 +310,7 @@ export default function OnboardingScreen() {
         return;
       }
 
-      const years = Number(yearsExperience);
+      const years = yearsExperience.trim() ? Number(yearsExperience) : 0;
       if (!specialty.trim()) throw new Error(t("profile.specialtyRequired"));
       if (!Number.isInteger(years) || years < 0) {
         throw new Error(t("profile.yearsError"));
@@ -349,7 +359,9 @@ export default function OnboardingScreen() {
     status && configuredDocumentTypes.length
       ? configuredDocumentTypes.map((docType) => ({
           key: getGatewayDocumentTypeKey(docType),
-          label: docType.nameAr || docType.name,
+          allowedExtensions: docType.allowedExtensions,
+          label: catalogItemLabel(docType, language),
+          maxSizeMb: docType.maxSizeMb,
           required: docType.isRequired,
           uploaded: status.uploadedDocuments.some((document) =>
             documentTypeMatches(document.documentType, docType),
@@ -357,7 +369,9 @@ export default function OnboardingScreen() {
         }))
       : (status?.requiredDocuments ?? []).map((documentType) => ({
           key: documentType,
-          label: documentType,
+          allowedExtensions: [],
+          label: displayLabel(documentType, language),
+          maxSizeMb: 10,
           required: true,
           uploaded: uploaded.has(documentType),
         }));
@@ -365,13 +379,6 @@ export default function OnboardingScreen() {
   const missingRequiredDocumentKeys = requiredDocumentSlots
     .filter((slot) => !slot.uploaded)
     .map((slot) => slot.key);
-  const completion = status
-    ? Math.round(
-        ((requiredDocumentSlots.length - missingRequiredDocumentKeys.length) /
-          Math.max(requiredDocumentSlots.length, 1)) *
-          100,
-      )
-    : 0;
   const phoneError =
     phoneTouched && !validateYemenPhone(phone)
       ? t("profile.yemenPhoneError")
@@ -381,6 +388,59 @@ export default function OnboardingScreen() {
     (selectedLocation.latitude == null || selectedLocation.longitude == null)
       ? t("location.mustSelect")
       : undefined;
+  const profileChecklist = [
+    {
+      complete: Boolean(displayNameDraft.trim()),
+      label: isClinic ? t("profile.organizationName") : t("profile.fullName"),
+    },
+    {
+      complete: validateYemenPhone(phone),
+      label: t("profile.yemenPhone"),
+    },
+    {
+      complete:
+        selectedLocation.latitude != null && selectedLocation.longitude != null,
+      label: t("profile.location"),
+    },
+    ...(isClinic
+      ? [
+          {
+            complete: Boolean(cleanFacilityType(facilityType)),
+            label: t("profile.facilityType"),
+          },
+        ]
+      : [
+          {
+            complete: Boolean(specialty.trim()),
+            label: t("profile.specialty"),
+          },
+          {
+            complete:
+              !yearsExperience.trim() ||
+              (Number.isInteger(Number(yearsExperience)) &&
+                Number(yearsExperience) >= 0),
+            label: t("profile.yearsExperience"),
+          },
+        ]),
+  ];
+  const missingProfileChecklist = profileChecklist.filter(
+    (item) => !item.complete,
+  );
+  const checklistTotal =
+    profileChecklist.length + Math.max(requiredDocumentSlots.length, 1);
+  const checklistDone =
+    profileChecklist.length -
+    missingProfileChecklist.length +
+    Math.max(
+      requiredDocumentSlots.length - missingRequiredDocumentKeys.length,
+      0,
+    );
+  const completion = status
+    ? Math.round((checklistDone / checklistTotal) * 100)
+    : 0;
+  const canSubmit =
+    missingProfileChecklist.length === 0 &&
+    missingRequiredDocumentKeys.length === 0;
 
   return (
     <Screen
@@ -417,7 +477,11 @@ export default function OnboardingScreen() {
                 <Text style={text.h2}>
                   {interpolate(t("onboarding.complete"), { count: completion })}
                 </Text>
-                <Text style={text.body}>{status.nextAction}</Text>
+                <Text style={text.body}>
+                  {canSubmit
+                    ? t("onboarding.profileSetupBody")
+                    : t("onboarding.reviewBlocked")}
+                </Text>
               </View>
               <Badge
                 tone={
@@ -428,13 +492,33 @@ export default function OnboardingScreen() {
                       : "warning"
                 }
               >
-                {status.verificationStatus.replace("_", " ")}
+                {displayLabel(status.verificationStatus, language)}
               </Badge>
             </View>
             <View
               style={[styles.track, { backgroundColor: palette.surfaceMuted }]}
             >
               <View style={[styles.fill, { width: `${completion}%` }]} />
+            </View>
+            <View style={styles.checklist}>
+              <Text style={text.strong}>
+                {t("onboarding.profileChecklist")}
+              </Text>
+              {profileChecklist.map((item) => (
+                <View key={item.label} style={styles.checklistItem}>
+                  <View
+                    style={[
+                      styles.checkDot,
+                      {
+                        backgroundColor: item.complete
+                          ? colors.success
+                          : colors.warning,
+                      },
+                    ]}
+                  />
+                  <Text style={text.body}>{item.label}</Text>
+                </View>
+              ))}
             </View>
           </Card>
 
@@ -476,7 +560,7 @@ export default function OnboardingScreen() {
                 setPhoneTouched(true);
                 setPhone(normalizeYemenPhoneInput(value));
               }}
-              placeholder="77xxxxxxx"
+              placeholder="771234567"
               returnKeyType="next"
               textContentType="telephoneNumber"
               value={phone}
@@ -491,6 +575,13 @@ export default function OnboardingScreen() {
             />
             {isClinic ? (
               <>
+                <Field
+                  label={t("profile.facilityType")}
+                  onChangeText={setFacilityType}
+                  placeholder={displayLabel("healthcare_facility", language)}
+                  returnKeyType="next"
+                  value={facilityType}
+                />
                 <Field
                   autoCapitalize="none"
                   autoComplete="url"
@@ -514,14 +605,12 @@ export default function OnboardingScreen() {
                   keyboardType="number-pad"
                   label={t("profile.yearsExperience")}
                   onChangeText={setYearsExperience}
+                  placeholder={t("profile.yearsPlaceholder")}
                   returnKeyType="next"
                   value={yearsExperience}
                 />
-                <Field
-                  label={t("profile.languages")}
-                  onChangeText={setLanguagesText}
-                  placeholder="ar, en"
-                  returnKeyType="next"
+                <LanguageChips
+                  onChange={setLanguagesText}
                   value={languagesText}
                 />
                 <Text style={text.strong}>{t("profile.certifications")}</Text>
@@ -603,6 +692,13 @@ export default function OnboardingScreen() {
                           ? t("onboarding.uploadedReview")
                           : t("onboarding.requiredBeforeSubmit")}
                       </Text>
+                      {!documentSlot.uploaded ? (
+                        <Text style={text.body}>
+                          {interpolate(t("onboarding.fileRequirements"), {
+                            count: documentSlot.maxSizeMb || 10,
+                          })}
+                        </Text>
+                      ) : null}
                     </View>
                     <Badge tone={documentSlot.uploaded ? "success" : "warning"}>
                       {documentSlot.uploaded
@@ -631,7 +727,7 @@ export default function OnboardingScreen() {
           )}
 
           <Button
-            disabled={missingRequiredDocumentKeys.length > 0}
+            disabled={!canSubmit}
             loading={submitMutation.isPending}
             onPress={() =>
               submitMutation.mutate({
@@ -645,6 +741,9 @@ export default function OnboardingScreen() {
           >
             {t("onboarding.submitReview")}
           </Button>
+          {!canSubmit ? (
+            <Text style={text.body}>{t("onboarding.reviewBlocked")}</Text>
+          ) : null}
         </>
       ) : null}
     </Screen>
@@ -665,6 +764,7 @@ function CatalogChips({
   selectedValues: string[];
 }) {
   const t = useT();
+  const { language } = usePreferences();
   const text = useTextStyles();
 
   if (loading) return <LoadingBlock label={t("common.loading")} />;
@@ -676,6 +776,7 @@ function CatalogChips({
     <View style={styles.chipGrid}>
       {items.map((item) => {
         const selected = selectedValues.includes(item.name);
+        const label = catalogItemLabel(item, language);
         return (
           <Pressable
             accessibilityRole={multiple ? "checkbox" : "radio"}
@@ -690,11 +791,61 @@ function CatalogChips({
                 selected ? styles.chipTextSelected : undefined,
               ]}
             >
-              {item.name}
+              {label}
             </Text>
           </Pressable>
         );
       })}
+    </View>
+  );
+}
+
+function LanguageChips({
+  onChange,
+  value,
+}: {
+  onChange: (value: string) => void;
+  value: string;
+}) {
+  const t = useT();
+  const text = useTextStyles();
+  const selectedValues = splitCsv(value);
+  const options = [
+    { label: t("profile.language.ar"), value: "ar" },
+    { label: t("profile.language.en"), value: "en" },
+  ];
+
+  return (
+    <View style={styles.languageGroup}>
+      <Text style={text.strong}>{t("profile.languages")}</Text>
+      <View style={styles.chipGrid}>
+        {options.map((option) => {
+          const selected = selectedValues.includes(option.value);
+          return (
+            <Pressable
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: selected }}
+              key={option.value}
+              onPress={() => {
+                const next = selected
+                  ? selectedValues.filter((item) => item !== option.value)
+                  : [...selectedValues, option.value];
+                onChange(joinUnique(next.length ? next : ["ar"]));
+              }}
+              style={[styles.chip, selected ? styles.chipSelected : undefined]}
+            >
+              <Text
+                style={[
+                  styles.chipText,
+                  selected ? styles.chipTextSelected : undefined,
+                ]}
+              >
+                {option.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
     </View>
   );
 }
@@ -724,6 +875,20 @@ const styles = StyleSheet.create({
   chipTextSelected: {
     color: colors.primaryDark,
   },
+  checkDot: {
+    borderRadius: 5,
+    height: 10,
+    width: 10,
+  },
+  checklist: {
+    gap: 8,
+    marginTop: 6,
+  },
+  checklistItem: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
   documentIcon: {
     alignItems: "center",
     borderRadius: 12,
@@ -738,6 +903,9 @@ const styles = StyleSheet.create({
   grow: {
     flex: 1,
     gap: 4,
+  },
+  languageGroup: {
+    gap: 8,
   },
   row: {
     alignItems: "flex-start",

@@ -512,7 +512,7 @@ export default function ProfileScreen() {
                 setPhoneTouched(true);
                 setPhone(normalizeYemenPhoneInput(value));
               }}
-              placeholder="77xxxxxxx"
+              placeholder="771234567"
               returnKeyType="next"
               textContentType="telephoneNumber"
               value={phone}
@@ -695,7 +695,9 @@ export default function ProfileScreen() {
                 <DetailRow
                   icon={<Languages color={colors.primary} size={18} />}
                   label={t("profile.languages")}
-                  value={professionalProfile.languages.join(", ")}
+                  value={professionalProfile.languages
+                    .map((item) => displayLabel(item, language))
+                    .join(language === "ar" ? "، " : ", ")}
                 />
                 <DetailRow
                   icon={<ShieldCheck color={colors.primary} size={18} />}

@@ -40,6 +40,8 @@ const en = {
   "auth.googleFirstHint":
     "Continue with Google for the fastest setup, or use email.",
   "auth.googleOpening": "Opening Google...",
+  "auth.googleCancelledNeutral":
+    "Google sign-in was cancelled. You can continue when ready.",
   "auth.googleSecureHint":
     "A secure Google window will open, then return you to SyndeoCare.",
   "auth.join": "Join SyndeoCare",
@@ -119,6 +121,7 @@ const en = {
   "messages.unread": "{{count}} unread",
   "location.currentLocationFailed":
     "Could not detect your current location. Please allow location access and try again.",
+  "location.currentLocation": "Current location",
   "location.mustSelect":
     "Select a location from suggestions or use current location.",
   "location.popularSuggestions": "Suggested places in Yemen",
@@ -142,8 +145,14 @@ const en = {
   "onboarding.profileSetup": "Profile setup",
   "onboarding.profileSetupBody":
     "Complete your image, location, contact details, and qualifications before submitting for review.",
+  "onboarding.profileChecklist": "Profile checklist",
+  "onboarding.fileRequirements": "PDF or image, up to {{count}} MB.",
   "onboarding.required": "required",
   "onboarding.requiredBeforeSubmit": "Required before submitting your account.",
+  "onboarding.reviewBlocked":
+    "Complete the required profile items and documents before submitting for admin review.",
+  "onboarding.saveDraft": "Save draft",
+  "onboarding.saved": "Changes saved.",
   "onboarding.submitReview": "Submit for admin review",
   "onboarding.title": "Onboarding",
   "onboarding.uploadDocument": "Upload document",
@@ -171,6 +180,8 @@ const en = {
   "profile.headline": "Headline",
   "profile.imagePermission": "Allow photo access to upload your image.",
   "profile.languages": "Languages",
+  "profile.language.ar": "Arabic",
+  "profile.language.en": "English",
   "profile.licenseDetails": "License / certification details",
   "profile.location": "Location",
   "profile.locationHint":
@@ -205,6 +216,7 @@ const en = {
   "profile.yemenPhone": "Yemeni phone number",
   "profile.yemenPhoneError":
     "Enter a valid Yemeni number starting with 71, 73, 77, or 78.",
+  "profile.yearsPlaceholder": "Example: 3",
   "profile.yearsError": "Enter valid years of experience.",
   "profile.yearsExperience": "Years of experience",
   "shifts.alreadyApplied": "Already applied",
@@ -323,6 +335,8 @@ const ar: Record<TranslationKey, string> = {
   "auth.googleFirstHint":
     "تابع باستخدام Google للإعداد الأسرع، أو استخدم البريد الإلكتروني.",
   "auth.googleOpening": "جاري فتح Google...",
+  "auth.googleCancelledNeutral":
+    "تم إلغاء تسجيل الدخول باستخدام Google. يمكنك المتابعة عندما تكون جاهزاً.",
   "auth.googleSecureHint":
     "ستفتح نافذة Google آمنة ثم تعود تلقائياً إلى SyndeoCare.",
   "auth.join": "انضم إلى SyndeoCare",
@@ -401,6 +415,7 @@ const ar: Record<TranslationKey, string> = {
   "messages.unread": "{{count}} غير مقروءة",
   "location.currentLocationFailed":
     "تعذر تحديد موقعك الحالي. يرجى السماح بالوصول للموقع والمحاولة مرة أخرى.",
+  "location.currentLocation": "الموقع الحالي",
   "location.mustSelect": "اختر موقعاً من الاقتراحات أو استخدم موقعك الحالي.",
   "location.popularSuggestions": "مواقع مقترحة في اليمن",
   "location.searchPlaceholder": "ابحث عن مدينة أو عنوان في اليمن",
@@ -423,8 +438,14 @@ const ar: Record<TranslationKey, string> = {
   "onboarding.profileSetup": "إعداد الملف",
   "onboarding.profileSetupBody":
     "أكمل الصورة والموقع وبيانات التواصل والمؤهلات قبل الإرسال للمراجعة.",
+  "onboarding.profileChecklist": "قائمة إكمال الملف",
+  "onboarding.fileRequirements": "PDF أو صورة حتى {{count}} م.ب.",
   "onboarding.required": "مطلوب",
   "onboarding.requiredBeforeSubmit": "مطلوب قبل إرسال حسابك.",
+  "onboarding.reviewBlocked":
+    "أكمل بيانات الملف والمستندات المطلوبة قبل إرسال الحساب لمراجعة الإدارة.",
+  "onboarding.saveDraft": "حفظ كمسودة",
+  "onboarding.saved": "تم حفظ التغييرات.",
   "onboarding.submitReview": "إرسال لمراجعة الإدارة",
   "onboarding.title": "إكمال البيانات",
   "onboarding.uploadDocument": "رفع المستند",
@@ -452,6 +473,8 @@ const ar: Record<TranslationKey, string> = {
   "profile.headline": "العنوان المهني",
   "profile.imagePermission": "اسمح بالوصول إلى الصور لرفع الصورة.",
   "profile.languages": "اللغات",
+  "profile.language.ar": "العربية",
+  "profile.language.en": "الإنجليزية",
   "profile.licenseDetails": "تفاصيل الترخيص / الشهادات",
   "profile.location": "الموقع",
   "profile.locationHint":
@@ -486,6 +509,7 @@ const ar: Record<TranslationKey, string> = {
   "profile.yemenPhone": "رقم الهاتف اليمني",
   "profile.yemenPhoneError":
     "أدخل رقماً يمنياً صحيحاً يبدأ بـ 71 أو 73 أو 77 أو 78.",
+  "profile.yearsPlaceholder": "مثال: ٣",
   "profile.yearsError": "أدخل سنوات خبرة صحيحة.",
   "profile.yearsExperience": "سنوات الخبرة",
   "shifts.alreadyApplied": "تم التقديم مسبقاً",
