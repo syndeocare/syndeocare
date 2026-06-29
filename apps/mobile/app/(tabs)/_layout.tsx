@@ -10,14 +10,15 @@ import { useEffect } from "react";
 import { useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { colors, useThemePalette } from "../../src/components/ui";
+import { colors, fonts, useThemePalette } from "../../src/components/ui";
 import { listConversations, listNotifications } from "../../src/lib/api";
 import { useAuth } from "../../src/lib/auth";
 import { syncAppBadge } from "../../src/lib/notifications";
-import { useT } from "../../src/lib/preferences";
+import { usePreferences, useT } from "../../src/lib/preferences";
 
 export default function TabsLayout() {
   const t = useT();
+  const { language, theme } = usePreferences();
   const { session } = useAuth();
   const palette = useThemePalette();
   const insets = useSafeAreaInsets();
@@ -25,7 +26,8 @@ export default function TabsLayout() {
   const compact = width < 380;
   const tabBarWidth = Math.min(width - 28, 520);
   const tabBarSide = Math.max(14, (width - tabBarWidth) / 2);
-  const tabBarHeight = compact ? 64 : 68;
+  const tabBarHeight = compact ? 66 : 70;
+  const isDark = theme === "dark";
   const notificationsQuery = useQuery({
     enabled: Boolean(session),
     queryFn: listNotifications,
@@ -56,7 +58,7 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.primary,
+        tabBarActiveTintColor: isDark ? "#ffffff" : colors.primary,
         tabBarBadgeStyle: {
           backgroundColor: colors.danger,
           color: "#ffffff",
@@ -75,29 +77,28 @@ export default function TabsLayout() {
           minHeight: compact ? 46 : 50,
           paddingVertical: compact ? 3 : 4,
         },
-        tabBarActiveBackgroundColor:
-          palette.background === colors.dark
-            ? "rgba(161,83,172,0.24)"
-            : colors.primarySoft,
+        tabBarActiveBackgroundColor: isDark
+          ? "rgba(161,83,172,0.30)"
+          : colors.primarySoft,
         tabBarLabelStyle: {
+          fontFamily: language === "ar" ? fonts.arabicBold : fonts.bodyBold,
           fontSize: compact ? 10 : 11,
           fontWeight: "800",
           marginTop: 1,
         },
         tabBarStyle: {
-          backgroundColor:
-            palette.background === colors.dark
-              ? "rgba(32,22,42,0.96)"
-              : "rgba(255,255,255,0.96)",
+          backgroundColor: isDark
+            ? "rgba(32,22,42,0.96)"
+            : "rgba(255,255,255,0.96)",
           borderColor: palette.border,
-          borderRadius: compact ? 20 : 24,
+          borderRadius: compact ? 22 : 26,
           borderWidth: 1,
           bottom: Math.max(14, insets.bottom + 8),
           elevation: 10,
           height: tabBarHeight,
           left: tabBarSide,
           paddingBottom: compact ? 7 : 9,
-          paddingHorizontal: compact ? 7 : 10,
+          paddingHorizontal: compact ? 8 : 11,
           paddingTop: compact ? 7 : 9,
           position: "absolute",
           right: tabBarSide,

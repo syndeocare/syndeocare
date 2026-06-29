@@ -256,7 +256,7 @@ function GoogleButton({
       onPress={onPress}
       style={({ pressed }) => [
         styles.googleButton,
-        { borderColor: palette.border },
+        { backgroundColor: palette.input, borderColor: palette.border },
         isRTL && styles.rowReverse,
         pressed && !loading && styles.pressed,
       ]}
@@ -274,6 +274,7 @@ function GoogleButton({
       <Text
         style={[
           styles.googleButtonText,
+          { color: palette.text },
           language === "ar" && styles.googleButtonTextArabic,
         ]}
       >
@@ -312,9 +313,21 @@ function EmailToggle({
   children: string;
   onPress: () => void;
 }) {
+  const palette = useThemePalette();
+  const { language } = usePreferences();
   return (
     <Pressable onPress={onPress} style={styles.emailToggle}>
-      <Text style={styles.emailToggleText}>{children}</Text>
+      <Text
+        style={[
+          styles.emailToggleText,
+          {
+            color: palette.text,
+            fontFamily: language === "ar" ? fonts.arabicBold : fonts.bodyBold,
+          },
+        ]}
+      >
+        {children}
+      </Text>
       <ChevronDown color={colors.primary} size={16} />
     </Pressable>
   );
@@ -322,13 +335,14 @@ function EmailToggle({
 
 function BackButton({ onPress }: { onPress: () => void }) {
   const { direction } = usePreferences();
+  const palette = useThemePalette();
   const t = useT();
   const copy = useAuthCopy();
   const Icon = direction === "rtl" ? ArrowRight : ArrowLeft;
 
   return (
     <Pressable onPress={onPress} style={styles.backButton}>
-      <Icon color={colors.muted} size={17} />
+      <Icon color={palette.muted} size={17} />
       <Text style={[styles.backText, copy.body]}>{t("auth.back")}</Text>
     </Pressable>
   );
@@ -364,6 +378,9 @@ function SignInContent({
 }) {
   const t = useT();
   const copy = useAuthCopy();
+  const palette = useThemePalette();
+  const { language } = usePreferences();
+  const family = language === "ar" ? fonts.arabicBold : fonts.bodyBold;
   return (
     <>
       <View style={styles.centerHeader}>
@@ -384,7 +401,9 @@ function SignInContent({
             {t("auth.signInWithEmail")}
           </EmailToggle>
         ) : (
-          <View style={styles.detailsPanel}>
+          <View
+            style={[styles.detailsPanel, { borderTopColor: palette.border }]}
+          >
             <EmailPasswordFields form={form} />
             {resetSuccess ? (
               <Text style={styles.success}>
@@ -392,7 +411,7 @@ function SignInContent({
               </Text>
             ) : null}
             <Pressable onPress={onReset} disabled={resetPending}>
-              <Text style={styles.forgotText}>
+              <Text style={[styles.forgotText, { fontFamily: family }]}>
                 {resetPending
                   ? t("auth.sendingReset")
                   : t("auth.forgotPassword")}
@@ -488,6 +507,7 @@ function RoleCard({
   variant: "accent" | "primary";
 }) {
   const { direction } = usePreferences();
+  const palette = useThemePalette();
   const copy = useAuthCopy();
   const Icon = direction === "rtl" ? ArrowLeft : ArrowRight;
 
@@ -496,8 +516,12 @@ function RoleCard({
       onPress={onPress}
       style={[
         styles.roleCard,
+        { backgroundColor: palette.surface, borderColor: palette.border },
         direction === "rtl" && styles.rowReverse,
-        isSelected && styles.roleCardSelected,
+        isSelected && {
+          backgroundColor: palette.surfaceMuted,
+          borderColor: colors.primary,
+        },
       ]}
     >
       <View
@@ -591,6 +615,9 @@ function DetailsContent({
 }) {
   const t = useT();
   const copy = useAuthCopy();
+  const palette = useThemePalette();
+  const { language } = usePreferences();
+  const family = language === "ar" ? fonts.arabicBold : fonts.bodyBold;
   return (
     <>
       <View style={styles.centerHeader}>
@@ -623,9 +650,9 @@ function DetailsContent({
               }
               leftIcon={
                 role === "clinic" ? (
-                  <Building2 color={colors.muted} size={20} />
+                  <Building2 color={palette.placeholder} size={20} />
                 ) : (
-                  <User color={colors.muted} size={20} />
+                  <User color={palette.placeholder} size={20} />
                 )
               }
               onChangeText={field.onChange}
@@ -637,11 +664,23 @@ function DetailsContent({
         />
         <EmailPasswordFields form={form} />
 
-        <View style={styles.checks}>
+        <View
+          style={[
+            styles.checks,
+            {
+              backgroundColor: palette.surfaceMuted,
+              borderColor: palette.border,
+            },
+          ]}
+        >
           {checks.map((check) => (
             <Text
               key={check.label}
-              style={[styles.check, check.ok && styles.checkOk]}
+              style={[
+                styles.check,
+                { color: palette.muted, fontFamily: family },
+                check.ok && styles.checkOk,
+              ]}
             >
               {check.ok ? "✓" : "•"} {check.label}
             </Text>
@@ -677,6 +716,7 @@ function EmailPasswordFields({
   form: ReturnType<typeof useForm<FormValues>>;
 }) {
   const t = useT();
+  const palette = useThemePalette();
   return (
     <>
       <Controller
@@ -688,7 +728,7 @@ function EmailPasswordFields({
             error={fieldState.error?.message}
             keyboardType="email-address"
             label={t("auth.email")}
-            leftIcon={<Mail color={colors.muted} size={20} />}
+            leftIcon={<Mail color={palette.placeholder} size={20} />}
             onChangeText={field.onChange}
             placeholder="name@example.com"
             returnKeyType="next"
@@ -705,7 +745,7 @@ function EmailPasswordFields({
             autoComplete="current-password"
             error={fieldState.error?.message}
             label={t("auth.password")}
-            leftIcon={<Lock color={colors.muted} size={20} />}
+            leftIcon={<Lock color={palette.placeholder} size={20} />}
             onChangeText={field.onChange}
             placeholder="••••••••"
             returnKeyType="done"

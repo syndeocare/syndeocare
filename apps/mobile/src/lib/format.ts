@@ -88,6 +88,10 @@ const arabicLabelMap = new Map<string, string>([
     "البريد الإلكتروني أو كلمة المرور غير صحيحة",
   ],
   ["invalid parameter: redirect_uri", "تعذر فتح تسجيل الدخول باستخدام Google."],
+  [
+    "professional must be verification approved before requesting this booking",
+    "يجب اعتماد ملف المختص قبل التقديم على هذه المناوبة",
+  ],
 ]);
 
 const englishLabelMap = new Map<string, string>([
@@ -95,6 +99,10 @@ const englishLabelMap = new Map<string, string>([
   ["pending_review", "Pending review"],
   ["healthcare_facility", "Healthcare facility"],
   ["invalid parameter: redirect_uri", "Could not open Google sign-in."],
+  [
+    "professional must be verification approved before requesting this booking",
+    "Your profile must be approved before you can apply for this shift.",
+  ],
 ]);
 
 export function displayLabel(

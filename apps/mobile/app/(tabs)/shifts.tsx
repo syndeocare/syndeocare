@@ -31,6 +31,7 @@ import {
   Screen,
   SectionHeader,
   colors,
+  fonts,
   useThemePalette,
   useTextStyles,
 } from "../../src/components/ui";
@@ -93,6 +94,10 @@ export default function ShiftsScreen() {
   const text = useTextStyles();
   const palette = useThemePalette();
   const isRTL = direction === "rtl";
+  const professionalCanApply =
+    session?.principal.role !== "professional" ||
+    (session.principal.verificationStatus === "approved" &&
+      session.principal.onboardingCompleted);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [proposal, setProposal] = useState("");
   const [showCreateShift, setShowCreateShift] = useState(false);
@@ -326,23 +331,29 @@ export default function ShiftsScreen() {
       <ErrorBanner
         message={
           jobsQuery.error instanceof Error
-            ? jobsQuery.error.message
+            ? displayLabel(jobsQuery.error.message, language)
             : bookingsQuery.error instanceof Error
-              ? bookingsQuery.error.message
+              ? displayLabel(bookingsQuery.error.message, language)
               : professionalsQuery.error instanceof Error
-                ? professionalsQuery.error.message
+                ? displayLabel(professionalsQuery.error.message, language)
                 : rolesQuery.error instanceof Error
-                  ? rolesQuery.error.message
+                  ? displayLabel(rolesQuery.error.message, language)
                   : certificationsQuery.error instanceof Error
-                    ? certificationsQuery.error.message
+                    ? displayLabel(certificationsQuery.error.message, language)
                     : applyMutation.error instanceof Error
-                      ? applyMutation.error.message
+                      ? displayLabel(applyMutation.error.message, language)
                       : messageMutation.error instanceof Error
-                        ? messageMutation.error.message
+                        ? displayLabel(messageMutation.error.message, language)
                         : createShiftMutation.error instanceof Error
-                          ? createShiftMutation.error.message
+                          ? displayLabel(
+                              createShiftMutation.error.message,
+                              language,
+                            )
                           : bookingStatusMutation.error instanceof Error
-                            ? bookingStatusMutation.error.message
+                            ? displayLabel(
+                                bookingStatusMutation.error.message,
+                                language,
+                              )
                             : undefined
         }
       />
@@ -368,7 +379,15 @@ export default function ShiftsScreen() {
               {t("shifts.createShift")}
             </Button>
           </Card>
-          <View style={styles.segmented}>
+          <View
+            style={[
+              styles.segmented,
+              {
+                backgroundColor: palette.surfaceMuted,
+                borderColor: palette.border,
+              },
+            ]}
+          >
             {(["shifts", "applications", "professionals"] as const).map(
               (view) => (
                 <Pressable
@@ -378,13 +397,24 @@ export default function ShiftsScreen() {
                   onPress={() => setClinicView(view)}
                   style={[
                     styles.segment,
-                    clinicView === view && styles.segmentActive,
+                    {
+                      backgroundColor:
+                        clinicView === view ? palette.surface : "transparent",
+                    },
+                    clinicView === view && {
+                      shadowColor: palette.shadow,
+                    },
                   ]}
                 >
                   <Text
                     style={[
                       styles.segmentText,
-                      clinicView === view && styles.segmentTextActive,
+                      {
+                        color:
+                          clinicView === view ? colors.primary : palette.muted,
+                        fontFamily:
+                          language === "ar" ? fonts.arabicBold : fonts.bodyBold,
+                      },
                     ]}
                   >
                     {t(`shifts.view.${view}`)}
@@ -553,14 +583,46 @@ export default function ShiftsScreen() {
                   <Text style={text.body}>
                     {displayLabel(job.summary, language)}
                   </Text>
+                  {session?.principal.role === "professional" &&
+                  !professionalCanApply ? (
+                    <View
+                      style={[
+                        styles.notice,
+                        {
+                          backgroundColor: palette.surfaceMuted,
+                          borderColor: palette.border,
+                        },
+                        isRTL && styles.rowReverse,
+                      ]}
+                    >
+                      <AlertCircle color={colors.warning} size={18} />
+                      <View style={styles.grow}>
+                        <Text style={text.strong}>
+                          {t("shifts.verificationRequiredTitle")}
+                        </Text>
+                        <Text style={text.body}>
+                          {t("shifts.verificationRequiredBody")}
+                        </Text>
+                      </View>
+                    </View>
+                  ) : null}
                   {session?.principal.role === "professional" ? (
                     <Button
-                      disabled={applied || job.status !== "open"}
-                      onPress={() => setSelectedJob(job)}
+                      disabled={
+                        !professionalCanApply ||
+                        applied ||
+                        job.status !== "open"
+                      }
+                      onPress={() => {
+                        if (!professionalCanApply) return;
+                        setSelectedJob(job);
+                      }}
                     >
-                      {applied
-                        ? t("shifts.alreadyApplied")
-                        : t("shifts.applyProposal")}
+                      {!professionalCanApply
+                        ? t("shifts.waitForVerification")
+                        : applied
+                          ? t("shifts.alreadyApplied")
+                          : t("shifts.applyProposal")}
                     </Button>
                   ) : null}
                 </Card>
@@ -582,7 +644,12 @@ export default function ShiftsScreen() {
         visible={Boolean(selectedJob)}
       >
         <View style={styles.modalShade}>
-          <View style={[styles.modal, { backgroundColor: palette.surface }]}>
+          <View
+            style={[
+              styles.modal,
+              { backgroundColor: palette.surface, borderColor: palette.border },
+            ]}
+          >
             <Text style={text.h2}>{t("shifts.applyTitle")}</Text>
             <Text style={text.body}>{t("shifts.applyBody")}</Text>
             <Field
@@ -1038,13 +1105,21 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 44,
   },
+  notice: {
+    alignItems: "flex-start",
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    padding: 12,
+  },
   metaLine: {
     alignItems: "center",
     flexDirection: "row",
     gap: 8,
   },
   modal: {
-    backgroundColor: "#ffffff",
+    borderWidth: 1,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     gap: 14,
@@ -1097,15 +1172,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   segmentActive: {
-    backgroundColor: "#ffffff",
-    shadowColor: "#5B6E78",
     shadowOffset: { height: 6, width: 0 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
   },
   segmented: {
-    backgroundColor: colors.panelSoft,
-    borderColor: "rgba(86,132,154,0.16)",
     borderRadius: 20,
     borderWidth: 1,
     flexDirection: "row",
@@ -1116,9 +1187,6 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 12,
     fontWeight: "900",
-  },
-  segmentTextActive: {
-    color: colors.primaryDark,
   },
   stepActions: {
     gap: 10,

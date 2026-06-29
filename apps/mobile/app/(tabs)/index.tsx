@@ -1,4 +1,5 @@
 import { useQueries } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
 import {
   Bell,
   BriefcaseBusiness,
@@ -6,7 +7,7 @@ import {
   ChevronRight,
   MessageCircle,
 } from "lucide-react-native";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import {
   Badge,
@@ -33,6 +34,7 @@ import { displayLabel, verificationStatusLabel } from "../../src/lib/format";
 import { interpolate, usePreferences, useT } from "../../src/lib/preferences";
 
 export default function DashboardScreen() {
+  const router = useRouter();
   const { session } = useAuth();
   const t = useT();
   const { direction, language } = usePreferences();
@@ -111,22 +113,26 @@ export default function DashboardScreen() {
         <StatCard
           icon={<CalendarCheck color={colors.primary} size={21} />}
           label={t("dashboard.bookings")}
+          onPress={() => router.push("/(tabs)/shifts")}
           value={bookings.data?.total ?? 0}
         />
         <StatCard
           icon={<BriefcaseBusiness color={colors.primary} size={21} />}
           label={t("dashboard.openShifts")}
+          onPress={() => router.push("/(tabs)/shifts")}
           value={jobs.data?.total ?? 0}
         />
         <StatCard
           icon={<Bell color={colors.accentDark} size={21} />}
           label={t("dashboard.unreadAlerts")}
+          onPress={() => router.push("/(tabs)/notifications")}
           value={unread}
           variant="accent"
         />
         <StatCard
           icon={<MessageCircle color={colors.accentDark} size={21} />}
           label={t("dashboard.messages")}
+          onPress={() => router.push("/(tabs)/messages")}
           value={conversations.data?.total ?? 0}
           variant="accent"
         />
@@ -163,21 +169,30 @@ export default function DashboardScreen() {
 function StatCard({
   icon,
   label,
+  onPress,
   value,
   variant = "primary",
 }: {
   icon: React.ReactNode;
   label: string;
+  onPress?: () => void;
   value: number;
   variant?: "accent" | "primary";
 }) {
   const palette = useThemePalette();
+  const { language } = usePreferences();
+  const labelFamily = language === "ar" ? fonts.arabic : fonts.body;
+  const valueFamily = language === "ar" ? fonts.arabicBold : fonts.bodyBold;
 
   return (
-    <View
-      style={[
+    <Pressable
+      accessibilityRole="button"
+      disabled={!onPress}
+      onPress={onPress}
+      style={({ pressed }) => [
         styles.statCard,
         { backgroundColor: palette.surface, borderColor: palette.border },
+        pressed && styles.statPressed,
       ]}
     >
       <View
@@ -189,12 +204,24 @@ function StatCard({
         {icon}
       </View>
       <View style={styles.statCopy}>
-        <Text style={[styles.statValue, { color: palette.text }]}>{value}</Text>
-        <Text style={[styles.statLabel, { color: palette.muted }]}>
+        <Text
+          style={[
+            styles.statValue,
+            { color: palette.text, fontFamily: valueFamily },
+          ]}
+        >
+          {value}
+        </Text>
+        <Text
+          style={[
+            styles.statLabel,
+            { color: palette.muted, fontFamily: labelFamily },
+          ]}
+        >
           {label}
         </Text>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -240,6 +267,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
+  },
+  statPressed: {
+    opacity: 0.88,
+    transform: [{ scale: 0.99 }],
   },
   statValue: {
     color: colors.text,

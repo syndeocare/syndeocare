@@ -68,6 +68,7 @@ type UploadDescriptor = {
 };
 
 type MobileProfile = ClinicProfile | ProfessionalProfile;
+type OnboardingStep = "contact" | "documents" | "profile";
 
 function isClinicProfile(profile: MobileProfile): profile is ClinicProfile {
   return "organizationName" in profile;
@@ -164,8 +165,8 @@ export default function OnboardingScreen() {
   const { refresh, session } = useAuth();
   const t = useT();
   const { language } = usePreferences();
-  const text = useTextStyles();
   const palette = useThemePalette();
+  const text = useTextStyles();
   const isClinic = session?.principal.role === "clinic";
   const [displayNameDraft, setDisplayNameDraft] = useState("");
   const [phone, setPhone] = useState("");
@@ -179,6 +180,8 @@ export default function OnboardingScreen() {
   const [selectedLocation, setSelectedLocation] = useState<LocationSelection>(
     createLocationSelection(),
   );
+  const [onboardingStep, setOnboardingStep] =
+    useState<OnboardingStep>("contact");
   const [phoneTouched, setPhoneTouched] = useState(false);
   const [locationTouched, setLocationTouched] = useState(false);
   const statusQuery = useQuery({
@@ -441,6 +444,11 @@ export default function OnboardingScreen() {
   const canSubmit =
     missingProfileChecklist.length === 0 &&
     missingRequiredDocumentKeys.length === 0;
+  const stepLabels = {
+    contact: t("onboarding.stepContact"),
+    documents: t("onboarding.stepDocuments"),
+    profile: t("onboarding.stepProfile"),
+  };
 
   return (
     <Screen
@@ -500,6 +508,43 @@ export default function OnboardingScreen() {
             >
               <View style={[styles.fill, { width: `${completion}%` }]} />
             </View>
+            <View style={styles.stepTabs}>
+              {(["contact", "profile", "documents"] as const).map((step) => (
+                <Pressable
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: onboardingStep === step }}
+                  key={step}
+                  onPress={() => setOnboardingStep(step)}
+                  style={[
+                    styles.stepTab,
+                    {
+                      backgroundColor:
+                        onboardingStep === step
+                          ? colors.primarySoft
+                          : palette.surfaceMuted,
+                      borderColor:
+                        onboardingStep === step
+                          ? colors.primary
+                          : palette.border,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.stepTabText,
+                      {
+                        color:
+                          onboardingStep === step
+                            ? colors.primaryDark
+                            : palette.muted,
+                      },
+                    ]}
+                  >
+                    {stepLabels[step]}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
             <View style={styles.checklist}>
               <Text style={text.strong}>
                 {t("onboarding.profileChecklist")}
@@ -522,146 +567,180 @@ export default function OnboardingScreen() {
             </View>
           </Card>
 
-          <Card>
-            <SectionHeader title={t("onboarding.profileSetup")} />
-            <Text style={text.body}>{t("onboarding.profileSetupBody")}</Text>
-            <View style={styles.profileHeader}>
-              <Avatar label={displayNameDraft} size={72} uri={imageUrl} />
-              <View style={styles.grow}>
-                <Text style={text.strong}>
-                  {isClinic
-                    ? t("profile.uploadLogo")
-                    : t("profile.uploadPhoto")}
-                </Text>
+          {onboardingStep === "contact" ? (
+            <Card>
+              <SectionHeader title={t("onboarding.profileSetup")} />
+              <Text style={text.body}>{t("onboarding.profileSetupBody")}</Text>
+              <View style={styles.profileHeader}>
+                <Avatar label={displayNameDraft} size={72} uri={imageUrl} />
+                <View style={styles.grow}>
+                  <Text style={text.strong}>
+                    {isClinic
+                      ? t("profile.uploadLogo")
+                      : t("profile.uploadPhoto")}
+                  </Text>
+                  <Button
+                    loading={imageMutation.isPending}
+                    onPress={() => imageMutation.mutate()}
+                    tone="secondary"
+                  >
+                    {t("onboarding.chooseImage")}
+                  </Button>
+                </View>
+              </View>
+              <Field
+                autoCapitalize="words"
+                label={
+                  isClinic
+                    ? t("profile.organizationName")
+                    : t("profile.fullName")
+                }
+                onChangeText={setDisplayNameDraft}
+                returnKeyType="next"
+                value={displayNameDraft}
+              />
+              <Field
+                autoComplete="tel"
+                error={phoneError}
+                keyboardType="phone-pad"
+                label={t("profile.yemenPhone")}
+                onChangeText={(value) => {
+                  setPhoneTouched(true);
+                  setPhone(normalizeYemenPhoneInput(value));
+                }}
+                placeholder="771234567"
+                returnKeyType="next"
+                textContentType="telephoneNumber"
+                value={phone}
+              />
+              <LocationField
+                error={locationError}
+                onChange={(location) => {
+                  setLocationTouched(true);
+                  setSelectedLocation(location);
+                }}
+                value={selectedLocation}
+              />
+              <View style={styles.stepActions}>
                 <Button
-                  loading={imageMutation.isPending}
-                  onPress={() => imageMutation.mutate()}
+                  loading={saveProfileMutation.isPending}
+                  onPress={() => saveProfileMutation.mutate()}
                   tone="secondary"
                 >
-                  {t("onboarding.chooseImage")}
+                  {t("profile.save")}
+                </Button>
+                <Button onPress={() => setOnboardingStep("profile")}>
+                  {t("onboarding.next")}
                 </Button>
               </View>
-            </View>
-            <Field
-              autoCapitalize="words"
-              label={
-                isClinic ? t("profile.organizationName") : t("profile.fullName")
-              }
-              onChangeText={setDisplayNameDraft}
-              returnKeyType="next"
-              value={displayNameDraft}
-            />
-            <Field
-              autoComplete="tel"
-              error={phoneError}
-              keyboardType="phone-pad"
-              label={t("profile.yemenPhone")}
-              onChangeText={(value) => {
-                setPhoneTouched(true);
-                setPhone(normalizeYemenPhoneInput(value));
-              }}
-              placeholder="771234567"
-              returnKeyType="next"
-              textContentType="telephoneNumber"
-              value={phone}
-            />
-            <LocationField
-              error={locationError}
-              onChange={(location) => {
-                setLocationTouched(true);
-                setSelectedLocation(location);
-              }}
-              value={selectedLocation}
-            />
-            {isClinic ? (
-              <>
-                <Field
-                  label={t("profile.facilityType")}
-                  onChangeText={setFacilityType}
-                  placeholder={displayLabel("healthcare_facility", language)}
-                  returnKeyType="next"
-                  value={facilityType}
-                />
-                <Field
-                  autoCapitalize="none"
-                  autoComplete="url"
-                  keyboardType="url"
-                  label={t("profile.website")}
-                  onChangeText={setWebsiteUrl}
-                  returnKeyType="next"
-                  value={websiteUrl}
-                />
-              </>
-            ) : (
-              <>
-                <Text style={text.strong}>{t("profile.specialty")}</Text>
-                <CatalogChips
-                  items={specialtyOptions}
-                  loading={specialtiesQuery.isLoading}
-                  onSelect={(item) => setSpecialty(item.name)}
-                  selectedValues={[specialty]}
-                />
-                <Field
-                  keyboardType="number-pad"
-                  label={t("profile.yearsExperience")}
-                  onChangeText={setYearsExperience}
-                  placeholder={t("profile.yearsPlaceholder")}
-                  returnKeyType="next"
-                  value={yearsExperience}
-                />
-                <LanguageChips
-                  onChange={setLanguagesText}
-                  value={languagesText}
-                />
-                <Text style={text.strong}>{t("profile.certifications")}</Text>
-                <CatalogChips
-                  items={certificationOptions}
-                  loading={certificationsQuery.isLoading}
-                  multiple
-                  onSelect={(item) => {
-                    const values = splitCsv(licenseDetails);
-                    setLicenseDetails(
-                      values.includes(item.name)
-                        ? joinUnique(
-                            values.filter((value) => value !== item.name),
-                          )
-                        : joinUnique([...values, item.name]),
-                    );
-                  }}
-                  selectedValues={splitCsv(licenseDetails)}
-                />
-                <Field
-                  label={t("profile.licenseDetails")}
-                  multiline
-                  onChangeText={setLicenseDetails}
-                  placeholder={t("profile.commaSeparated")}
-                  returnKeyType="default"
-                  value={licenseDetails}
-                />
-              </>
-            )}
-            <Field
-              label={
-                isClinic ? t("profile.facilityDescription") : t("profile.bio")
-              }
-              multiline
-              onChangeText={setDescription}
-              returnKeyType="default"
-              value={description}
-            />
-            <Button
-              loading={saveProfileMutation.isPending}
-              onPress={() => saveProfileMutation.mutate()}
-            >
-              {t("profile.save")}
-            </Button>
-          </Card>
+            </Card>
+          ) : null}
 
-          {documentSlots.length ? (
+          {onboardingStep === "profile" ? (
+            <Card>
+              <SectionHeader title={t("onboarding.stepProfile")} />
+              {isClinic ? (
+                <>
+                  <Field
+                    label={t("profile.facilityType")}
+                    onChangeText={setFacilityType}
+                    placeholder={displayLabel("healthcare_facility", language)}
+                    returnKeyType="next"
+                    value={facilityType}
+                  />
+                  <Field
+                    autoCapitalize="none"
+                    autoComplete="url"
+                    keyboardType="url"
+                    label={t("profile.website")}
+                    onChangeText={setWebsiteUrl}
+                    returnKeyType="next"
+                    value={websiteUrl}
+                  />
+                </>
+              ) : (
+                <>
+                  <Text style={text.strong}>{t("profile.specialty")}</Text>
+                  <CatalogChips
+                    items={specialtyOptions}
+                    loading={specialtiesQuery.isLoading}
+                    onSelect={(item) => setSpecialty(item.name)}
+                    selectedValues={[specialty]}
+                  />
+                  <Field
+                    keyboardType="number-pad"
+                    label={t("profile.yearsExperience")}
+                    onChangeText={setYearsExperience}
+                    placeholder={t("profile.yearsPlaceholder")}
+                    returnKeyType="next"
+                    value={yearsExperience}
+                  />
+                  <LanguageChips
+                    onChange={setLanguagesText}
+                    value={languagesText}
+                  />
+                  <Text style={text.strong}>{t("profile.certifications")}</Text>
+                  <CatalogChips
+                    items={certificationOptions}
+                    loading={certificationsQuery.isLoading}
+                    multiple
+                    onSelect={(item) => {
+                      const values = splitCsv(licenseDetails);
+                      setLicenseDetails(
+                        values.includes(item.name)
+                          ? joinUnique(
+                              values.filter((value) => value !== item.name),
+                            )
+                          : joinUnique([...values, item.name]),
+                      );
+                    }}
+                    selectedValues={splitCsv(licenseDetails)}
+                  />
+                  <Field
+                    label={t("profile.licenseDetails")}
+                    multiline
+                    onChangeText={setLicenseDetails}
+                    placeholder={t("profile.commaSeparated")}
+                    returnKeyType="default"
+                    value={licenseDetails}
+                  />
+                </>
+              )}
+              <Field
+                label={
+                  isClinic ? t("profile.facilityDescription") : t("profile.bio")
+                }
+                multiline
+                onChangeText={setDescription}
+                returnKeyType="default"
+                value={description}
+              />
+              <View style={styles.stepActions}>
+                <Button
+                  onPress={() => setOnboardingStep("contact")}
+                  tone="secondary"
+                >
+                  {t("onboarding.previous")}
+                </Button>
+                <Button
+                  loading={saveProfileMutation.isPending}
+                  onPress={() => saveProfileMutation.mutate()}
+                  tone="secondary"
+                >
+                  {t("profile.save")}
+                </Button>
+                <Button onPress={() => setOnboardingStep("documents")}>
+                  {t("onboarding.next")}
+                </Button>
+              </View>
+            </Card>
+          ) : null}
+
+          {onboardingStep === "documents" && documentSlots.length ? (
             <SectionHeader title={t("onboarding.title")} />
           ) : null}
 
-          {documentSlots.length ? (
+          {onboardingStep === "documents" && documentSlots.length ? (
             documentSlots.map((documentSlot) => {
               return (
                 <Card key={documentSlot.key}>
@@ -719,30 +798,42 @@ export default function OnboardingScreen() {
                 </Card>
               );
             })
-          ) : (
+          ) : onboardingStep === "documents" ? (
             <EmptyState
               body={t("onboarding.noRequiredDocumentsBody")}
               title={t("onboarding.noRequiredDocumentsTitle")}
             />
-          )}
+          ) : null}
 
-          <Button
-            disabled={!canSubmit}
-            loading={submitMutation.isPending}
-            onPress={() =>
-              submitMutation.mutate({
-                ...status,
-                missingDocuments: missingRequiredDocumentKeys,
-                requiredDocuments: requiredDocumentSlots.map(
-                  (slot) => slot.key,
-                ),
-              })
-            }
-          >
-            {t("onboarding.submitReview")}
-          </Button>
-          {!canSubmit ? (
-            <Text style={text.body}>{t("onboarding.reviewBlocked")}</Text>
+          {onboardingStep === "documents" ? (
+            <>
+              <View style={styles.stepActions}>
+                <Button
+                  onPress={() => setOnboardingStep("profile")}
+                  tone="secondary"
+                >
+                  {t("onboarding.previous")}
+                </Button>
+                <Button
+                  disabled={!canSubmit}
+                  loading={submitMutation.isPending}
+                  onPress={() =>
+                    submitMutation.mutate({
+                      ...status,
+                      missingDocuments: missingRequiredDocumentKeys,
+                      requiredDocuments: requiredDocumentSlots.map(
+                        (slot) => slot.key,
+                      ),
+                    })
+                  }
+                >
+                  {t("onboarding.submitReview")}
+                </Button>
+              </View>
+              {!canSubmit ? (
+                <Text style={text.body}>{t("onboarding.reviewBlocked")}</Text>
+              ) : null}
+            </>
           ) : null}
         </>
       ) : null}
@@ -765,6 +856,7 @@ function CatalogChips({
 }) {
   const t = useT();
   const { language } = usePreferences();
+  const palette = useThemePalette();
   const text = useTextStyles();
 
   if (loading) return <LoadingBlock label={t("common.loading")} />;
@@ -783,11 +875,16 @@ function CatalogChips({
             accessibilityState={{ checked: selected }}
             key={item.id}
             onPress={() => onSelect(item)}
-            style={[styles.chip, selected ? styles.chipSelected : undefined]}
+            style={[
+              styles.chip,
+              { backgroundColor: palette.surface, borderColor: palette.border },
+              selected ? styles.chipSelected : undefined,
+            ]}
           >
             <Text
               style={[
                 styles.chipText,
+                { color: palette.text },
                 selected ? styles.chipTextSelected : undefined,
               ]}
             >
@@ -809,6 +906,7 @@ function LanguageChips({
 }) {
   const t = useT();
   const text = useTextStyles();
+  const palette = useThemePalette();
   const selectedValues = splitCsv(value);
   const options = [
     { label: t("profile.language.ar"), value: "ar" },
@@ -832,11 +930,19 @@ function LanguageChips({
                   : [...selectedValues, option.value];
                 onChange(joinUnique(next.length ? next : ["ar"]));
               }}
-              style={[styles.chip, selected ? styles.chipSelected : undefined]}
+              style={[
+                styles.chip,
+                {
+                  backgroundColor: palette.surface,
+                  borderColor: palette.border,
+                },
+                selected ? styles.chipSelected : undefined,
+              ]}
             >
               <Text
                 style={[
                   styles.chipText,
+                  { color: palette.text },
                   selected ? styles.chipTextSelected : undefined,
                 ]}
               >
@@ -911,6 +1017,26 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     flexDirection: "row",
     gap: 12,
+  },
+  stepActions: {
+    gap: 10,
+  },
+  stepTab: {
+    alignItems: "center",
+    borderRadius: 999,
+    borderWidth: 1,
+    flex: 1,
+    minHeight: 38,
+    justifyContent: "center",
+    paddingHorizontal: 8,
+  },
+  stepTabs: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  stepTabText: {
+    fontSize: 12,
+    fontWeight: "900",
   },
   progressHeader: {
     alignItems: "flex-start",
