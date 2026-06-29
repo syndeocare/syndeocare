@@ -47,31 +47,14 @@ import {
   updateBookingStatus,
 } from "../../src/lib/api";
 import { useAuth } from "../../src/lib/auth";
-import { useT } from "../../src/lib/preferences";
+import {
+  displayLabel,
+  formatMoney,
+  formatShiftWindow,
+} from "../../src/lib/format";
+import { usePreferences, useT } from "../../src/lib/preferences";
 import { queryClient } from "../../src/lib/query";
 import type { CatalogItem, Job, JobCreateInput } from "../../src/types";
-
-function formatMoney(job: Job) {
-  return `${job.compensation.amount} ${job.compensation.currency}/${job.compensation.unit}`;
-}
-
-function formatShiftWindow(job: Job) {
-  const starts = new Date(job.startsAt);
-  const ends = job.endsAt ? new Date(job.endsAt) : null;
-  if (Number.isNaN(starts.getTime())) return "";
-  const date = starts.toLocaleDateString();
-  const startTime = starts.toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-  const endTime =
-    ends && !Number.isNaN(ends.getTime())
-      ? ends.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-      : "";
-  return endTime
-    ? `${date} - ${startTime}-${endTime}`
-    : `${date} - ${startTime}`;
-}
 
 function activeCatalogItems(items?: CatalogItem[]) {
   return (items ?? [])
@@ -106,8 +89,10 @@ export default function ShiftsScreen() {
   const router = useRouter();
   const { session } = useAuth();
   const t = useT();
+  const { direction, language } = usePreferences();
   const text = useTextStyles();
   const palette = useThemePalette();
+  const isRTL = direction === "rtl";
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [proposal, setProposal] = useState("");
   const [showCreateShift, setShowCreateShift] = useState(false);
@@ -164,10 +149,14 @@ export default function ShiftsScreen() {
     certificationsQuery.data?.items,
   );
   const filteredRoleOptions = roleOptions.filter((item) =>
-    item.name.toLowerCase().includes(roleSearch.trim().toLowerCase()),
+    `${item.name} ${item.nameAr ?? ""}`
+      .toLowerCase()
+      .includes(roleSearch.trim().toLowerCase()),
   );
   const filteredCertificationOptions = certificationOptions.filter((item) =>
-    item.name.toLowerCase().includes(certificationSearch.trim().toLowerCase()),
+    `${item.name} ${item.nameAr ?? ""}`
+      .toLowerCase()
+      .includes(certificationSearch.trim().toLowerCase()),
   );
 
   const appliedJobIds = useMemo(
@@ -361,7 +350,7 @@ export default function ShiftsScreen() {
       {session?.principal.role === "clinic" ? (
         <>
           <Card>
-            <View style={styles.ctaTop}>
+            <View style={[styles.ctaTop, isRTL && styles.rowReverse]}>
               <View
                 style={[
                   styles.iconShell,
@@ -413,7 +402,7 @@ export default function ShiftsScreen() {
           {bookingsQuery.data?.items.length ? (
             bookingsQuery.data.items.map((booking) => (
               <Card key={booking.id}>
-                <View style={styles.row}>
+                <View style={[styles.row, isRTL && styles.rowReverse]}>
                   <Avatar label={booking.professionalName} size={46} />
                   <View style={styles.grow}>
                     <Text style={text.h2}>{booking.professionalName}</Text>
@@ -435,7 +424,7 @@ export default function ShiftsScreen() {
                           : "warning"
                     }
                   >
-                    {booking.status}
+                    {displayLabel(booking.status, language)}
                   </Badge>
                 </View>
                 {booking.status === "requested" ? (
@@ -486,11 +475,13 @@ export default function ShiftsScreen() {
           {!professionalsQuery.isLoading && verifiedProfessionals.length ? (
             verifiedProfessionals.map((professional) => (
               <Card key={professional.id}>
-                <View style={styles.row}>
+                <View style={[styles.row, isRTL && styles.rowReverse]}>
                   <Avatar label={professional.fullName} size={46} />
                   <View style={styles.grow}>
                     <Text style={text.h2}>{professional.fullName}</Text>
-                    <Text style={text.body}>{professional.specialty}</Text>
+                    <Text style={text.body}>
+                      {displayLabel(professional.specialty, language)}
+                    </Text>
                     <Text style={text.body}>
                       {professional.city}, {professional.region}
                     </Text>
@@ -523,7 +514,7 @@ export default function ShiftsScreen() {
               const applied = appliedJobIds.has(job.id);
               return (
                 <Card key={job.id}>
-                  <View style={styles.row}>
+                  <View style={[styles.row, isRTL && styles.rowReverse]}>
                     <View
                       style={[
                         styles.iconShell,
@@ -533,25 +524,35 @@ export default function ShiftsScreen() {
                       <CalendarClock color={colors.accentDark} size={20} />
                     </View>
                     <View style={styles.grow}>
-                      <Text style={text.h2}>{job.title}</Text>
-                      <Text style={text.body}>{job.specialty}</Text>
+                      <Text style={text.h2}>
+                        {displayLabel(job.title, language)}
+                      </Text>
+                      <Text style={text.body}>
+                        {displayLabel(job.specialty, language)}
+                      </Text>
                     </View>
                     <Badge tone={job.status === "open" ? "success" : "warning"}>
-                      {job.status}
+                      {displayLabel(job.status, language)}
                     </Badge>
                   </View>
-                  <View style={styles.metaLine}>
+                  <View style={[styles.metaLine, isRTL && styles.rowReverse]}>
                     <MapPin color={colors.muted} size={16} />
                     <Text style={text.body}>
                       {job.location.city}, {job.location.region}
                     </Text>
                   </View>
-                  <View style={styles.metaLine}>
+                  <View style={[styles.metaLine, isRTL && styles.rowReverse]}>
                     <CalendarClock color={colors.muted} size={16} />
-                    <Text style={text.body}>{formatShiftWindow(job)}</Text>
+                    <Text style={text.body}>
+                      {formatShiftWindow(job, language)}
+                    </Text>
                   </View>
-                  <Text style={text.strong}>{formatMoney(job)}</Text>
-                  <Text style={text.body}>{job.summary}</Text>
+                  <Text style={text.strong}>
+                    {formatMoney(job.compensation, language)}
+                  </Text>
+                  <Text style={text.body}>
+                    {displayLabel(job.summary, language)}
+                  </Text>
                   {session?.principal.role === "professional" ? (
                     <Button
                       disabled={applied || job.status !== "open"}
@@ -934,6 +935,7 @@ function CatalogChips({
 }) {
   const palette = useThemePalette();
   const textStyles = useTextStyles();
+  const { language } = usePreferences();
 
   if (items.length === 0) {
     return <Text style={textStyles.body}>{emptyLabel}</Text>;
@@ -943,6 +945,10 @@ function CatalogChips({
     <View style={styles.chipGrid}>
       {items.map((item) => {
         const selected = selectedValues.includes(item.name);
+        const label =
+          language === "ar" && item.nameAr
+            ? item.nameAr
+            : displayLabel(item.name, language);
         return (
           <Pressable
             accessibilityRole={multiple ? "checkbox" : "radio"}
@@ -966,7 +972,7 @@ function CatalogChips({
                 { color: selected ? colors.primaryDark : palette.text },
               ]}
             >
-              {item.name}
+              {label}
             </Text>
             {selected ? <X color={colors.primaryDark} size={14} /> : null}
           </Pressable>
@@ -1078,6 +1084,9 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     flexDirection: "row",
     gap: 12,
+  },
+  rowReverse: {
+    flexDirection: "row-reverse",
   },
   segment: {
     alignItems: "center",

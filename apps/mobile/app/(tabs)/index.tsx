@@ -29,12 +29,15 @@ import {
   listNotifications,
 } from "../../src/lib/api";
 import { useAuth } from "../../src/lib/auth";
-import { interpolate, useT } from "../../src/lib/preferences";
+import { displayLabel, verificationStatusLabel } from "../../src/lib/format";
+import { interpolate, usePreferences, useT } from "../../src/lib/preferences";
 
 export default function DashboardScreen() {
   const { session } = useAuth();
   const t = useT();
+  const { direction, language } = usePreferences();
   const text = useTextStyles();
+  const isRTL = direction === "rtl";
   const [me, bookings, jobs, conversations, notifications] = useQueries({
     queries: [
       { queryFn: getMe, queryKey: ["me"] },
@@ -81,9 +84,16 @@ export default function DashboardScreen() {
                 : "warning"
             }
           >
-            {session?.principal.verificationStatus.replace("_", " ")}
+            {verificationStatusLabel(
+              session?.principal.verificationStatus,
+              language,
+            )}
           </Badge>
-          <ChevronRight color={colors.accentDark} size={18} />
+          <ChevronRight
+            color={colors.accentDark}
+            size={18}
+            style={isRTL ? styles.chevronRtl : undefined}
+          />
         </View>
         <Text style={text.h2}>
           {role === "clinic"
@@ -128,7 +138,9 @@ export default function DashboardScreen() {
             <Text style={text.strong}>{t("dashboard.latestConversation")}</Text>
             <MessageCircle color={colors.primary} size={18} />
           </View>
-          <Text style={text.h2}>{conversations.data.items[0].displayName}</Text>
+          <Text style={text.h2}>
+            {displayLabel(conversations.data.items[0].displayName, language)}
+          </Text>
           <Text style={text.body}>
             {conversations.data.items[0].lastMessage ??
               t("dashboard.noRecentMessage")}
@@ -187,6 +199,9 @@ function StatCard({
 }
 
 const styles = StyleSheet.create({
+  chevronRtl: {
+    transform: [{ rotate: "180deg" }],
+  },
   statCard: {
     alignItems: "flex-start",
     backgroundColor: colors.panel,

@@ -6,10 +6,13 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Avatar, colors, useThemePalette } from "./ui";
 import { listNotifications } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { usePreferences } from "../lib/preferences";
 
 export function AppHeaderActions() {
   const { session } = useAuth();
   const palette = useThemePalette();
+  const { direction, t } = usePreferences();
+  const isRTL = direction === "rtl";
   const notificationsQuery = useQuery({
     enabled: Boolean(session),
     queryFn: listNotifications,
@@ -20,10 +23,10 @@ export function AppHeaderActions() {
     notificationsQuery.data?.items.filter((item) => !item.isRead).length ?? 0;
 
   return (
-    <View style={styles.actions}>
+    <View style={[styles.actions, isRTL && styles.rowReverse]}>
       <Link asChild href="/(tabs)/notifications">
         <Pressable
-          accessibilityLabel="Notifications"
+          accessibilityLabel={t("notifications.title")}
           accessibilityRole="button"
           hitSlop={8}
           style={({ pressed }) => [
@@ -47,14 +50,14 @@ export function AppHeaderActions() {
       </Link>
       <Link asChild href="/(tabs)/profile">
         <Pressable
-          accessibilityLabel="Profile and settings"
+          accessibilityLabel={t("profile.title")}
           accessibilityRole="button"
           hitSlop={8}
           style={({ pressed }) => pressed && styles.pressed}
         >
           <Avatar
             label={session?.principal.displayName}
-            size={42}
+            size={40}
             uri={session?.principal.profileImageUrl}
           />
         </Pressable>
@@ -68,6 +71,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     gap: 10,
+  },
+  rowReverse: {
+    flexDirection: "row-reverse",
   },
   badge: {
     alignItems: "center",

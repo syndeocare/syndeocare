@@ -66,12 +66,12 @@ export function useThemePalette() {
     border: isDark ? "rgba(255,255,255,0.12)" : colors.border,
     control: isDark ? "rgba(255,255,255,0.10)" : "rgba(102,60,109,0.08)",
     controlBorder: isDark ? "rgba(255,255,255,0.16)" : "rgba(102,60,109,0.13)",
-    input: isDark ? "#150F1C" : "#ffffff",
-    muted: isDark ? "#D8CCE0" : colors.muted,
-    placeholder: isDark ? "#9E8EAA" : "#8798A1",
+    input: isDark ? "#1A1022" : "#ffffff",
+    muted: isDark ? "#E2D8EA" : colors.muted,
+    placeholder: isDark ? "#BAABCA" : "#8798A1",
     shadow: isDark ? "#000000" : "#5B6E78",
-    surface: isDark ? colors.darkCard : colors.panel,
-    surfaceMuted: isDark ? "#2A1B35" : colors.panelSoft,
+    surface: isDark ? "#24172F" : colors.panel,
+    surfaceMuted: isDark ? "#30203B" : colors.panelSoft,
     text: isDark ? "#F8FAFB" : colors.text,
   };
 }
@@ -829,16 +829,32 @@ export function Badge({
 export function EmptyState({
   action,
   body,
+  icon,
   title,
 }: {
   action?: { href: string; label: string };
   body: string;
+  icon?: React.ReactNode;
   title: string;
 }) {
   const themedText = useTextStyles();
+  const palette = useThemePalette();
 
   return (
     <Card>
+      {icon ? (
+        <View
+          style={[
+            styles.emptyIcon,
+            {
+              backgroundColor: palette.surfaceMuted,
+              borderColor: palette.border,
+            },
+          ]}
+        >
+          {icon}
+        </View>
+      ) : null}
       <Text style={themedText.h2}>{title}</Text>
       <Text style={themedText.body}>{body}</Text>
       {action ? (
@@ -1037,11 +1053,11 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.panel,
     borderColor: "rgba(86,132,154,0.16)",
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
     gap: 14,
     elevation: 1,
-    padding: 18,
+    padding: 16,
     shadowColor: "#5B6E78",
     shadowOffset: { height: 8, width: 0 },
     shadowOpacity: 0.06,
@@ -1051,13 +1067,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.panelSoft,
   },
   cardDark: {
-    backgroundColor: colors.darkCard,
-    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "#24172F",
+    borderColor: "rgba(255,255,255,0.14)",
     shadowColor: "#000000",
     shadowOpacity: 0.18,
   },
   cardMutedDark: {
-    backgroundColor: "#2A1B35",
+    backgroundColor: "#30203B",
   },
   preferenceButton: {
     alignItems: "center",
@@ -1105,6 +1121,14 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontFamily: fonts.bodyBold,
     fontSize: 18,
+  },
+  emptyIcon: {
+    alignItems: "center",
+    borderRadius: 18,
+    borderWidth: 1,
+    height: 58,
+    justifyContent: "center",
+    width: 58,
   },
   error: {
     color: colors.danger,
@@ -1216,9 +1240,9 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     elevation: 1,
-    gap: 10,
+    gap: 8,
     marginBottom: 4,
-    padding: 16,
+    padding: 14,
     shadowOffset: { height: 10, width: 0 },
     shadowOpacity: 0.08,
     shadowRadius: 18,
@@ -1232,14 +1256,14 @@ const styles = StyleSheet.create({
   screenTitle: {
     color: "#ffffff",
     fontFamily: fonts.bodyBold,
-    fontSize: 28,
-    lineHeight: 34,
-    marginTop: 6,
+    fontSize: 25,
+    lineHeight: 31,
+    marginTop: 3,
   },
   scroll: {
     alignSelf: "center",
     gap: 16,
-    paddingBottom: 124,
+    paddingBottom: 142,
     paddingTop: 14,
   },
   screenHeaderTop: {

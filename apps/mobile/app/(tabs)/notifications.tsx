@@ -22,13 +22,16 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
 } from "../../src/lib/api";
-import { useT } from "../../src/lib/preferences";
+import { formatDateTime } from "../../src/lib/format";
+import { usePreferences, useT } from "../../src/lib/preferences";
 import { queryClient } from "../../src/lib/query";
 
 export default function NotificationsScreen() {
   const t = useT();
   const text = useTextStyles();
   const palette = useThemePalette();
+  const { direction, language } = usePreferences();
+  const isRTL = direction === "rtl";
   const notificationsQuery = useQuery({
     queryFn: listNotifications,
     queryKey: ["notifications"],
@@ -61,7 +64,7 @@ export default function NotificationsScreen() {
       refreshing={notificationsQuery.isFetching}
       title={t("notifications.title")}
     >
-      {notificationsQuery.isLoading ? (
+      {notificationsQuery.isLoading && !notificationsQuery.data ? (
         <LoadingBlock label={t("notifications.loading")} />
       ) : null}
       <ErrorBanner
@@ -89,7 +92,7 @@ export default function NotificationsScreen() {
       {notificationsQuery.data?.items.length ? (
         notificationsQuery.data.items.map((notification) => (
           <Card key={notification.id}>
-            <View style={styles.notificationTop}>
+            <View style={[styles.notificationTop, isRTL && styles.rowReverse]}>
               <View
                 style={[
                   styles.iconShell,
@@ -118,7 +121,7 @@ export default function NotificationsScreen() {
                 </View>
                 <Text style={text.body}>{notification.message}</Text>
                 <Text style={[styles.time, { color: palette.muted }]}>
-                  {new Date(notification.createdAt).toLocaleString()}
+                  {formatDateTime(notification.createdAt, language)}
                 </Text>
               </View>
             </View>
@@ -146,6 +149,7 @@ export default function NotificationsScreen() {
         <EmptyState
           body={t("notifications.noNotificationsBody")}
           title={t("notifications.noNotificationsTitle")}
+          icon={<Bell color={colors.primary} size={26} />}
         />
       )}
     </Screen>
@@ -178,6 +182,9 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     flexDirection: "row",
     gap: 12,
+  },
+  rowReverse: {
+    flexDirection: "row-reverse",
   },
   time: {
     fontSize: 12,

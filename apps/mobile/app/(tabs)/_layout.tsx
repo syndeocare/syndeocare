@@ -23,9 +23,9 @@ export default function TabsLayout() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const compact = width < 380;
-  const tabBarWidth = Math.min(width - 24, 560);
-  const tabBarSide = Math.max(12, (width - tabBarWidth) / 2);
-  const tabBarHeight = compact ? 68 : 74;
+  const tabBarWidth = Math.min(width - 28, 520);
+  const tabBarSide = Math.max(14, (width - tabBarWidth) / 2);
+  const tabBarHeight = compact ? 64 : 68;
   const notificationsQuery = useQuery({
     enabled: Boolean(session),
     queryFn: listNotifications,
@@ -67,20 +67,20 @@ export default function TabsLayout() {
         tabBarInactiveTintColor: palette.muted,
         tabBarHideOnKeyboard: true,
         tabBarIconStyle: {
-          marginTop: compact ? 2 : 1,
+          marginTop: 1,
         },
         tabBarItemStyle: {
           borderRadius: compact ? 16 : 18,
-          marginHorizontal: compact ? 1 : 3,
-          minHeight: compact ? 48 : 52,
-          paddingVertical: compact ? 3 : 5,
+          marginHorizontal: compact ? 2 : 4,
+          minHeight: compact ? 46 : 50,
+          paddingVertical: compact ? 3 : 4,
         },
         tabBarActiveBackgroundColor:
           palette.background === colors.dark
-            ? "rgba(102,60,109,0.34)"
+            ? "rgba(161,83,172,0.24)"
             : colors.primarySoft,
         tabBarLabelStyle: {
-          fontSize: compact ? 9 : 10,
+          fontSize: compact ? 10 : 11,
           fontWeight: "800",
           marginTop: 1,
         },
@@ -90,10 +90,10 @@ export default function TabsLayout() {
               ? "rgba(32,22,42,0.96)"
               : "rgba(255,255,255,0.96)",
           borderColor: palette.border,
-          borderRadius: compact ? 22 : 26,
+          borderRadius: compact ? 20 : 24,
           borderWidth: 1,
-          bottom: Math.max(8, insets.bottom ? insets.bottom - 2 : 8),
-          elevation: 8,
+          bottom: Math.max(14, insets.bottom + 8),
+          elevation: 10,
           height: tabBarHeight,
           left: tabBarSide,
           paddingBottom: compact ? 7 : 9,
@@ -103,7 +103,7 @@ export default function TabsLayout() {
           right: tabBarSide,
           shadowColor: palette.shadow,
           shadowOffset: { height: -8, width: 0 },
-          shadowOpacity: 0.08,
+          shadowOpacity: 0.12,
           shadowRadius: 20,
         },
       }}

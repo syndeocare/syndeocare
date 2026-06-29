@@ -60,6 +60,7 @@ import {
   uploadProfileImage,
 } from "../../src/lib/api";
 import { useAuth } from "../../src/lib/auth";
+import { displayLabel, verificationStatusLabel } from "../../src/lib/format";
 import { usePreferences, useT } from "../../src/lib/preferences";
 import { queryClient } from "../../src/lib/query";
 import type {
@@ -122,6 +123,7 @@ function cleanFacilityType(value?: string) {
 export default function ProfileScreen() {
   const { logout, session } = useAuth();
   const t = useT();
+  const { language } = usePreferences();
   const text = useTextStyles();
   const palette = useThemePalette();
   const { width } = useWindowDimensions();
@@ -233,7 +235,7 @@ export default function ProfileScreen() {
         await updateMyClinicProfile({
           organizationName: displayNameDraft.trim(),
           facilityType:
-            cleanFacilityType(facilityType) || "Healthcare facility",
+            cleanFacilityType(facilityType) || "healthcare_facility",
           contactPhone: normalizedPhone,
           description:
             description ||
@@ -351,7 +353,7 @@ export default function ProfileScreen() {
       refreshing={profileQuery.isFetching}
       title={t("profile.title")}
     >
-      {profileQuery.isLoading ? (
+      {profileQuery.isLoading && !profileQuery.data ? (
         <LoadingBlock label={t("profile.loading")} />
       ) : null}
       <ErrorBanner
@@ -411,12 +413,18 @@ export default function ProfileScreen() {
             <Text style={text.h2}>{displayName}</Text>
             {clinicProfile ? (
               <Text style={text.body}>
-                {cleanFacilityType(clinicProfile.facilityType) ||
-                  t("profile.facilityType")}
+                {displayLabel(
+                  cleanFacilityType(clinicProfile.facilityType) ||
+                    "healthcare_facility",
+                  language,
+                )}
               </Text>
             ) : professionalProfile ? (
               <Text style={text.body}>
-                {professionalProfile.headline || professionalProfile.specialty}
+                {displayLabel(
+                  professionalProfile.headline || professionalProfile.specialty,
+                  language,
+                )}
               </Text>
             ) : null}
             {session?.principal.email ? (
@@ -432,7 +440,10 @@ export default function ProfileScreen() {
               >
                 {session?.principal.verificationStatus === "approved"
                   ? t("verification.approved")
-                  : session?.principal.verificationStatus.replace("_", " ")}
+                  : verificationStatusLabel(
+                      session?.principal.verificationStatus,
+                      language,
+                    )}
               </Badge>
               <Badge
                 tone={profile?.onboardingCompleted ? "success" : "warning"}
@@ -639,7 +650,10 @@ export default function ProfileScreen() {
                 <DetailRow
                   icon={<BriefcaseBusiness color={colors.primary} size={18} />}
                   label={t("profile.facilityType")}
-                  value={cleanFacilityType(clinicProfile.facilityType)}
+                  value={displayLabel(
+                    cleanFacilityType(clinicProfile.facilityType),
+                    language,
+                  )}
                 />
                 <DetailRow
                   icon={<Globe2 color={colors.primary} size={18} />}
@@ -651,7 +665,9 @@ export default function ProfileScreen() {
                   label={t("profile.services")}
                   value={
                     clinicProfile.services.length
-                      ? clinicProfile.services.join(", ")
+                      ? clinicProfile.services
+                          .map((service) => displayLabel(service, language))
+                          .join(", ")
                       : undefined
                   }
                 />
@@ -665,11 +681,11 @@ export default function ProfileScreen() {
                 <DetailRow
                   icon={<Stethoscope color={colors.primary} size={18} />}
                   label={t("profile.specialty")}
-                  value={professionalProfile.specialty}
+                  value={displayLabel(professionalProfile.specialty, language)}
                 />
                 <DetailRow
                   label={t("profile.headline")}
-                  value={professionalProfile.headline}
+                  value={displayLabel(professionalProfile.headline, language)}
                 />
                 <DetailRow
                   icon={<BriefcaseBusiness color={colors.primary} size={18} />}
@@ -684,7 +700,10 @@ export default function ProfileScreen() {
                 <DetailRow
                   icon={<ShieldCheck color={colors.primary} size={18} />}
                   label={t("profile.licenseDetails")}
-                  value={professionalProfile.licenseNumber}
+                  value={displayLabel(
+                    professionalProfile.licenseNumber,
+                    language,
+                  )}
                 />
                 <DetailRow
                   label={t("profile.availability")}
@@ -694,7 +713,11 @@ export default function ProfileScreen() {
                 />
                 <DetailRow
                   label={t("profile.locationRadius")}
-                  value={`${professionalProfile.availability.locationRadiusKm} km`}
+                  value={
+                    language === "ar"
+                      ? `${professionalProfile.availability.locationRadiusKm} كم`
+                      : `${professionalProfile.availability.locationRadiusKm} km`
+                  }
                 />
                 <DetailRow
                   label={t("profile.bio")}
@@ -924,6 +947,7 @@ function CatalogChips({
 }) {
   const t = useT();
   const text = useTextStyles();
+  const { language } = usePreferences();
 
   if (loading) return <LoadingBlock label={t("common.loading")} />;
   if (!items.length) {
@@ -934,6 +958,10 @@ function CatalogChips({
     <View style={styles.chipGrid}>
       {items.map((item) => {
         const selected = selectedValues.includes(item.name);
+        const label =
+          language === "ar" && item.nameAr
+            ? item.nameAr
+            : displayLabel(item.name, language);
         return (
           <Pressable
             accessibilityRole={multiple ? "checkbox" : "radio"}
@@ -948,7 +976,7 @@ function CatalogChips({
                 selected ? styles.chipTextSelected : undefined,
               ]}
             >
-              {item.name}
+              {label}
             </Text>
           </Pressable>
         );

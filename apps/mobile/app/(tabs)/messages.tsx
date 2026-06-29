@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "expo-router";
-import { ChevronRight, Search } from "lucide-react-native";
+import { ChevronRight, MessageCircle, Search } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -19,13 +19,14 @@ import {
 } from "../../src/components/ui";
 import { AppHeaderActions } from "../../src/components/AppHeaderActions";
 import { listConversations } from "../../src/lib/api";
+import { displayLabel, formatTime } from "../../src/lib/format";
 import { interpolate, usePreferences, useT } from "../../src/lib/preferences";
 
 export default function MessagesScreen() {
   const t = useT();
   const text = useTextStyles();
   const palette = useThemePalette();
-  const { direction } = usePreferences();
+  const { direction, language } = usePreferences();
   const isRTL = direction === "rtl";
   const [search, setSearch] = useState("");
   const conversationsQuery = useQuery({
@@ -58,7 +59,7 @@ export default function MessagesScreen() {
       refreshing={conversationsQuery.isFetching}
       title={t("messages.title")}
     >
-      {conversationsQuery.isLoading ? (
+      {conversationsQuery.isLoading && !conversationsQuery.data ? (
         <LoadingBlock label={t("messages.loading")} />
       ) : null}
       <ErrorBanner
@@ -72,6 +73,7 @@ export default function MessagesScreen() {
         label={t("messages.search")}
         leftIcon={<Search color={colors.muted} size={18} />}
         onChangeText={setSearch}
+        placeholder={t("messages.search")}
         returnKeyType="search"
         value={search}
       />
@@ -99,23 +101,19 @@ export default function MessagesScreen() {
                   <View style={styles.grow}>
                     <View style={[styles.row, isRTL && styles.rowReverse]}>
                       <Text numberOfLines={1} style={[text.h2, styles.title]}>
-                        {conversation.displayName}
+                        {displayLabel(conversation.displayName, language)}
                       </Text>
                       <Text style={[styles.time, { color: palette.muted }]}>
-                        {new Date(
-                          conversation.lastMessageAt,
-                        ).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                        {formatTime(conversation.lastMessageAt, language)}
                       </Text>
                     </View>
                     <Text style={[styles.role, { color: palette.muted }]}>
                       {t(`roles.${conversation.counterpartRole}`)}
                     </Text>
                     <Text numberOfLines={2} style={text.body}>
-                      {conversation.lastMessage ??
-                        t("messages.openConversation")}
+                      {conversation.lastMessage
+                        ? displayLabel(conversation.lastMessage, language)
+                        : t("messages.openConversation")}
                     </Text>
                     {conversation.unreadCount ? (
                       <View style={styles.unreadLine}>
@@ -149,6 +147,7 @@ export default function MessagesScreen() {
               ? t("messages.noSearchTitle")
               : t("messages.noConversationsTitle")
           }
+          icon={<MessageCircle color={colors.primary} size={26} />}
         />
       )}
     </Screen>

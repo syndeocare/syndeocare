@@ -1,7 +1,14 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import * as DocumentPicker from "expo-document-picker";
-import { Stack, useLocalSearchParams } from "expo-router";
-import { MessageCircle, Paperclip, Send } from "lucide-react-native";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import {
+  ArrowLeft,
+  ArrowRight,
+  FileText,
+  MessageCircle,
+  Paperclip,
+  Send,
+} from "lucide-react-native";
 import { useMemo, useState } from "react";
 import {
   Linking,
@@ -32,6 +39,7 @@ import {
   uploadChatMedia,
 } from "../../src/lib/api";
 import { useAuth } from "../../src/lib/auth";
+import { displayLabel, formatDateTime, formatTime } from "../../src/lib/format";
 import { usePreferences, useT } from "../../src/lib/preferences";
 import { queryClient } from "../../src/lib/query";
 import type { UserRole } from "../../src/types";
@@ -42,6 +50,7 @@ export default function ConversationScreen() {
     name?: string;
     role?: UserRole;
   }>();
+  const router = useRouter();
   const t = useT();
   const text = useTextStyles();
   const palette = useThemePalette();
@@ -148,9 +157,14 @@ export default function ConversationScreen() {
         headerEnd={<AppHeaderActions />}
         onRefresh={() => void messagesQuery.refetch()}
         refreshing={messagesQuery.isFetching}
-        title={t("conversation.title")}
+        subtitle={
+          typeof role === "string"
+            ? t(`roles.${role}`)
+            : t("conversation.secureThread")
+        }
+        title={displayLabel(counterpartLabel, language)}
       >
-        {messagesQuery.isLoading ? (
+        {messagesQuery.isLoading && !messagesQuery.data ? (
           <LoadingBlock label={t("conversation.loading")} />
         ) : null}
         <ErrorBanner
@@ -165,12 +179,35 @@ export default function ConversationScreen() {
           }
         />
 
-        <Card>
+        <Card tone="muted">
           <View style={[styles.conversationHeader, isRTL && styles.rowReverse]}>
-            <Avatar label={counterpartLabel} />
+            <Pressable
+              accessibilityLabel={t("shifts.back")}
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={() => router.back()}
+              style={({ pressed }) => [
+                styles.backButton,
+                { borderColor: palette.border },
+                pressed && styles.pressed,
+              ]}
+            >
+              {isRTL ? (
+                <ArrowRight color={palette.text} size={18} />
+              ) : (
+                <ArrowLeft color={palette.text} size={18} />
+              )}
+            </Pressable>
+            <Avatar label={counterpartLabel} size={46} />
             <View style={styles.grow}>
-              <Text style={text.h2}>{counterpartLabel}</Text>
-              <Text style={text.body}>{t("conversation.secureThread")}</Text>
+              <Text style={text.h2}>
+                {displayLabel(counterpartLabel, language)}
+              </Text>
+              <Text style={text.body}>
+                {typeof role === "string"
+                  ? t(`roles.${role}`)
+                  : t("conversation.secureThread")}
+              </Text>
             </View>
             <MessageCircle color={colors.primary} size={22} />
           </View>
@@ -191,7 +228,7 @@ export default function ConversationScreen() {
                 {showDate ? (
                   <View style={styles.datePill}>
                     <Text style={styles.datePillText}>
-                      {new Date(message.createdAt).toLocaleDateString()}
+                      {formatDateTime(message.createdAt, language)}
                     </Text>
                   </View>
                 ) : null}
@@ -205,11 +242,15 @@ export default function ConversationScreen() {
                       alignSelf: isMine ? "flex-end" : "flex-start",
                       backgroundColor:
                         isMine && theme === "dark"
-                          ? "#2F1F3A"
+                          ? "#6E4676"
                           : isMine
                             ? colors.primarySoft
-                            : palette.surface,
-                      borderColor: palette.border,
+                            : theme === "dark"
+                              ? "#30203B"
+                              : palette.surface,
+                      borderColor: isMine
+                        ? "rgba(255,255,255,0.16)"
+                        : palette.border,
                     },
                   ]}
                 >
@@ -217,25 +258,48 @@ export default function ConversationScreen() {
                     style={[styles.messageHeader, isRTL && styles.rowReverse]}
                   >
                     <Text
-                      style={[text.strong, isMine && styles.messageSenderMine]}
+                      style={[
+                        text.strong,
+                        isMine &&
+                          (theme === "dark"
+                            ? styles.messageSenderMineDark
+                            : styles.messageSenderMineLight),
+                      ]}
                     >
                       {isMine
                         ? t("conversation.you")
                         : t(`roles.${message.senderRole}`)}
                     </Text>
-                    <Text style={[styles.time, { color: palette.muted }]}>
-                      {new Date(message.createdAt).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                    <Text
+                      style={[
+                        styles.time,
+                        {
+                          color:
+                            isMine && theme === "dark"
+                              ? "#F2EAF5"
+                              : palette.muted,
+                        },
+                      ]}
+                    >
+                      {formatTime(message.createdAt, language)}
                     </Text>
                   </View>
                   {message.content ? (
                     <Text
                       style={[
-                        text.body,
                         styles.messageText,
-                        isMine && styles.messageTextMine,
+                        {
+                          color:
+                            isMine && theme === "dark"
+                              ? "#ffffff"
+                              : isMine
+                                ? colors.text
+                                : palette.text,
+                          fontFamily:
+                            language === "ar" ? fonts.arabic : fonts.body,
+                          textAlign: isRTL ? "right" : "left",
+                          writingDirection: direction,
+                        },
                       ]}
                     >
                       {message.content}
@@ -251,8 +315,20 @@ export default function ConversationScreen() {
                       }
                       style={[styles.fileRow, isRTL && styles.rowReverse]}
                     >
-                      <Paperclip color={colors.primaryDark} size={16} />
-                      <Text style={styles.file}>
+                      <FileText
+                        color={
+                          isMine && theme === "dark"
+                            ? "#ffffff"
+                            : colors.primaryDark
+                        }
+                        size={16}
+                      />
+                      <Text
+                        style={[
+                          styles.file,
+                          isMine && theme === "dark" && styles.fileMine,
+                        ]}
+                      >
                         {t("conversation.attachment")} {message.fileName}
                       </Text>
                     </Pressable>
@@ -265,24 +341,19 @@ export default function ConversationScreen() {
           <EmptyState
             body={t("conversation.emptyBody")}
             title={t("conversation.emptyTitle")}
+            icon={<MessageCircle color={colors.primary} size={26} />}
           />
         )}
 
-        <Card tone="muted">
-          <View style={[styles.composerTitle, isRTL && styles.rowReverse]}>
-            <View
-              style={[
-                styles.composerTitleIcon,
-                { borderColor: palette.border },
-              ]}
-            >
-              <Send color={colors.primary} size={17} />
-            </View>
-            <View style={styles.grow}>
-              <Text style={text.strong}>{t("conversation.composerTitle")}</Text>
-              <Text style={text.body}>{t("conversation.composerHint")}</Text>
-            </View>
-          </View>
+        <View
+          style={[
+            styles.composerPanel,
+            {
+              backgroundColor: palette.surfaceMuted,
+              borderColor: palette.border,
+            },
+          ]}
+        >
           {attachment ? (
             <View
               style={[
@@ -362,7 +433,7 @@ export default function ConversationScreen() {
               <Send color="#ffffff" size={18} />
             </Pressable>
           </View>
-        </Card>
+        </View>
       </Screen>
     </>
   );
@@ -380,7 +451,7 @@ const styles = StyleSheet.create({
   },
   composer: {
     alignItems: "flex-end",
-    borderRadius: 18,
+    borderRadius: 22,
     borderWidth: 1,
     flexDirection: "row",
     gap: 8,
@@ -405,17 +476,26 @@ const styles = StyleSheet.create({
   composerInputShell: {
     flex: 1,
   },
-  composerTitleIcon: {
+  backButton: {
     alignItems: "center",
     borderRadius: 999,
     borderWidth: 1,
-    height: 36,
+    height: 38,
     justifyContent: "center",
-    width: 36,
+    width: 38,
+  },
+  composerPanel: {
+    borderRadius: 20,
+    borderWidth: 1,
+    gap: 10,
+    padding: 10,
   },
   file: {
     color: colors.primaryDark,
     fontWeight: "800",
+  },
+  fileMine: {
+    color: "#ffffff",
   },
   fileRow: {
     alignItems: "center",
@@ -426,8 +506,9 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     gap: 8,
-    maxWidth: "86%",
-    padding: 14,
+    maxWidth: "88%",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
   messageBubbleMine: {
     borderBottomEndRadius: 6,
@@ -435,19 +516,15 @@ const styles = StyleSheet.create({
   messageBubbleOther: {
     borderBottomStartRadius: 6,
   },
-  messageSenderMine: {
+  messageSenderMineDark: {
+    color: "#ffffff",
+  },
+  messageSenderMineLight: {
     color: colors.primaryDark,
   },
   messageText: {
     fontSize: 15,
-  },
-  messageTextMine: {
-    color: colors.text,
-  },
-  composerTitle: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 8,
+    lineHeight: 22,
   },
   conversationHeader: {
     alignItems: "center",
