@@ -8,7 +8,13 @@ import {
 } from "lucide-react-native";
 import type React from "react";
 import { useEffect } from "react";
-import { StyleSheet, useWindowDimensions, View } from "react-native";
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors, fonts, useThemePalette } from "../../src/components/ui";
@@ -57,6 +63,18 @@ export default function TabsLayout() {
 
   return (
     <Tabs
+      tabBar={(props) => (
+        <SyndeoTabBar
+          {...props}
+          compact={compact}
+          direction={language === "ar" ? "rtl" : "ltr"}
+          isDark={isDark}
+          palette={palette}
+          tabBarHeight={tabBarHeight}
+          tabBarSide={tabBarSide}
+          tabBarWidth={tabBarWidth}
+        />
+      )}
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: "#ffffff",
@@ -175,6 +193,139 @@ export default function TabsLayout() {
   );
 }
 
+type SyndeoTabBarProps = Parameters<
+  NonNullable<React.ComponentProps<typeof Tabs>["tabBar"]>
+>[0] & {
+  compact: boolean;
+  direction: "ltr" | "rtl";
+  isDark: boolean;
+  palette: ReturnType<typeof useThemePalette>;
+  tabBarHeight: number;
+  tabBarSide: number;
+  tabBarWidth: number;
+};
+
+const ltrTabOrder = ["index", "shifts", "messages", "profile"];
+const rtlTabOrder = ["profile", "messages", "shifts", "index"];
+type TabRoute = SyndeoTabBarProps["state"]["routes"][number];
+
+function SyndeoTabBar({
+  compact,
+  descriptors,
+  direction,
+  isDark,
+  navigation,
+  palette,
+  state,
+  tabBarHeight,
+  tabBarSide,
+  tabBarWidth,
+}: SyndeoTabBarProps) {
+  const insets = useSafeAreaInsets();
+  const orderedRouteNames = direction === "rtl" ? rtlTabOrder : ltrTabOrder;
+  const visibleRoutes = orderedRouteNames
+    .map((routeName) => state.routes.find((route) => route.name === routeName))
+    .filter((route): route is TabRoute => Boolean(route));
+
+  return (
+    <View
+      style={[
+        styles.tabBar,
+        {
+          backgroundColor: isDark
+            ? "rgba(32,22,42,0.96)"
+            : "rgba(255,255,255,0.96)",
+          borderColor: palette.border,
+          bottom: Math.max(14, insets.bottom + 8),
+          height: tabBarHeight,
+          left: tabBarSide,
+          paddingBottom: compact ? 7 : 9,
+          paddingHorizontal: compact ? 8 : 11,
+          paddingTop: compact ? 7 : 9,
+          right: tabBarSide,
+          shadowColor: palette.shadow,
+          width: tabBarWidth,
+        },
+      ]}
+    >
+      {visibleRoutes.map((route) => {
+        const routeIndex = state.routes.findIndex(
+          (stateRoute) => stateRoute.key === route.key,
+        );
+        const focused = state.index === routeIndex;
+        const { options } = descriptors[route.key];
+        const label =
+          typeof options.title === "string" ? options.title : route.name;
+        const color = focused ? "#ffffff" : palette.muted;
+        const badge = options.tabBarBadge;
+
+        return (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={focused ? { selected: true } : undefined}
+            key={route.key}
+            onPress={() => {
+              const event = navigation.emit({
+                canPreventDefault: true,
+                target: route.key,
+                type: "tabPress",
+              });
+
+              if (!focused && !event.defaultPrevented) {
+                navigation.navigate(route.name, route.params);
+              }
+            }}
+            onLongPress={() => {
+              navigation.emit({
+                target: route.key,
+                type: "tabLongPress",
+              });
+            }}
+            style={[
+              styles.tabItem,
+              {
+                borderRadius: compact ? 16 : 18,
+                marginHorizontal: compact ? 2 : 4,
+                minHeight: compact ? 46 : 50,
+                paddingVertical: compact ? 3 : 4,
+              },
+            ]}
+          >
+            <View style={styles.tabIconWrap}>
+              {options.tabBarIcon?.({
+                color,
+                focused,
+                size: focused ? 23 : 21,
+              })}
+              {typeof badge === "number" && badge > 0 ? (
+                <View style={styles.tabBadge}>
+                  <Text style={styles.tabBadgeText}>
+                    {badge > 99 ? "99+" : badge}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.tabLabel,
+                {
+                  color,
+                  fontFamily:
+                    direction === "rtl" ? fonts.arabicBold : fonts.bodyBold,
+                  fontSize: compact ? 10 : 11,
+                },
+              ]}
+            >
+              {label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 function TabIcon({
   children,
   focused,
@@ -190,8 +341,56 @@ function TabIcon({
 }
 
 const styles = StyleSheet.create({
+  tabBar: {
+    alignItems: "center",
+    borderRadius: 26,
+    borderWidth: 1,
+    elevation: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    position: "absolute",
+    shadowOffset: { height: -8, width: 0 },
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+  },
+  tabItem: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center",
+  },
+  tabIconWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 38,
+    minWidth: 38,
+  },
   tabBarIconSlot: {
     marginTop: -2,
+  },
+  tabLabel: {
+    fontWeight: "800",
+    marginTop: 1,
+    maxWidth: "100%",
+    textAlign: "center",
+  },
+  tabBadge: {
+    alignItems: "center",
+    backgroundColor: colors.danger,
+    borderColor: "#ffffff",
+    borderRadius: 999,
+    borderWidth: 1,
+    justifyContent: "center",
+    minWidth: 18,
+    paddingHorizontal: 5,
+    position: "absolute",
+    right: -5,
+    top: -3,
+  },
+  tabBadgeText: {
+    color: "#ffffff",
+    fontSize: 10,
+    fontWeight: "900",
+    lineHeight: 14,
   },
   tabIcon: {
     alignItems: "center",
