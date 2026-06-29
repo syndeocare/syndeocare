@@ -3,7 +3,12 @@ import { Loader2, MapPin, Navigation, X } from "lucide-react-native";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
-import { colors, useTextStyles, useThemePalette } from "./ui";
+import {
+  colors,
+  useKeyboardAwareInput,
+  useTextStyles,
+  useThemePalette,
+} from "./ui";
 import { displayLabel } from "../lib/format";
 import { usePreferences, useT } from "../lib/preferences";
 import type { LocationValue } from "../types";
@@ -152,6 +157,7 @@ export function LocationField({
   const { direction, language } = usePreferences();
   const text = useTextStyles();
   const palette = useThemePalette();
+  const { ensureInputVisible } = useKeyboardAwareInput();
   const isRTL = direction === "rtl";
   const [inputValue, setInputValue] = useState(
     localizeLocationLabel(cleanCityLabel(value.address), language),
@@ -335,7 +341,8 @@ export function LocationField({
                 region: "Yemen",
               });
             }}
-            onFocus={() => {
+            onFocus={(event) => {
+              ensureInputVisible(event.nativeEvent.target);
               setSuggestions(fallbackSuggestions);
               setHasNetworkResults(false);
               setShowSuggestions(true);

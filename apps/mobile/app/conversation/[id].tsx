@@ -28,6 +28,7 @@ import {
   Screen,
   colors,
   fonts,
+  useKeyboardAwareInput,
   useTextStyles,
   useThemePalette,
 } from "../../src/components/ui";
@@ -406,22 +407,13 @@ export default function ConversationScreen() {
               <Paperclip color={colors.primary} size={20} />
             </Pressable>
             <Pressable style={styles.composerInputShell}>
-              <TextInput
-                accessibilityLabel={t("conversation.message")}
-                multiline
+              <ComposerTextInput
+                content={content}
+                direction={direction}
+                isRTL={isRTL}
+                language={language}
                 onChangeText={setContent}
-                placeholder={t("conversation.messagePlaceholder")}
-                placeholderTextColor={palette.placeholder}
-                style={[
-                  styles.composerInput,
-                  {
-                    color: palette.text,
-                    fontFamily: language === "ar" ? fonts.arabic : fonts.body,
-                    textAlign: isRTL ? "right" : "left",
-                    writingDirection: direction,
-                  },
-                ]}
-                value={content}
+                palette={palette}
               />
             </Pressable>
             <Pressable
@@ -447,6 +439,46 @@ export default function ConversationScreen() {
         </View>
       </Screen>
     </>
+  );
+}
+
+function ComposerTextInput({
+  content,
+  direction,
+  isRTL,
+  language,
+  onChangeText,
+  palette,
+}: {
+  content: string;
+  direction: "ltr" | "rtl";
+  isRTL: boolean;
+  language: "ar" | "en";
+  onChangeText: (value: string) => void;
+  palette: ReturnType<typeof useThemePalette>;
+}) {
+  const t = useT();
+  const { ensureInputVisible } = useKeyboardAwareInput();
+
+  return (
+    <TextInput
+      accessibilityLabel={t("conversation.message")}
+      multiline
+      onChangeText={onChangeText}
+      onFocus={(event) => ensureInputVisible(event.nativeEvent.target)}
+      placeholder={t("conversation.messagePlaceholder")}
+      placeholderTextColor={palette.placeholder}
+      style={[
+        styles.composerInput,
+        {
+          color: palette.text,
+          fontFamily: language === "ar" ? fonts.arabic : fonts.body,
+          textAlign: isRTL ? "right" : "left",
+          writingDirection: direction,
+        },
+      ]}
+      value={content}
+    />
   );
 }
 

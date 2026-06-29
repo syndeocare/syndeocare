@@ -3,7 +3,13 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Link } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Languages, Moon, Sun } from "lucide-react-native";
-import React, { useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Image,
@@ -137,6 +143,18 @@ const gradients = {
 };
 
 type ScreenTone = "app" | "auth";
+type KeyboardAwareScrollContextValue = {
+  ensureInputVisible: (target?: null | number) => void;
+};
+
+const KeyboardAwareScrollContext =
+  createContext<KeyboardAwareScrollContextValue>({
+    ensureInputVisible: () => undefined,
+  });
+
+export function useKeyboardAwareInput() {
+  return useContext(KeyboardAwareScrollContext);
+}
 
 function pressFeedback() {
   if (Platform.OS === "web") return;
@@ -405,6 +423,26 @@ export function Screen({
   const isCompact = width < 380;
   const horizontalPadding = isCompact ? 12 : 18;
   const contentMaxWidth = isAuth ? 520 : 720;
+  const scrollRef = useRef<ScrollView | null>(null);
+  const ensureInputVisible = useCallback((target?: null | number) => {
+    if (!target) return;
+    setTimeout(() => {
+      const responder = scrollRef.current as
+        | (ScrollView & {
+            scrollResponderScrollNativeHandleToKeyboard?: (
+              nodeHandle: number,
+              additionalOffset?: number,
+              preventNegativeScrollOffset?: boolean,
+            ) => void;
+          })
+        | null;
+      responder?.scrollResponderScrollNativeHandleToKeyboard?.(
+        target,
+        132,
+        true,
+      );
+    }, 80);
+  }, []);
 
   return (
     <LinearGradient
@@ -426,10 +464,12 @@ export function Screen({
       ) : null}
       <SafeAreaView style={styles.safe}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 8 : 0}
           style={styles.safe}
         >
           <ScrollView
+            ref={scrollRef}
             contentContainerStyle={[
               styles.scroll,
               {
@@ -442,6 +482,7 @@ export function Screen({
             ]}
             contentInsetAdjustmentBehavior="automatic"
             decelerationRate="fast"
+            keyboardDismissMode="interactive"
             keyboardShouldPersistTaps="handled"
             refreshControl={
               onRefresh ? (
@@ -453,53 +494,55 @@ export function Screen({
               ) : undefined
             }
           >
-            {title ? (
-              <View
-                style={[
-                  styles.screenHeader,
-                  {
-                    backgroundColor: onDark
-                      ? "rgba(32,22,42,0.72)"
-                      : "rgba(255,255,255,0.82)",
-                    borderColor: onDark
-                      ? "rgba(255,255,255,0.10)"
-                      : "rgba(86,132,154,0.16)",
-                    shadowColor: palette.shadow,
-                  },
-                ]}
-              >
+            <KeyboardAwareScrollContext.Provider value={{ ensureInputVisible }}>
+              {title ? (
                 <View
                   style={[
-                    styles.screenHeaderTop,
-                    direction === "rtl" && styles.rowReverse,
+                    styles.screenHeader,
+                    {
+                      backgroundColor: onDark
+                        ? "rgba(32,22,42,0.72)"
+                        : "rgba(255,255,255,0.82)",
+                      borderColor: onDark
+                        ? "rgba(255,255,255,0.10)"
+                        : "rgba(86,132,154,0.16)",
+                      shadowColor: palette.shadow,
+                    },
                   ]}
                 >
-                  <BrandLockup compact onDark={onDark} />
-                  {!isAuth ? headerEnd : null}
-                </View>
-                <Text
-                  style={[
-                    styles.screenTitle,
-                    { color: onDark ? "#ffffff" : palette.text },
-                    direction === "rtl" && styles.textRight,
-                  ]}
-                >
-                  {title}
-                </Text>
-                {subtitle ? (
+                  <View
+                    style={[
+                      styles.screenHeaderTop,
+                      direction === "rtl" && styles.rowReverse,
+                    ]}
+                  >
+                    <BrandLockup compact onDark={onDark} />
+                    {!isAuth ? headerEnd : null}
+                  </View>
                   <Text
                     style={[
-                      styles.screenSubtitle,
-                      { color: onDark ? colors.darkMuted : palette.muted },
+                      styles.screenTitle,
+                      { color: onDark ? "#ffffff" : palette.text },
                       direction === "rtl" && styles.textRight,
                     ]}
                   >
-                    {subtitle}
+                    {title}
                   </Text>
-                ) : null}
-              </View>
-            ) : null}
-            {children}
+                  {subtitle ? (
+                    <Text
+                      style={[
+                        styles.screenSubtitle,
+                        { color: onDark ? colors.darkMuted : palette.muted },
+                        direction === "rtl" && styles.textRight,
+                      ]}
+                    >
+                      {subtitle}
+                    </Text>
+                  ) : null}
+                </View>
+              ) : null}
+              {children}
+            </KeyboardAwareScrollContext.Provider>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -743,6 +786,7 @@ export function Field({
   const isRTL = direction === "rtl";
   const family = language === "ar" ? fonts.arabic : fonts.body;
   const labelFamily = language === "ar" ? fonts.arabicBold : fonts.bodyBold;
+  const { ensureInputVisible } = useKeyboardAwareInput();
 
   return (
     <View style={styles.field}>
@@ -777,7 +821,10 @@ export function Field({
           multiline={multiline}
           onBlur={() => setFocused(false)}
           onChangeText={onChangeText}
-          onFocus={() => setFocused(true)}
+          onFocus={(event) => {
+            setFocused(true);
+            ensureInputVisible(event.nativeEvent.target);
+          }}
           placeholder={placeholder}
           placeholderTextColor={palette.placeholder}
           returnKeyType={returnKeyType}

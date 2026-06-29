@@ -4,6 +4,8 @@ import {
   AlertCircle,
   CalendarClock,
   Check,
+  ChevronLeft,
+  ChevronRight,
   MapPin,
   Plus,
   Search,
@@ -12,10 +14,13 @@ import {
 import { useMemo, useState } from "react";
 import {
   Modal,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 
@@ -66,7 +71,40 @@ function activeCatalogItems(items?: CatalogItem[]) {
 }
 
 function dateTimeToIso(date: string, time: string) {
-  return new Date(`${date}T${time}:00+03:00`).toISOString();
+  const parsed = new Date(`${date}T${time}:00+03:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+function startOfToday() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return today;
+}
+
+function formatDateInput(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function parseDateInput(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function addMonths(value: Date, amount: number) {
+  return new Date(value.getFullYear(), value.getMonth() + amount, 1);
 }
 
 function splitLocation(
@@ -93,7 +131,9 @@ export default function ShiftsScreen() {
   const { direction, language } = usePreferences();
   const text = useTextStyles();
   const palette = useThemePalette();
+  const { width } = useWindowDimensions();
   const isRTL = direction === "rtl";
+  const isNarrow = width < 440;
   const professionalCanApply =
     session?.principal.role !== "professional" ||
     (session.principal.verificationStatus === "approved" &&
@@ -192,23 +232,37 @@ export default function ShiftsScreen() {
   });
   const createShiftMutation = useMutation({
     mutationFn: async () => {
-      const startsAtIso = dateTimeToIso(
-        shiftDraft.shiftDate,
-        shiftDraft.startTime,
-      );
-      const endsAtIso = dateTimeToIso(shiftDraft.shiftDate, shiftDraft.endTime);
-      const startsAt = new Date(startsAtIso);
-      const endsAt = new Date(endsAtIso);
+      const shiftDate = parseDateInput(shiftDraft.shiftDate);
       const amount = Number(shiftDraft.amount);
 
       if (!shiftDraft.role.trim()) throw new Error(t("shifts.roleRequired"));
       if (!shiftDraft.shiftDate.trim()) {
         throw new Error(t("shifts.shiftDateRequired"));
       }
-      if (Number.isNaN(startsAt.getTime())) {
+      if (!shiftDate) {
+        throw new Error(t("shifts.shiftDateRequired"));
+      }
+      if (shiftDate < startOfToday()) {
+        throw new Error(t("shifts.shiftDatePast"));
+      }
+
+      const startsAtIso = dateTimeToIso(
+        shiftDraft.shiftDate,
+        shiftDraft.startTime,
+      );
+      const endsAtIso = dateTimeToIso(shiftDraft.shiftDate, shiftDraft.endTime);
+
+      if (!startsAtIso) {
         throw new Error(t("shifts.startsAtRequired"));
       }
-      if (Number.isNaN(endsAt.getTime()) || endsAt <= startsAt) {
+      if (!endsAtIso) {
+        throw new Error(t("shifts.endsAtInvalid"));
+      }
+
+      const startsAt = new Date(startsAtIso);
+      const endsAt = new Date(endsAtIso);
+
+      if (endsAt <= startsAt) {
         throw new Error(t("shifts.endsAtInvalid"));
       }
       if (!Number.isFinite(amount) || amount <= 0) {
@@ -650,35 +704,43 @@ export default function ShiftsScreen() {
         visible={Boolean(selectedJob)}
       >
         <View style={styles.modalShade}>
-          <View
-            style={[
-              styles.modal,
-              { backgroundColor: palette.surface, borderColor: palette.border },
-            ]}
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={styles.modalKeyboard}
           >
-            <Text style={text.h2}>{t("shifts.applyTitle")}</Text>
-            <Text style={text.body}>{t("shifts.applyBody")}</Text>
-            <Field
-              label={t("shifts.proposal")}
-              multiline
-              onChangeText={setProposal}
-              placeholder={t("shifts.proposalPlaceholder")}
-              returnKeyType="default"
-              value={proposal}
-            />
-            <Button
-              loading={applyMutation.isPending}
-              onPress={() => applyMutation.mutate()}
+            <View
+              style={[
+                styles.modal,
+                {
+                  backgroundColor: palette.surface,
+                  borderColor: palette.border,
+                },
+              ]}
             >
-              {t("shifts.submitApplication")}
-            </Button>
-            <Pressable
-              onPress={() => setSelectedJob(null)}
-              style={styles.cancel}
-            >
-              <Text style={styles.cancelText}>{t("shifts.cancel")}</Text>
-            </Pressable>
-          </View>
+              <Text style={text.h2}>{t("shifts.applyTitle")}</Text>
+              <Text style={text.body}>{t("shifts.applyBody")}</Text>
+              <Field
+                label={t("shifts.proposal")}
+                multiline
+                onChangeText={setProposal}
+                placeholder={t("shifts.proposalPlaceholder")}
+                returnKeyType="default"
+                value={proposal}
+              />
+              <Button
+                loading={applyMutation.isPending}
+                onPress={() => applyMutation.mutate()}
+              >
+                {t("shifts.submitApplication")}
+              </Button>
+              <Pressable
+                onPress={() => setSelectedJob(null)}
+                style={styles.cancel}
+              >
+                <Text style={styles.cancelText}>{t("shifts.cancel")}</Text>
+              </Pressable>
+            </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
 
@@ -689,289 +751,307 @@ export default function ShiftsScreen() {
         visible={showCreateShift}
       >
         <View style={styles.modalShade}>
-          <View
-            style={[styles.modalSheet, { backgroundColor: palette.surface }]}
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={styles.modalKeyboard}
           >
-            <ScrollView
-              contentContainerStyle={styles.modalScroll}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
+            <View
+              style={[styles.modalSheet, { backgroundColor: palette.surface }]}
             >
-              <Text style={text.h2}>{t("shifts.createShift")}</Text>
-              <Text style={text.body}>{t("shifts.createShiftBody")}</Text>
-              <StepDots current={createStep} />
-              {createStep === "details" ? (
-                <>
-                  {rolesQuery.isLoading ? (
-                    <LoadingBlock label={t("shifts.loadingRoles")} />
-                  ) : null}
-                  <Field
-                    label={t("shifts.searchRole")}
-                    leftIcon={<Search color={colors.muted} size={18} />}
-                    onChangeText={setRoleSearch}
-                    returnKeyType="search"
-                    value={roleSearch}
-                  />
-                  <CatalogChips
-                    emptyLabel={t("shifts.noRoles")}
-                    items={filteredRoleOptions}
-                    onSelect={(item) =>
-                      setShiftDraft((draft) => ({
-                        ...draft,
-                        role: item.name,
-                        title: draft.title || item.name,
-                      }))
-                    }
-                    selectedValues={[shiftDraft.role]}
-                  />
-                  <Field
-                    label={t("shifts.shiftTitle")}
-                    onChangeText={(value) =>
-                      setShiftDraft((draft) => ({ ...draft, title: value }))
-                    }
-                    returnKeyType="next"
-                    value={shiftDraft.title}
-                  />
-                  <View style={styles.twoColumn}>
-                    <Field
-                      autoComplete="off"
-                      label={t("shifts.shiftDate")}
-                      onChangeText={(value) =>
-                        setShiftDraft((draft) => ({
-                          ...draft,
-                          shiftDate: value,
-                        }))
-                      }
-                      placeholder="2026-06-28"
-                      returnKeyType="next"
-                      value={shiftDraft.shiftDate}
-                    />
-                    <Field
-                      keyboardType="decimal-pad"
-                      label={t("shifts.hourlyRate")}
-                      onChangeText={(value) =>
-                        setShiftDraft((draft) => ({ ...draft, amount: value }))
-                      }
-                      returnKeyType="next"
-                      value={shiftDraft.amount}
-                    />
-                  </View>
-                  <View style={styles.twoColumn}>
-                    <Field
-                      autoComplete="off"
-                      label={t("shifts.startTime")}
-                      onChangeText={(value) =>
-                        setShiftDraft((draft) => ({
-                          ...draft,
-                          startTime: value,
-                        }))
-                      }
-                      placeholder="08:00"
-                      returnKeyType="next"
-                      value={shiftDraft.startTime}
-                    />
-                    <Field
-                      autoComplete="off"
-                      label={t("shifts.endTime")}
-                      onChangeText={(value) =>
-                        setShiftDraft((draft) => ({
-                          ...draft,
-                          endTime: value,
-                        }))
-                      }
-                      placeholder="16:00"
-                      returnKeyType="next"
-                      value={shiftDraft.endTime}
-                    />
-                  </View>
-                  <Field
-                    label={t("shifts.location")}
-                    onChangeText={(value) =>
-                      setShiftDraft((draft) => ({
-                        ...draft,
-                        locationAddress: value,
-                      }))
-                    }
-                    placeholder={t("shifts.locationPlaceholder")}
-                    returnKeyType="next"
-                    value={shiftDraft.locationAddress}
-                  />
-                </>
-              ) : null}
-              {createStep === "requirements" ? (
-                <>
-                  <Field
-                    label={t("shifts.summary")}
-                    multiline
-                    onChangeText={(value) =>
-                      setShiftDraft((draft) => ({ ...draft, summary: value }))
-                    }
-                    returnKeyType="default"
-                    value={shiftDraft.summary}
-                  />
-                  <Field
-                    label={t("shifts.description")}
-                    multiline
-                    onChangeText={(value) =>
-                      setShiftDraft((draft) => ({
-                        ...draft,
-                        description: value,
-                      }))
-                    }
-                    returnKeyType="default"
-                    value={shiftDraft.description}
-                  />
-                  {certificationsQuery.isLoading ? (
-                    <LoadingBlock label={t("shifts.loadingCertifications")} />
-                  ) : null}
-                  <Field
-                    label={t("shifts.searchCertifications")}
-                    leftIcon={<Search color={colors.muted} size={18} />}
-                    onChangeText={setCertificationSearch}
-                    returnKeyType="search"
-                    value={certificationSearch}
-                  />
-                  <CatalogChips
-                    emptyLabel={t("shifts.noCertifications")}
-                    items={filteredCertificationOptions}
-                    multiple
-                    onSelect={(item) =>
-                      setShiftDraft((draft) => ({
-                        ...draft,
-                        requiredCertifications:
-                          draft.requiredCertifications.includes(item.name)
-                            ? draft.requiredCertifications.filter(
-                                (name) => name !== item.name,
-                              )
-                            : [...draft.requiredCertifications, item.name],
-                      }))
-                    }
-                    selectedValues={shiftDraft.requiredCertifications}
-                  />
-                  <Pressable
-                    accessibilityRole="switch"
-                    accessibilityState={{ checked: shiftDraft.isUrgent }}
-                    onPress={() =>
-                      setShiftDraft((draft) => ({
-                        ...draft,
-                        isUrgent: !draft.isUrgent,
-                      }))
-                    }
-                    style={[
-                      styles.urgentRow,
-                      {
-                        backgroundColor: shiftDraft.isUrgent
-                          ? colors.dangerSoft
-                          : palette.surfaceMuted,
-                        borderColor: shiftDraft.isUrgent
-                          ? "#FCA5A5"
-                          : palette.border,
-                      },
-                    ]}
-                  >
-                    <AlertCircle
-                      color={shiftDraft.isUrgent ? colors.danger : colors.muted}
-                      size={20}
-                    />
-                    <View style={styles.grow}>
-                      <Text style={text.strong}>{t("shifts.markUrgent")}</Text>
-                      <Text style={text.body}>{t("shifts.urgentHint")}</Text>
-                    </View>
-                    {shiftDraft.isUrgent ? (
-                      <Check color={colors.danger} size={20} />
+              <ScrollView
+                contentContainerStyle={styles.modalScroll}
+                keyboardDismissMode="interactive"
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                <Text style={text.h2}>{t("shifts.createShift")}</Text>
+                <Text style={text.body}>{t("shifts.createShiftBody")}</Text>
+                <StepDots current={createStep} />
+                {createStep === "details" ? (
+                  <>
+                    {rolesQuery.isLoading ? (
+                      <LoadingBlock label={t("shifts.loadingRoles")} />
                     ) : null}
-                  </Pressable>
-                </>
-              ) : null}
-              {createStep === "review" ? (
-                <Card tone="muted">
-                  <ReviewRow
-                    label={t("shifts.specialty")}
-                    value={displayLabel(shiftDraft.role, language)}
-                  />
-                  <ReviewRow
-                    label={t("shifts.shiftTitle")}
-                    value={displayLabel(
-                      shiftDraft.title || shiftDraft.role,
-                      language,
-                    )}
-                  />
-                  <ReviewRow
-                    label={t("shifts.startsAt")}
-                    value={`${shiftDraft.shiftDate} ${shiftDraft.startTime}`}
-                  />
-                  <ReviewRow
-                    label={t("shifts.endsAt")}
-                    value={`${shiftDraft.shiftDate} ${shiftDraft.endTime}`}
-                  />
-                  <ReviewRow
-                    label={t("shifts.location")}
-                    value={displayLabel(
-                      shiftDraft.locationAddress ||
-                        `${clinicProfileQuery.data?.city ?? ""}, ${
-                          clinicProfileQuery.data?.region ?? ""
-                        }`,
-                      language,
-                    )}
-                  />
-                  <ReviewRow
-                    label={t("shifts.requirements")}
-                    value={
-                      shiftDraft.requiredCertifications
-                        .map((item) => displayLabel(item, language))
-                        .join(language === "ar" ? "، " : ", ") ||
-                      t("shifts.noOptionalRequirements")
+                    <Field
+                      label={t("shifts.searchRole")}
+                      leftIcon={<Search color={colors.muted} size={18} />}
+                      onChangeText={setRoleSearch}
+                      returnKeyType="search"
+                      value={roleSearch}
+                    />
+                    <CatalogChips
+                      emptyLabel={t("shifts.noRoles")}
+                      items={filteredRoleOptions}
+                      onSelect={(item) =>
+                        setShiftDraft((draft) => ({
+                          ...draft,
+                          role: item.name,
+                          title: draft.title || item.name,
+                        }))
+                      }
+                      selectedValues={[shiftDraft.role]}
+                    />
+                    <Field
+                      label={t("shifts.shiftTitle")}
+                      onChangeText={(value) =>
+                        setShiftDraft((draft) => ({ ...draft, title: value }))
+                      }
+                      returnKeyType="next"
+                      value={shiftDraft.title}
+                    />
+                    <View
+                      style={[styles.twoColumn, isNarrow && styles.oneColumn]}
+                    >
+                      <DatePickerField
+                        label={t("shifts.shiftDate")}
+                        minimumDate={startOfToday()}
+                        onChange={(value) =>
+                          setShiftDraft((draft) => ({
+                            ...draft,
+                            shiftDate: value,
+                          }))
+                        }
+                        value={shiftDraft.shiftDate}
+                      />
+                      <Field
+                        keyboardType="decimal-pad"
+                        label={t("shifts.hourlyRate")}
+                        onChangeText={(value) =>
+                          setShiftDraft((draft) => ({
+                            ...draft,
+                            amount: value,
+                          }))
+                        }
+                        returnKeyType="next"
+                        value={shiftDraft.amount}
+                      />
+                    </View>
+                    <View
+                      style={[styles.twoColumn, isNarrow && styles.oneColumn]}
+                    >
+                      <Field
+                        autoComplete="off"
+                        label={t("shifts.startTime")}
+                        onChangeText={(value) =>
+                          setShiftDraft((draft) => ({
+                            ...draft,
+                            startTime: value,
+                          }))
+                        }
+                        placeholder="08:00"
+                        returnKeyType="next"
+                        value={shiftDraft.startTime}
+                      />
+                      <Field
+                        autoComplete="off"
+                        label={t("shifts.endTime")}
+                        onChangeText={(value) =>
+                          setShiftDraft((draft) => ({
+                            ...draft,
+                            endTime: value,
+                          }))
+                        }
+                        placeholder="16:00"
+                        returnKeyType="next"
+                        value={shiftDraft.endTime}
+                      />
+                    </View>
+                    <Field
+                      label={t("shifts.location")}
+                      onChangeText={(value) =>
+                        setShiftDraft((draft) => ({
+                          ...draft,
+                          locationAddress: value,
+                        }))
+                      }
+                      placeholder={t("shifts.locationPlaceholder")}
+                      returnKeyType="next"
+                      value={shiftDraft.locationAddress}
+                    />
+                  </>
+                ) : null}
+                {createStep === "requirements" ? (
+                  <>
+                    <Field
+                      label={t("shifts.summary")}
+                      multiline
+                      onChangeText={(value) =>
+                        setShiftDraft((draft) => ({ ...draft, summary: value }))
+                      }
+                      returnKeyType="default"
+                      value={shiftDraft.summary}
+                    />
+                    <Field
+                      label={t("shifts.description")}
+                      multiline
+                      onChangeText={(value) =>
+                        setShiftDraft((draft) => ({
+                          ...draft,
+                          description: value,
+                        }))
+                      }
+                      returnKeyType="default"
+                      value={shiftDraft.description}
+                    />
+                    {certificationsQuery.isLoading ? (
+                      <LoadingBlock label={t("shifts.loadingCertifications")} />
+                    ) : null}
+                    <Field
+                      label={t("shifts.searchCertifications")}
+                      leftIcon={<Search color={colors.muted} size={18} />}
+                      onChangeText={setCertificationSearch}
+                      returnKeyType="search"
+                      value={certificationSearch}
+                    />
+                    <CatalogChips
+                      emptyLabel={t("shifts.noCertifications")}
+                      items={filteredCertificationOptions}
+                      multiple
+                      onSelect={(item) =>
+                        setShiftDraft((draft) => ({
+                          ...draft,
+                          requiredCertifications:
+                            draft.requiredCertifications.includes(item.name)
+                              ? draft.requiredCertifications.filter(
+                                  (name) => name !== item.name,
+                                )
+                              : [...draft.requiredCertifications, item.name],
+                        }))
+                      }
+                      selectedValues={shiftDraft.requiredCertifications}
+                    />
+                    <Pressable
+                      accessibilityRole="switch"
+                      accessibilityState={{ checked: shiftDraft.isUrgent }}
+                      onPress={() =>
+                        setShiftDraft((draft) => ({
+                          ...draft,
+                          isUrgent: !draft.isUrgent,
+                        }))
+                      }
+                      style={[
+                        styles.urgentRow,
+                        {
+                          backgroundColor: shiftDraft.isUrgent
+                            ? colors.dangerSoft
+                            : palette.surfaceMuted,
+                          borderColor: shiftDraft.isUrgent
+                            ? "#FCA5A5"
+                            : palette.border,
+                        },
+                      ]}
+                    >
+                      <AlertCircle
+                        color={
+                          shiftDraft.isUrgent ? colors.danger : colors.muted
+                        }
+                        size={20}
+                      />
+                      <View style={styles.grow}>
+                        <Text style={text.strong}>
+                          {t("shifts.markUrgent")}
+                        </Text>
+                        <Text style={text.body}>{t("shifts.urgentHint")}</Text>
+                      </View>
+                      {shiftDraft.isUrgent ? (
+                        <Check color={colors.danger} size={20} />
+                      ) : null}
+                    </Pressable>
+                  </>
+                ) : null}
+                {createStep === "review" ? (
+                  <Card tone="muted">
+                    <ReviewRow
+                      label={t("shifts.specialty")}
+                      value={displayLabel(shiftDraft.role, language)}
+                    />
+                    <ReviewRow
+                      label={t("shifts.shiftTitle")}
+                      value={displayLabel(
+                        shiftDraft.title || shiftDraft.role,
+                        language,
+                      )}
+                    />
+                    <ReviewRow
+                      label={t("shifts.startsAt")}
+                      value={`${shiftDraft.shiftDate} ${shiftDraft.startTime}`}
+                    />
+                    <ReviewRow
+                      label={t("shifts.endsAt")}
+                      value={`${shiftDraft.shiftDate} ${shiftDraft.endTime}`}
+                    />
+                    <ReviewRow
+                      label={t("shifts.location")}
+                      value={displayLabel(
+                        shiftDraft.locationAddress ||
+                          `${clinicProfileQuery.data?.city ?? ""}, ${
+                            clinicProfileQuery.data?.region ?? ""
+                          }`,
+                        language,
+                      )}
+                    />
+                    <ReviewRow
+                      label={t("shifts.requirements")}
+                      value={
+                        shiftDraft.requiredCertifications
+                          .map((item) => displayLabel(item, language))
+                          .join(language === "ar" ? "، " : ", ") ||
+                        t("shifts.noOptionalRequirements")
+                      }
+                    />
+                  </Card>
+                ) : null}
+              </ScrollView>
+              <View style={styles.stepActions}>
+                {createStep !== "details" ? (
+                  <Button
+                    onPress={() =>
+                      setCreateStep(
+                        createStep === "review" ? "requirements" : "details",
+                      )
                     }
-                  />
-                </Card>
-              ) : null}
-            </ScrollView>
-            <View style={styles.stepActions}>
-              {createStep !== "details" ? (
-                <Button
-                  onPress={() =>
-                    setCreateStep(
-                      createStep === "review" ? "requirements" : "details",
-                    )
-                  }
-                  tone="secondary"
-                >
-                  {t("shifts.back")}
-                </Button>
-              ) : null}
-              {createStep !== "review" ? (
-                <Button
-                  disabled={
-                    createStep === "details" &&
-                    (!shiftDraft.role ||
-                      rolesQuery.isLoading ||
-                      rolesQuery.isError ||
-                      roleOptions.length === 0)
-                  }
-                  onPress={() =>
-                    setCreateStep(
-                      createStep === "details" ? "requirements" : "review",
-                    )
-                  }
-                >
-                  {t("shifts.next")}
-                </Button>
-              ) : (
-                <Button
-                  loading={createShiftMutation.isPending}
-                  onPress={() => createShiftMutation.mutate()}
-                >
-                  {t("shifts.publishShift")}
-                </Button>
-              )}
+                    tone="secondary"
+                  >
+                    {t("shifts.back")}
+                  </Button>
+                ) : null}
+                {createStep !== "review" ? (
+                  <Button
+                    disabled={
+                      createStep === "details" &&
+                      (!shiftDraft.role ||
+                        !parseDateInput(shiftDraft.shiftDate) ||
+                        (parseDateInput(shiftDraft.shiftDate) ??
+                          startOfToday()) < startOfToday() ||
+                        rolesQuery.isLoading ||
+                        rolesQuery.isError ||
+                        roleOptions.length === 0)
+                    }
+                    onPress={() =>
+                      setCreateStep(
+                        createStep === "details" ? "requirements" : "review",
+                      )
+                    }
+                  >
+                    {t("shifts.next")}
+                  </Button>
+                ) : (
+                  <Button
+                    loading={createShiftMutation.isPending}
+                    onPress={() => createShiftMutation.mutate()}
+                  >
+                    {t("shifts.publishShift")}
+                  </Button>
+                )}
+              </View>
+              <Pressable
+                onPress={() => setShowCreateShift(false)}
+                style={styles.cancel}
+              >
+                <Text style={styles.cancelText}>{t("shifts.cancel")}</Text>
+              </Pressable>
             </View>
-            <Pressable
-              onPress={() => setShowCreateShift(false)}
-              style={styles.cancel}
-            >
-              <Text style={styles.cancelText}>{t("shifts.cancel")}</Text>
-            </Pressable>
-          </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
     </Screen>
@@ -1071,6 +1151,181 @@ function ReviewRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+function DatePickerField({
+  label,
+  minimumDate,
+  onChange,
+  value,
+}: {
+  label: string;
+  minimumDate: Date;
+  onChange: (value: string) => void;
+  value: string;
+}) {
+  const t = useT();
+  const textStyles = useTextStyles();
+  const palette = useThemePalette();
+  const { direction, language } = usePreferences();
+  const isRTL = direction === "rtl";
+  const selectedDate = parseDateInput(value);
+  const [isOpen, setIsOpen] = useState(false);
+  const [visibleMonth, setVisibleMonth] = useState(selectedDate ?? minimumDate);
+  const monthStart = new Date(
+    visibleMonth.getFullYear(),
+    visibleMonth.getMonth(),
+    1,
+  );
+  const daysInMonth = new Date(
+    monthStart.getFullYear(),
+    monthStart.getMonth() + 1,
+    0,
+  ).getDate();
+  const leadingBlanks = monthStart.getDay();
+  const locale = language === "ar" ? "ar-YE" : "en";
+  const monthLabel = new Intl.DateTimeFormat(locale, {
+    month: "long",
+    year: "numeric",
+  }).format(monthStart);
+  const weekdayLabels = Array.from({ length: 7 }, (_, index) =>
+    new Intl.DateTimeFormat(locale, { weekday: "short" }).format(
+      new Date(2026, 5, 7 + index),
+    ),
+  );
+  const cells: (Date | null)[] = [
+    ...Array.from({ length: leadingBlanks }, () => null),
+    ...Array.from(
+      { length: daysInMonth },
+      (_, index) =>
+        new Date(monthStart.getFullYear(), monthStart.getMonth(), index + 1),
+    ),
+  ];
+
+  return (
+    <View style={styles.dateField}>
+      <Text style={textStyles.strong}>{label}</Text>
+      <Pressable
+        accessibilityLabel={label}
+        accessibilityRole="button"
+        onPress={() => setIsOpen(true)}
+        style={({ pressed }) => [
+          styles.dateInput,
+          { backgroundColor: palette.input, borderColor: palette.border },
+          pressed && styles.pressedChip,
+        ]}
+      >
+        <CalendarClock color={palette.placeholder} size={18} />
+        <Text style={[styles.dateInputText, { color: palette.text }]}>
+          {selectedDate
+            ? new Intl.DateTimeFormat(locale, {
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              }).format(selectedDate)
+            : t("shifts.selectDate")}
+        </Text>
+      </Pressable>
+
+      <Modal
+        animationType="fade"
+        onRequestClose={() => setIsOpen(false)}
+        transparent
+        visible={isOpen}
+      >
+        <View style={styles.calendarShade}>
+          <View
+            style={[
+              styles.calendarPanel,
+              { backgroundColor: palette.surface, borderColor: palette.border },
+            ]}
+          >
+            <View style={[styles.calendarHeader, isRTL && styles.rowReverse]}>
+              <Pressable
+                accessibilityLabel={t("shifts.previousMonth")}
+                accessibilityRole="button"
+                onPress={() => setVisibleMonth((month) => addMonths(month, -1))}
+                style={styles.calendarNav}
+              >
+                {isRTL ? (
+                  <ChevronRight color={palette.text} size={20} />
+                ) : (
+                  <ChevronLeft color={palette.text} size={20} />
+                )}
+              </Pressable>
+              <Text style={textStyles.h2}>{monthLabel}</Text>
+              <Pressable
+                accessibilityLabel={t("shifts.nextMonth")}
+                accessibilityRole="button"
+                onPress={() => setVisibleMonth((month) => addMonths(month, 1))}
+                style={styles.calendarNav}
+              >
+                {isRTL ? (
+                  <ChevronLeft color={palette.text} size={20} />
+                ) : (
+                  <ChevronRight color={palette.text} size={20} />
+                )}
+              </Pressable>
+            </View>
+            <View style={styles.weekdayGrid}>
+              {weekdayLabels.map((weekday) => (
+                <Text
+                  key={weekday}
+                  style={[styles.weekdayLabel, { color: palette.muted }]}
+                >
+                  {weekday}
+                </Text>
+              ))}
+            </View>
+            <View style={styles.calendarGrid}>
+              {cells.map((date, index) => {
+                const disabled = !date || date < minimumDate;
+                const selected =
+                  date && selectedDate
+                    ? formatDateInput(date) === formatDateInput(selectedDate)
+                    : false;
+                return (
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={disabled}
+                    key={date ? formatDateInput(date) : `blank-${index}`}
+                    onPress={() => {
+                      if (!date) return;
+                      onChange(formatDateInput(date));
+                      setIsOpen(false);
+                    }}
+                    style={[
+                      styles.calendarDay,
+                      {
+                        backgroundColor: selected
+                          ? colors.primary
+                          : palette.surfaceMuted,
+                        opacity: disabled ? 0.35 : 1,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.calendarDayText,
+                        { color: selected ? "#ffffff" : palette.text },
+                      ]}
+                    >
+                      {date
+                        ? new Intl.NumberFormat(locale).format(date.getDate())
+                        : ""}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Button onPress={() => setIsOpen(false)} tone="secondary">
+              {t("common.cancel")}
+            </Button>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   cancel: {
     alignItems: "center",
@@ -1086,10 +1341,70 @@ const styles = StyleSheet.create({
   actions: {
     gap: 10,
   },
+  calendarDay: {
+    alignItems: "center",
+    borderRadius: 14,
+    height: 42,
+    justifyContent: "center",
+    width: "13.2%",
+  },
+  calendarDayText: {
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  calendarGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 5,
+  },
+  calendarHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  calendarNav: {
+    alignItems: "center",
+    borderRadius: 999,
+    height: 42,
+    justifyContent: "center",
+    width: 42,
+  },
+  calendarPanel: {
+    borderRadius: 24,
+    borderWidth: 1,
+    gap: 14,
+    padding: 18,
+    width: "92%",
+  },
+  calendarShade: {
+    alignItems: "center",
+    backgroundColor: "rgba(19, 13, 25, 0.72)",
+    flex: 1,
+    justifyContent: "center",
+    padding: 16,
+  },
   ctaTop: {
     alignItems: "center",
     flexDirection: "row",
     gap: 12,
+  },
+  dateField: {
+    flex: 1,
+    gap: 7,
+  },
+  dateInput: {
+    alignItems: "center",
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 9,
+    minHeight: 54,
+    paddingHorizontal: 14,
+  },
+  dateInputText: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "800",
   },
   choiceChip: {
     alignItems: "center",
@@ -1125,6 +1440,9 @@ const styles = StyleSheet.create({
     gap: 10,
     padding: 12,
   },
+  oneColumn: {
+    flexDirection: "column",
+  },
   metaLine: {
     alignItems: "center",
     flexDirection: "row",
@@ -1141,6 +1459,10 @@ const styles = StyleSheet.create({
   modalScroll: {
     gap: 14,
     paddingBottom: 14,
+  },
+  modalKeyboard: {
+    justifyContent: "flex-end",
+    width: "100%",
   },
   modalSheet: {
     borderTopLeftRadius: 28,
@@ -1222,6 +1544,16 @@ const styles = StyleSheet.create({
   twoColumn: {
     flexDirection: "row",
     gap: 10,
+  },
+  weekdayGrid: {
+    flexDirection: "row",
+    gap: 5,
+  },
+  weekdayLabel: {
+    fontSize: 11,
+    fontWeight: "900",
+    textAlign: "center",
+    width: "13.2%",
   },
   urgentRow: {
     alignItems: "center",
