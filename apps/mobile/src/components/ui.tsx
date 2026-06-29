@@ -402,6 +402,7 @@ export function Screen({
   headerEnd,
   onRefresh,
   refreshing,
+  scrollable = true,
   subtitle,
   title,
   tone = "app",
@@ -410,6 +411,7 @@ export function Screen({
   headerEnd?: React.ReactNode;
   onRefresh?: () => void;
   refreshing?: boolean;
+  scrollable?: boolean;
   subtitle?: string;
   title?: string;
   tone?: ScreenTone;
@@ -443,6 +445,71 @@ export function Screen({
       );
     }, 80);
   }, []);
+  const contentStyle = [
+    styles.scroll,
+    {
+      maxWidth: contentMaxWidth,
+      paddingHorizontal: horizontalPadding,
+      width: "100%" as const,
+    },
+    isAuth && styles.authScroll,
+    direction === "rtl" && styles.rtlContent,
+  ];
+  const staticContentStyle = [
+    styles.staticContent,
+    {
+      maxWidth: contentMaxWidth,
+      paddingHorizontal: horizontalPadding,
+      width: "100%" as const,
+    },
+    direction === "rtl" && styles.rtlContent,
+  ];
+  const headerNode = title ? (
+    <View
+      style={[
+        styles.screenHeader,
+        {
+          backgroundColor: onDark
+            ? "rgba(32,22,42,0.72)"
+            : "rgba(255,255,255,0.82)",
+          borderColor: onDark
+            ? "rgba(255,255,255,0.10)"
+            : "rgba(86,132,154,0.16)",
+          shadowColor: palette.shadow,
+        },
+      ]}
+    >
+      <View
+        style={[
+          styles.screenHeaderTop,
+          direction === "rtl" && styles.rowReverse,
+        ]}
+      >
+        <BrandLockup compact onDark={onDark} />
+        {!isAuth ? headerEnd : null}
+      </View>
+      <Text
+        style={[
+          styles.screenTitle,
+          { color: onDark ? "#ffffff" : palette.text },
+          direction === "rtl" && styles.textRight,
+        ]}
+      >
+        {title}
+      </Text>
+      {subtitle ? (
+        <Text
+          style={[
+            styles.screenSubtitle,
+            { color: onDark ? colors.darkMuted : palette.muted },
+            direction === "rtl" && styles.textRight,
+          ]}
+        >
+          {subtitle}
+        </Text>
+      ) : null}
+    </View>
+  ) : null;
 
   return (
     <LinearGradient
@@ -468,82 +535,35 @@ export function Screen({
           keyboardVerticalOffset={Platform.OS === "ios" ? 8 : 0}
           style={styles.safe}
         >
-          <ScrollView
-            ref={scrollRef}
-            contentContainerStyle={[
-              styles.scroll,
-              {
-                maxWidth: contentMaxWidth,
-                paddingHorizontal: horizontalPadding,
-                width: "100%",
-              },
-              isAuth && styles.authScroll,
-              direction === "rtl" && styles.rtlContent,
-            ]}
-            contentInsetAdjustmentBehavior="automatic"
-            decelerationRate="fast"
-            keyboardDismissMode="interactive"
-            keyboardShouldPersistTaps="handled"
-            refreshControl={
-              onRefresh ? (
-                <RefreshControl
-                  refreshing={Boolean(refreshing)}
-                  onRefresh={onRefresh}
-                  tintColor={onDark ? "#ffffff" : colors.primary}
-                />
-              ) : undefined
-            }
-          >
-            <KeyboardAwareScrollContext.Provider value={{ ensureInputVisible }}>
-              {title ? (
-                <View
-                  style={[
-                    styles.screenHeader,
-                    {
-                      backgroundColor: onDark
-                        ? "rgba(32,22,42,0.72)"
-                        : "rgba(255,255,255,0.82)",
-                      borderColor: onDark
-                        ? "rgba(255,255,255,0.10)"
-                        : "rgba(86,132,154,0.16)",
-                      shadowColor: palette.shadow,
-                    },
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.screenHeaderTop,
-                      direction === "rtl" && styles.rowReverse,
-                    ]}
-                  >
-                    <BrandLockup compact onDark={onDark} />
-                    {!isAuth ? headerEnd : null}
-                  </View>
-                  <Text
-                    style={[
-                      styles.screenTitle,
-                      { color: onDark ? "#ffffff" : palette.text },
-                      direction === "rtl" && styles.textRight,
-                    ]}
-                  >
-                    {title}
-                  </Text>
-                  {subtitle ? (
-                    <Text
-                      style={[
-                        styles.screenSubtitle,
-                        { color: onDark ? colors.darkMuted : palette.muted },
-                        direction === "rtl" && styles.textRight,
-                      ]}
-                    >
-                      {subtitle}
-                    </Text>
-                  ) : null}
-                </View>
-              ) : null}
-              {children}
-            </KeyboardAwareScrollContext.Provider>
-          </ScrollView>
+          <KeyboardAwareScrollContext.Provider value={{ ensureInputVisible }}>
+            {scrollable ? (
+              <ScrollView
+                ref={scrollRef}
+                contentContainerStyle={contentStyle}
+                contentInsetAdjustmentBehavior="automatic"
+                decelerationRate="fast"
+                keyboardDismissMode="interactive"
+                keyboardShouldPersistTaps="handled"
+                refreshControl={
+                  onRefresh ? (
+                    <RefreshControl
+                      refreshing={Boolean(refreshing)}
+                      onRefresh={onRefresh}
+                      tintColor={onDark ? "#ffffff" : colors.primary}
+                    />
+                  ) : undefined
+                }
+              >
+                {headerNode}
+                {children}
+              </ScrollView>
+            ) : (
+              <View style={staticContentStyle}>
+                {headerNode}
+                {children}
+              </View>
+            )}
+          </KeyboardAwareScrollContext.Provider>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </LinearGradient>
@@ -1316,6 +1336,12 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     gap: 16,
     paddingBottom: 142,
+    paddingTop: 14,
+  },
+  staticContent: {
+    alignSelf: "center",
+    flex: 1,
+    gap: 12,
     paddingTop: 14,
   },
   screenHeaderTop: {
