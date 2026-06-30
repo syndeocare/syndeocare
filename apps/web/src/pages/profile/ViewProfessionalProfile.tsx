@@ -34,6 +34,7 @@ import {
   getLegacyProfessionalById,
   isPlatformBackendConfigured,
 } from "@/lib/platform-backend";
+import { formatHourlyRate } from "@/lib/format";
 
 interface Profile {
   id: string;
@@ -55,6 +56,7 @@ interface Profile {
 const ViewProfessionalProfile = () => {
   const { t, i18n } = useTranslation();
   const isRTL = i18n.language === "ar";
+  const language = isRTL ? "ar" : "en";
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, userRole } = useAuth();
@@ -294,8 +296,8 @@ const ViewProfessionalProfile = () => {
                       )}
                       {profile.hourly_rate && (
                         <span className="flex items-center gap-1">
-                          <Clock className="w-4 h-4" />${profile.hourly_rate}
-                          {t("common.perHour")}
+                          <Clock className="w-4 h-4" />
+                          {formatHourlyRate(profile.hourly_rate, language)}
                         </span>
                       )}
                     </div>
@@ -420,8 +422,7 @@ const ViewProfessionalProfile = () => {
                         {t("profile.hourlyRate")}
                       </p>
                       <p className="font-medium text-foreground">
-                        ${profile.hourly_rate}
-                        {t("common.perHour")}
+                        {formatHourlyRate(profile.hourly_rate, language)}
                       </p>
                     </div>
                   </div>

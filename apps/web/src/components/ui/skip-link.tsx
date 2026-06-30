@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 
 // =============================================================================
@@ -14,15 +15,9 @@ interface SkipLinkProps extends React.AnchorHTMLAttributes<HTMLAnchorElement> {
 }
 
 const SkipLink = React.forwardRef<HTMLAnchorElement, SkipLinkProps>(
-  (
-    {
-      className,
-      targetId = "main-content",
-      children = "Skip to content",
-      ...props
-    },
-    ref,
-  ) => {
+  ({ className, targetId = "main-content", children, ...props }, ref) => {
+    const { t } = useTranslation();
+
     return (
       <a
         ref={ref}
@@ -46,7 +41,7 @@ const SkipLink = React.forwardRef<HTMLAnchorElement, SkipLinkProps>(
         )}
         {...props}
       >
-        {children}
+        {children ?? t("common.skipToContent")}
       </a>
     );
   },

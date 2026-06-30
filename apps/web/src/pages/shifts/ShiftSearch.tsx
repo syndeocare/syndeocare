@@ -14,7 +14,7 @@ import { motion } from "framer-motion";
 import {
   Calendar,
   Clock,
-  DollarSign,
+  Banknote,
   Star,
   Search,
   Filter,
@@ -52,6 +52,7 @@ import {
   fetchActiveJobRoleNames,
   withAllOption,
 } from "@/lib/admin-catalogs";
+import { formatHourlyRate } from "@/lib/format";
 
 interface Shift {
   id: string;
@@ -62,6 +63,7 @@ interface Shift {
   start_time: string;
   end_time: string;
   hourly_rate: number;
+  currency?: string;
   location_address: string | null;
   description: string | null;
   required_certifications: string[] | null;
@@ -535,7 +537,12 @@ const ShiftSearch = () => {
                   );
                   const clinicLabel = canViewClinicIdentity
                     ? shift.clinic?.name
-                    : t("shifts.modal.clinicHidden", "Clinic hidden");
+                    : t("shifts.modal.clinicHidden");
+                  const rateLabel = formatHourlyRate(
+                    shift.hourly_rate,
+                    isRTL ? "ar" : "en",
+                    shift.currency,
+                  );
 
                   return (
                     <motion.div
@@ -549,7 +556,7 @@ const ShiftSearch = () => {
                         setShowShiftDetail(true);
                       }}
                       role="article"
-                      aria-label={`${clinicLabel} - ${shift.role_required} - $${shift.hourly_rate}/hr`}
+                      aria-label={`${clinicLabel} - ${shift.role_required} - ${rateLabel}`}
                       tabIndex={0}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
@@ -586,10 +593,7 @@ const ShiftSearch = () => {
                               </Link>
                             ) : (
                               <span className="font-medium text-foreground">
-                                {t(
-                                  "shifts.modal.clinicHidden",
-                                  "Clinic hidden",
-                                )}
+                                {t("shifts.modal.clinicHidden")}
                               </span>
                             )}
                             {shift.is_urgent && (
@@ -639,12 +643,9 @@ const ShiftSearch = () => {
                         {/* Rate */}
                         <div className="text-end flex-shrink-0">
                           <div className="flex items-center gap-1 text-lg font-bold text-primary">
-                            <DollarSign className="w-4 h-4" />
-                            {shift.hourly_rate}
+                            <Banknote className="w-4 h-4" />
+                            {rateLabel}
                           </div>
-                          <span className="text-xs text-muted-foreground">
-                            {t("common.perHour")}
-                          </span>
                         </div>
                       </div>
 

@@ -15,6 +15,8 @@ pnpm-lock.yaml
 
 # Generated native/mobile output
 apps/web/android/
+apps/mobile/.expo/
+apps/mobile/expo-env.d.ts
 
 # SQL migrations are formatted by hand.
 packages/persistence/migrations/*.sql

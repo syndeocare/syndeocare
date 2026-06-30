@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import {
   Calendar,
   Clock,
-  DollarSign,
+  Banknote,
   Star,
   Filter,
   Search,
@@ -56,6 +56,7 @@ import {
   fetchActiveJobRoleNames,
   withAllOption,
 } from "@/lib/admin-catalogs";
+import { formatHourlyRate, formatMoney } from "@/lib/format";
 
 interface Shift {
   id: string;
@@ -66,6 +67,7 @@ interface Shift {
   start_time: string;
   end_time: string;
   hourly_rate: number;
+  currency?: string;
   location_address: string | null;
   description: string | null;
   required_certifications: string[] | null;
@@ -134,7 +136,8 @@ interface Filters {
 }
 
 const ProfessionalDashboard = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const language = i18n.language === "ar" ? "ar" : "en";
   const [searchQuery, setSearchQuery] = useState("");
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -490,8 +493,8 @@ const ProfessionalDashboard = () => {
   const stats = [
     {
       label: t("dashboard.stats.monthlyEarnings"),
-      value: `$${monthlyEarnings.toFixed(0)}`,
-      icon: DollarSign,
+      value: formatMoney(monthlyEarnings, language),
+      icon: Banknote,
     },
     {
       label: t("dashboard.stats.shiftsCompleted"),
@@ -711,10 +714,18 @@ const ProfessionalDashboard = () => {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Upcoming</SelectItem>
-                      <SelectItem value="today">Today</SelectItem>
-                      <SelectItem value="week">This Week</SelectItem>
-                      <SelectItem value="month">This Month</SelectItem>
+                      <SelectItem value="all">
+                        {t("shiftSearch.allUpcoming")}
+                      </SelectItem>
+                      <SelectItem value="today">
+                        {t("shiftSearch.today")}
+                      </SelectItem>
+                      <SelectItem value="week">
+                        {t("shiftSearch.thisWeek")}
+                      </SelectItem>
+                      <SelectItem value="month">
+                        {t("shiftSearch.thisMonth")}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -825,7 +836,11 @@ const ProfessionalDashboard = () => {
                     </div>
                     <div className="text-right flex-shrink-0">
                       <p className="text-lg font-bold text-primary">
-                        ${shift.hourly_rate}/hr
+                        {formatHourlyRate(
+                          shift.hourly_rate,
+                          language,
+                          shift.currency,
+                        )}
                       </p>
                       <ChevronRight className="w-5 h-5 text-muted-foreground ml-auto" />
                     </div>

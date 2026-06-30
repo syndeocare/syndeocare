@@ -61,7 +61,8 @@
     "dark": "داكن",
     "system": "تلقائي",
     "toggleTheme": "تغيير المظهر",
-    "redirecting": "جارٍ التحويل"
+    "redirecting": "جارٍ التحويل",
+    "skipToContent": "تخطي إلى المحتوى"
   },
   "errors": {
     "unexpectedTitle": "حدث خطأ غير متوقع",
@@ -246,6 +247,7 @@
     "features": {
       "title": "لماذا SyndeoCare؟",
       "subtitle": "نبني مستقبل التوظيف الصحي بتقنيات متطورة تخدم الجميع.",
+      "body": "كل ما تحتاجه لإدارة التوظيف الصحي والورديات بثقة وسرعة.",
       "verification": {
         "title": "كوادر موثّقة",
         "desc": "كل مختص يخضع لفحص شامل للخلفية والتحقق من الشهادات والمؤهلات."
@@ -264,6 +266,7 @@
       }
     },
     "howItWorks": {
+      "badge": "خطوات بسيطة",
       "title": "آلية العمل",
       "subtitle": "ابدأ في دقائق معدودة وليس أيام.",
       "professionals": {
@@ -424,7 +427,11 @@
       "alreadyAppliedDesc": "لقد تقدمت بالفعل لهذه الوردية.",
       "conflictTitle": "تعارض في الجدول",
       "conflictDesc": "لديك حجز بالفعل خلال هذا الوقت.",
-      "timeConflict": "تعارض الوقت"
+      "timeConflict": "تعارض الوقت",
+      "clinicHidden": "بيانات المنشأة مخفية",
+      "clinicHiddenDesc": "ستظهر تفاصيل المنشأة بعد قبول طلبك لهذه الوردية.",
+      "proposalLabel": "رسالة قصيرة",
+      "proposalPlaceholder": "اكتب للمنشأة لماذا أنت مناسب لهذه الوردية."
     },
     "invitations": {
       "title": "دعوات الورديات",
@@ -626,6 +633,7 @@
     "privacy": "سياسة الخصوصية",
     "terms": "الشروط والأحكام",
     "help": "المساعدة والدعم",
+    "backToTop": "العودة للأعلى",
     "copyright": "© {{year}} SyndeoCare.ai. جميع الحقوق محفوظة."
   },
   "about": {

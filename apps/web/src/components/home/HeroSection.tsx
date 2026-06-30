@@ -17,6 +17,10 @@ import { forwardRef, useRef } from "react";
 const HeroSection = forwardRef<HTMLElement>((_, ref) => {
   const { t } = useTranslation();
   const sectionRef = useRef<HTMLDivElement>(null);
+  const heroTitle = t("home.hero.title");
+  const [heroTitleMain, heroTitleAccent = ""] = heroTitle.includes(",")
+    ? heroTitle.split(/,(.+)/).map((part) => part.trim())
+    : [heroTitle, ""];
 
   // Parallax scroll effect
   const { scrollYProgress } = useScroll({
@@ -127,19 +131,31 @@ const HeroSection = forwardRef<HTMLElement>((_, ref) => {
             transition={{ duration: 0.7, delay: 0.15 }}
             className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-white leading-[1.1] mb-8 tracking-tight"
           >
-            {t("home.hero.title").split(",")[0]},{" "}
-            <span className="relative inline-block">
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent via-accent to-sky">
-                {t("home.hero.title").split(",")[1] || "Simplified"}
-              </span>
-              {/* Underline decoration */}
+            {heroTitleMain}
+            {heroTitleAccent ? (
+              <>
+                ,{" "}
+                <span className="relative inline-block">
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent via-accent to-sky">
+                    {heroTitleAccent}
+                  </span>
+                  {/* Underline decoration */}
+                  <motion.span
+                    initial={{ scaleX: 0 }}
+                    animate={{ scaleX: 1 }}
+                    transition={{ duration: 0.8, delay: 0.8 }}
+                    className="absolute -bottom-2 left-0 right-0 h-1 bg-gradient-to-r from-accent to-sky rounded-full origin-left"
+                  />
+                </span>
+              </>
+            ) : (
               <motion.span
                 initial={{ scaleX: 0 }}
                 animate={{ scaleX: 1 }}
                 transition={{ duration: 0.8, delay: 0.8 }}
-                className="absolute -bottom-2 left-0 right-0 h-1 bg-gradient-to-r from-accent to-sky rounded-full origin-left"
+                className="block mx-auto mt-3 h-1 w-28 bg-gradient-to-r from-accent to-sky rounded-full origin-left"
               />
-            </span>
+            )}
           </motion.h1>
 
           {/* Subtitle */}

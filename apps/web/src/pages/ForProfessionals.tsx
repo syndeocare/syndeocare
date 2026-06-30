@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 import {
   Users,
   Calendar,
-  DollarSign,
+  Banknote,
   MapPin,
   Shield,
   Clock,
@@ -26,7 +26,7 @@ const ForProfessionals = () => {
       description: t("professionals.benefits.flexibilityDesc"),
     },
     {
-      icon: DollarSign,
+      icon: Banknote,
       title: t("professionals.benefits.topPay"),
       description: t("professionals.benefits.topPayDesc"),
     },

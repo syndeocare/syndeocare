@@ -28,7 +28,7 @@ import {
 import {
   Calendar as CalendarIcon,
   Clock,
-  DollarSign,
+  Banknote,
   MapPin,
   Loader2,
   Briefcase,
@@ -381,7 +381,7 @@ const CreateShiftModal = ({
                   {t("shifts.fields.hourlyRate")} *
                 </Label>
                 <div className="relative">
-                  <DollarSign className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Banknote className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
                     id="hourly_rate"
                     type="number"

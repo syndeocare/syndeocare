@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import {
   Calendar,
   Clock,
-  DollarSign,
+  Banknote,
   Star,
   Plus,
   Users,
@@ -35,6 +35,7 @@ import {
   listLegacyBookings,
   listLegacyJobs,
 } from "@/lib/platform-backend";
+import { formatHourlyRate, formatMoney } from "@/lib/format";
 
 interface Shift {
   id: string;
@@ -45,6 +46,7 @@ interface Shift {
   start_time: string;
   end_time: string;
   hourly_rate: number;
+  currency?: string;
   location_address: string | null;
   description: string | null;
   is_filled: boolean;
@@ -79,7 +81,8 @@ interface ShiftSpendBooking {
 }
 
 const ClinicDashboard = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const language = i18n.language === "ar" ? "ar" : "en";
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [clinic, setClinic] = useState<Clinic | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -321,8 +324,8 @@ const ClinicDashboard = () => {
     },
     {
       label: t("dashboard.stats.totalSpend"),
-      value: `$${monthlySpend.toFixed(0)}`,
-      icon: DollarSign,
+      value: formatMoney(monthlySpend, language),
+      icon: Banknote,
     },
     {
       label: t("dashboard.stats.avgRating"),
@@ -519,7 +522,11 @@ const ClinicDashboard = () => {
                         {shift.start_time} - {shift.end_time}
                       </span>
                       <span className="font-medium text-foreground">
-                        ${shift.hourly_rate}/hr
+                        {formatHourlyRate(
+                          shift.hourly_rate,
+                          language,
+                          shift.currency,
+                        )}
                       </span>
                     </div>
                   </div>

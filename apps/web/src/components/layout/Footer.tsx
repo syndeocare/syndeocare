@@ -174,9 +174,9 @@ const Footer = forwardRef<HTMLElement>((_, ref) => {
             <button
               onClick={scrollToTop}
               className="text-sm text-white/50 hover:text-accent transition-colors flex items-center gap-1"
-              aria-label="Scroll to top"
+              aria-label={t("footer.backToTop")}
             >
-              Back to top
+              {t("footer.backToTop")}
               <ArrowUpRight className="w-4 h-4" />
             </button>
           </div>

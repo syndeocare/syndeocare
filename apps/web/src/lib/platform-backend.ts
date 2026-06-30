@@ -235,6 +235,7 @@ type ClinicProfileUpdateDraft = {
 export type LegacyShift = {
   id: string;
   source?: "platform" | "legacy";
+  currency?: string;
   title: string;
   role_required: string;
   shift_date: string;
@@ -578,6 +579,7 @@ function mapJobToLegacyShift(item: PlatformJob): LegacyShift {
     start_time: startsAt.time,
     end_time: endsAt.time,
     hourly_rate: toHourlyRate(item.compensation),
+    currency: item.compensation.currency,
     location_address: buildLocationAddress(
       item.location.city,
       item.location.region,
@@ -1038,7 +1040,7 @@ export async function createLegacyJob(
       endsAt: endsAt.toISOString(),
       compensation: {
         amount: draft.hourly_rate,
-        currency: "USD",
+        currency: "YER",
         unit: "hour",
       },
       verificationRequired: true,

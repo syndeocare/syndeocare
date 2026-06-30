@@ -15,7 +15,7 @@ import {
   ArrowLeft,
   Loader2,
   Phone,
-  DollarSign,
+  Banknote,
   Briefcase,
   X,
   Sparkles,
@@ -906,7 +906,7 @@ const ProfessionalOnboarding = () => {
                     {t("onboarding.fields.hourlyRate")}
                   </Label>
                   <div className="relative">
-                    <DollarSign className="absolute start-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Banknote className="absolute start-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                     <Input
                       id="hourly_rate"
                       type="number"

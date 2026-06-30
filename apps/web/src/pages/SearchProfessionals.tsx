@@ -27,8 +27,9 @@ import {
   User,
   Filter,
   X,
-  DollarSign,
+  Banknote,
 } from "lucide-react";
+import { formatHourlyRate } from "@/lib/format";
 import {
   Sheet,
   SheetContent,
@@ -68,6 +69,7 @@ interface Professional {
 
 export default function SearchProfessionals() {
   const { t, i18n } = useTranslation();
+  const language = i18n.language === "ar" ? "ar" : "en";
   const navigate = useNavigate();
   const { user, userRole } = useAuth();
   const isRTL = i18n.language === "ar";
@@ -496,8 +498,8 @@ export default function SearchProfessionals() {
                       ) : null}
                       {pro.hourly_rate && (
                         <span className="flex items-center gap-1">
-                          <DollarSign className="h-3.5 w-3.5" />
-                          {pro.hourly_rate}/hr
+                          <Banknote className="h-3.5 w-3.5" />
+                          {formatHourlyRate(pro.hourly_rate, language)}
                         </span>
                       )}
                     </div>

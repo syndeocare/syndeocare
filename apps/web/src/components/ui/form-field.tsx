@@ -2,6 +2,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { LucideIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface FormFieldProps {
   label: string;
@@ -26,6 +27,7 @@ export const FormField = ({
   children,
   className,
 }: FormFieldProps) => {
+  const { t } = useTranslation();
   const errorId = error ? `${htmlFor}-error` : undefined;
   const hintId = hint ? `${htmlFor}-hint` : undefined;
 
@@ -38,7 +40,7 @@ export const FormField = ({
             *
           </span>
         )}
-        {required && <span className="sr-only">(required)</span>}
+        {required && <span className="sr-only">{t("common.required")}</span>}
       </Label>
 
       {React.cloneElement(children as React.ReactElement, {

@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { backendDb } from "@/integrations/backend/client";
 import { useTranslation } from "react-i18next";
+import { formatHourlyRate } from "@/lib/format";
 
 interface Profile {
   id: string;
@@ -74,7 +75,8 @@ const UserDetailsModal = ({
   onClose,
   onVerify,
 }: UserDetailsModalProps) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const language = i18n.language === "ar" ? "ar" : "en";
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -211,7 +213,7 @@ const UserDetailsModal = ({
                     {t("profile.hourlyRate")}
                   </h4>
                   <p className="text-2xl font-bold text-primary">
-                    ${profile.hourly_rate}/hr
+                    {formatHourlyRate(profile.hourly_rate, language)}
                   </p>
                 </div>
               )}

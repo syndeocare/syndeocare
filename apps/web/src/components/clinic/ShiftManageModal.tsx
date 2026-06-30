@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Calendar,
   Clock,
-  DollarSign,
+  Banknote,
   MapPin,
   Users,
   Loader2,
@@ -37,6 +37,7 @@ import {
   listLegacyBookings,
   updateLegacyBookingStatus,
 } from "@/lib/platform-backend";
+import { formatHourlyRate } from "@/lib/format";
 
 interface Shift {
   id: string;
@@ -47,6 +48,7 @@ interface Shift {
   start_time: string;
   end_time: string;
   hourly_rate: number;
+  currency?: string;
   location_address: string | null;
   description: string | null;
   is_filled: boolean;
@@ -86,6 +88,7 @@ const ShiftManageModal = ({
 }: ShiftManageModalProps) => {
   const { t, i18n } = useTranslation();
   const isRTL = i18n.language === "ar";
+  const language = isRTL ? "ar" : "en";
   const [applicants, setApplicants] = useState<Applicant[]>([]);
   const [invitations, setInvitations] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -501,12 +504,11 @@ const ShiftManageModal = ({
             role="listitem"
           >
             <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-              <DollarSign className="w-3 h-3" aria-hidden="true" />
+              <Banknote className="w-3 h-3" aria-hidden="true" />
               <span>{t("shifts.rate")}</span>
             </div>
             <p className="text-sm font-medium text-foreground">
-              ${shift.hourly_rate}
-              {t("common.perHour")}
+              {formatHourlyRate(shift.hourly_rate, language, shift.currency)}
             </p>
           </div>
           <div

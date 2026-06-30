@@ -155,7 +155,7 @@ const FeaturesSection = forwardRef<HTMLElement>((_, ref) => {
             {t("home.features.subtitle")}
           </h2>
           <p className="text-base md:text-lg lg:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed px-4">
-            Everything you need to streamline dental staffing
+            {t("home.features.body")}
           </p>
         </motion.div>
 
@@ -223,7 +223,7 @@ const FeaturesSection = forwardRef<HTMLElement>((_, ref) => {
                 transition={{ duration: 0.2 }}
                 className="flex items-center gap-1 text-sm font-medium text-primary"
               >
-                Learn more
+                {t("common.learnMore")}
                 <ArrowRight className="w-4 h-4 rtl-flip" />
               </motion.div>
             </motion.div>

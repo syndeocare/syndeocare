@@ -13,7 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   Calendar,
   Clock,
-  DollarSign,
+  Banknote,
   MapPin,
   Building2,
   AlertCircle,
@@ -32,6 +32,7 @@ import {
   isGatewayBackendConfigured,
   requestLegacyBooking,
 } from "@/lib/platform-backend";
+import { formatHourlyRate, formatMoney } from "@/lib/format";
 
 interface Shift {
   id: string;
@@ -42,6 +43,7 @@ interface Shift {
   start_time: string;
   end_time: string;
   hourly_rate: number;
+  currency?: string;
   location_address: string | null;
   description: string | null;
   required_certifications: string[] | null;
@@ -75,6 +77,7 @@ const ShiftDetailModal = ({
 }: ShiftDetailModalProps) => {
   const { t, i18n } = useTranslation();
   const isRTL = i18n.language === "ar";
+  const language = i18n.language === "ar" ? "ar" : "en";
   const [isApplying, setIsApplying] = useState(false);
   const [hasApplied, setHasApplied] = useState(false);
   const [hasConflict, setHasConflict] = useState(false);
@@ -240,9 +243,7 @@ const ShiftDetailModal = ({
     return hours > 0 ? hours : 24 + hours;
   };
 
-  const estimatedEarnings = (calculateShiftHours() * shift.hourly_rate).toFixed(
-    0,
-  );
+  const estimatedEarnings = calculateShiftHours() * shift.hourly_rate;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -302,12 +303,11 @@ const ShiftDetailModal = ({
               role="listitem"
             >
               <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                <DollarSign className="w-4 h-4" aria-hidden="true" />
+                <Banknote className="w-4 h-4" aria-hidden="true" />
                 <span>{t("shifts.rate")}</span>
               </div>
               <p className="font-medium text-foreground">
-                ${shift.hourly_rate}
-                {t("common.perHour")}
+                {formatHourlyRate(shift.hourly_rate, language, shift.currency)}
               </p>
             </div>
             <div
@@ -315,13 +315,12 @@ const ShiftDetailModal = ({
               role="listitem"
             >
               <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                <DollarSign
-                  className="w-4 h-4 text-primary"
-                  aria-hidden="true"
-                />
+                <Banknote className="w-4 h-4 text-primary" aria-hidden="true" />
                 <span>{t("shifts.modal.estimated")}</span>
               </div>
-              <p className="font-bold text-primary">${estimatedEarnings}</p>
+              <p className="font-bold text-primary">
+                {formatMoney(estimatedEarnings, language, shift.currency)}
+              </p>
             </div>
           </div>
 
@@ -412,13 +411,10 @@ const ShiftDetailModal = ({
               </div>
               <div className="flex-1">
                 <p className="font-medium text-foreground">
-                  {t("shifts.modal.clinicHidden", "Clinic hidden")}
+                  {t("shifts.modal.clinicHidden")}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  {t(
-                    "shifts.modal.clinicHiddenDesc",
-                    "Clinic details are shared after your application is accepted.",
-                  )}
+                  {t("shifts.modal.clinicHiddenDesc")}
                 </p>
               </div>
             </div>
@@ -476,7 +472,7 @@ const ShiftDetailModal = ({
                   htmlFor="shift-proposal"
                   className="text-sm font-medium text-foreground"
                 >
-                  {t("shifts.modal.proposalLabel", "Short proposal")}
+                  {t("shifts.modal.proposalLabel")}
                 </label>
                 <Textarea
                   id="shift-proposal"
@@ -484,10 +480,7 @@ const ShiftDetailModal = ({
                   onChange={(event) => setProposal(event.target.value)}
                   maxLength={500}
                   rows={4}
-                  placeholder={t(
-                    "shifts.modal.proposalPlaceholder",
-                    "Tell the clinic why you are a good fit for this shift.",
-                  )}
+                  placeholder={t("shifts.modal.proposalPlaceholder")}
                 />
                 <p className="text-xs text-muted-foreground">
                   {proposal.length}/500

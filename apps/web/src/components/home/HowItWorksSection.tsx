@@ -49,11 +49,6 @@ const HowItWorksSection = forwardRef<HTMLElement>((_, ref) => {
     },
     {
       icon: Search,
-      title: t("home.howItWorks.clinics.step2.title"),
-      description: t("home.howItWorks.clinics.step2.desc"),
-    },
-    {
-      icon: CalendarCheck,
       title: t("home.howItWorks.clinics.step3.title"),
       description: t("home.howItWorks.clinics.step3.desc"),
     },
@@ -75,7 +70,7 @@ const HowItWorksSection = forwardRef<HTMLElement>((_, ref) => {
   return (
     <section
       ref={ref}
-      aria-label="How it works"
+      aria-label={t("home.howItWorks.title")}
       className="py-16 md:py-24 lg:py-32 bg-gradient-to-b from-background via-secondary/30 to-background relative overflow-hidden"
     >
       {/* Background decorative elements */}
@@ -101,7 +96,7 @@ const HowItWorksSection = forwardRef<HTMLElement>((_, ref) => {
           >
             <Sparkles className="w-4 h-4 text-accent" />
             <span className="text-sm font-medium text-accent">
-              Simple Process
+              {t("home.howItWorks.badge")}
             </span>
           </motion.div>
 

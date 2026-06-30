@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Calendar,
   Clock,
-  DollarSign,
+  Banknote,
   Building2,
   Check,
   X,
@@ -16,6 +16,7 @@ import { backendDb } from "@/integrations/backend/client";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
 import { createNotification } from "@/lib/notifications";
+import { formatHourlyRate } from "@/lib/format";
 
 interface ShiftInvitation {
   id: string;
@@ -33,6 +34,7 @@ interface ShiftInvitation {
     start_time: string;
     end_time: string;
     hourly_rate: number;
+    currency?: string;
     location_address: string | null;
   };
   clinic?: {
@@ -53,6 +55,7 @@ const ShiftInvitationCard = ({
 }: ShiftInvitationCardProps) => {
   const { t, i18n } = useTranslation();
   const isRTL = i18n.language === "ar";
+  const language = isRTL ? "ar" : "en";
   const { toast } = useToast();
   const [isAccepting, setIsAccepting] = useState(false);
   const [isDeclining, setIsDeclining] = useState(false);
@@ -181,8 +184,12 @@ const ShiftInvitationCard = ({
             {shift?.start_time} - {shift?.end_time}
           </div>
           <div className="flex items-center gap-1.5 text-muted-foreground">
-            <DollarSign className="w-3.5 h-3.5" />${shift?.hourly_rate}
-            {t("common.perHour")}
+            <Banknote className="w-3.5 h-3.5" />
+            {formatHourlyRate(
+              shift?.hourly_rate ?? 0,
+              language,
+              shift?.currency,
+            )}
           </div>
           {shift?.location_address && (
             <div className="flex items-center gap-1.5 text-muted-foreground">

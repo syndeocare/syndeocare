@@ -61,7 +61,8 @@
     "dark": "Dark",
     "system": "System",
     "toggleTheme": "Toggle theme",
-    "redirecting": "Redirecting"
+    "redirecting": "Redirecting",
+    "skipToContent": "Skip to content"
   },
   "errors": {
     "unexpectedTitle": "Something went wrong",
@@ -246,6 +247,7 @@
     "features": {
       "title": "Why Choose SyndeoCare?",
       "subtitle": "We're building the future of healthcare staffing with technology that works for everyone.",
+      "body": "Everything you need to streamline healthcare staffing and shift coverage.",
       "verification": {
         "title": "Verified Professionals",
         "desc": "Every professional undergoes thorough background checks and credential verification."
@@ -264,6 +266,7 @@
       }
     },
     "howItWorks": {
+      "badge": "Simple Process",
       "title": "How It Works",
       "subtitle": "Get started in minutes, not days.",
       "professionals": {
@@ -424,7 +427,11 @@
       "alreadyAppliedDesc": "You have already applied for this shift.",
       "conflictTitle": "Schedule Conflict",
       "conflictDesc": "You already have a booking during this time slot.",
-      "timeConflict": "Time Conflict"
+      "timeConflict": "Time Conflict",
+      "clinicHidden": "Facility hidden",
+      "clinicHiddenDesc": "Facility details are shared after your application is accepted.",
+      "proposalLabel": "Short proposal",
+      "proposalPlaceholder": "Tell the facility why you are a good fit for this shift."
     },
     "invitations": {
       "title": "Shift Invitations",
@@ -626,6 +633,7 @@
     "privacy": "Privacy",
     "terms": "Terms",
     "help": "Help",
+    "backToTop": "Back to top",
     "copyright": "© {{year}} SyndeoCare.ai. All rights reserved."
   },
   "about": {

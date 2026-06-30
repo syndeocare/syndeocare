@@ -12,7 +12,7 @@ import {
   Mail,
   Phone,
   MapPin,
-  DollarSign,
+  Banknote,
   FileText,
   CheckCircle2,
   Clock,
@@ -32,6 +32,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { backendDb } from "@/integrations/backend/client";
 import { useToast } from "@/hooks/use-toast";
+import { formatHourlyRate } from "@/lib/format";
 import DocumentUploadCard from "@/components/onboarding/DocumentUploadCard";
 import TaxonomyPicker from "@/components/onboarding/TaxonomyPicker";
 import { useTranslation } from "react-i18next";
@@ -154,7 +155,8 @@ const mapGatewayDocumentStatus = (
 };
 
 const ProfessionalProfile = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const language = i18n.language === "ar" ? "ar" : "en";
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user, userRole, isLoading: authLoading } = useAuth();
@@ -718,7 +720,8 @@ const ProfessionalProfile = () => {
                 )}
                 {profile?.hourly_rate && (
                   <span className="flex items-center gap-1">
-                    <DollarSign className="w-4 h-4" />${profile.hourly_rate}/hr
+                    <Banknote className="w-4 h-4" />
+                    {formatHourlyRate(profile.hourly_rate, language)}
                   </span>
                 )}
               </div>
@@ -918,7 +921,7 @@ const ProfessionalProfile = () => {
                       {t("profile.hourlyRate")}
                     </Label>
                     <div className="relative">
-                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                      <Banknote className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                       <Input
                         id="hourly_rate"
                         type="number"
