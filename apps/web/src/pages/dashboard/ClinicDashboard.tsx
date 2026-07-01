@@ -13,6 +13,7 @@ import {
   AlertCircle,
   ChevronRight,
   Loader2,
+  RefreshCw,
   FileText,
   Upload,
   Building2,
@@ -32,6 +33,7 @@ import {
   getCurrentClinicProfile,
   isGatewayBackendConfigured,
   isPlatformBackendConfigured,
+  listCurrentClinicLegacyJobs,
   listLegacyBookings,
   listLegacyJobs,
 } from "@/lib/platform-backend";
@@ -91,11 +93,13 @@ const ClinicDashboard = () => {
   const [showManageShift, setShowManageShift] = useState(false);
   const [selectedShift, setSelectedShift] = useState<Shift | null>(null);
   const [monthlySpend, setMonthlySpend] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const {
     user,
     userRole,
     isLoading: authLoading,
     isOnboardingComplete,
+    refreshOnboardingStatus,
   } = useAuth();
   const navigate = useNavigate();
 
@@ -109,17 +113,43 @@ const ClinicDashboard = () => {
   }, []);
 
   const fetchClinicShifts = useCallback(
-    async (clinicId: string) => {
+    async (clinicData: Clinic) => {
       const today = new Date().toISOString().split("T")[0];
       const collected: Shift[] = [];
 
-      if (isPlatformBackendConfigured()) {
+      if (user && isGatewayBackendConfigured()) {
+        try {
+          const jobs = await listCurrentClinicLegacyJobs({
+            user,
+            userRole: "clinic",
+            clinicId: clinicData.id,
+            verificationStatus:
+              clinicData.verification_status === "verified"
+                ? "verified"
+                : clinicData.verification_status === "rejected"
+                  ? "rejected"
+                  : "pending",
+            onboardingCompleted: clinicData.onboarding_completed,
+            displayName: clinicData.name,
+          });
+
+          collected.push(
+            ...((jobs as unknown as Shift[]).filter(
+              (shift) => shift.shift_date >= today,
+            ) ?? []),
+          );
+        } catch (error) {
+          console.warn("Falling back to public clinic shifts fetch", error);
+        }
+      }
+
+      if (collected.length === 0 && isPlatformBackendConfigured()) {
         try {
           const jobs = await listLegacyJobs();
           collected.push(
             ...((jobs as unknown as Shift[]).filter(
               (shift) =>
-                shift.clinic?.id === clinicId && shift.shift_date >= today,
+                shift.clinic?.id === clinicData.id && shift.shift_date >= today,
             ) ?? []),
           );
         } catch (error) {
@@ -130,7 +160,7 @@ const ClinicDashboard = () => {
       const { data: shiftsData } = await backendDb
         .from("shifts")
         .select("*")
-        .eq("clinic_id", clinicId)
+        .eq("clinic_id", clinicData.id)
         .gte("shift_date", today)
         .order("shift_date", { ascending: true })
         .limit(10);
@@ -146,13 +176,13 @@ const ClinicDashboard = () => {
 
       setShifts(mergeShifts(collected).slice(0, 10));
     },
-    [mergeShifts],
+    [mergeShifts, user],
   );
 
   const fetchShifts = useCallback(async () => {
-    if (!clinic?.id) return;
-    await fetchClinicShifts(clinic.id);
-  }, [clinic?.id, fetchClinicShifts]);
+    if (!clinic) return;
+    await fetchClinicShifts(clinic);
+  }, [clinic, fetchClinicShifts]);
 
   useEffect(() => {
     if (!authLoading) {
@@ -167,9 +197,15 @@ const ClinicDashboard = () => {
     }
   }, [user, userRole, authLoading, isOnboardingComplete, navigate]);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!user) return;
+  const loadDashboardData = useCallback(
+    async ({ silent = false }: { silent?: boolean } = {}) => {
+      if (!user || !isOnboardingComplete) return;
+
+      if (silent) {
+        setIsRefreshing(true);
+      } else {
+        setIsLoading(true);
+      }
 
       try {
         let clinicData: Clinic | null = null;
@@ -201,7 +237,8 @@ const ClinicDashboard = () => {
 
         if (clinicData) {
           setClinic(clinicData);
-          await fetchClinicShifts(clinicData.id);
+          await fetchClinicShifts(clinicData);
+
           let loadedGatewaySpend = false;
 
           if (isGatewayBackendConfigured()) {
@@ -285,7 +322,8 @@ const ClinicDashboard = () => {
           }
         }
 
-        // Fetch clinic documents
+        await refreshOnboardingStatus();
+
         const { data: docsData } = await backendDb
           .from("documents")
           .select("id, status")
@@ -296,13 +334,38 @@ const ClinicDashboard = () => {
         }
       } finally {
         setIsLoading(false);
+        setIsRefreshing(false);
+      }
+    },
+    [fetchClinicShifts, isOnboardingComplete, refreshOnboardingStatus, user],
+  );
+
+  useEffect(() => {
+    void loadDashboardData();
+  }, [loadDashboardData]);
+
+  useEffect(() => {
+    if (!user || !isOnboardingComplete) return;
+
+    const refreshSilently = () => {
+      void loadDashboardData({ silent: true });
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refreshSilently();
       }
     };
 
-    if (user && isOnboardingComplete) {
-      void fetchData();
-    }
-  }, [fetchClinicShifts, isOnboardingComplete, user]);
+    window.addEventListener("focus", refreshSilently);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    const intervalId = window.setInterval(refreshSilently, 20000);
+
+    return () => {
+      window.removeEventListener("focus", refreshSilently);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.clearInterval(intervalId);
+    };
+  }, [isOnboardingComplete, loadDashboardData, user]);
 
   if (authLoading || isLoading) {
     return (
@@ -442,6 +505,17 @@ const ClinicDashboard = () => {
           <h2 className="text-lg font-semibold text-foreground">
             {t("dashboard.myShifts")}
           </h2>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void loadDashboardData({ silent: true })}
+            disabled={isRefreshing}
+          >
+            <RefreshCw
+              className={`w-4 h-4 me-2 ${isRefreshing ? "animate-spin" : ""}`}
+            />
+            {t("common.refresh")}
+          </Button>
         </div>
 
         {isLoading ? (
@@ -545,7 +619,7 @@ const ClinicDashboard = () => {
           open={showCreateShift}
           onOpenChange={setShowCreateShift}
           clinicId={clinic.id}
-          onSuccess={fetchShifts}
+          onSuccess={() => void loadDashboardData({ silent: true })}
         />
       )}
 

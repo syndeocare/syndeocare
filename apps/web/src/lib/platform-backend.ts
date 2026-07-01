@@ -766,6 +766,21 @@ export async function listLegacyJobs(filters?: {
   return response.items.map(mapJobToLegacyShift);
 }
 
+export async function listCurrentClinicLegacyJobs(bridge: BackendActorBridge) {
+  if (!apiGatewayBaseUrl) {
+    throw new BackendRequestError("API gateway is not configured.", 500);
+  }
+
+  const response = await requestJson<{ items: PlatformJob[] }>(
+    `${apiGatewayBaseUrl}/jobs/mine`,
+    {
+      headers: buildGatewayHeaders(bridge),
+    },
+  );
+
+  return response.items.map(mapJobToLegacyShift);
+}
+
 export async function getLegacyJobById(jobId: string) {
   if (!platformApiBaseUrl) {
     throw new BackendRequestError("Platform API is not configured.", 500);
