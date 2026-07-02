@@ -44,6 +44,21 @@ on:
         required: true
         type: boolean
         default: true
+      wait_for_build:
+        description: Wait for EAS build completion
+        required: true
+        type: boolean
+        default: false
+      auto_submit:
+        description: Submit after successful EAS build using the matching submit profile
+        required: true
+        type: boolean
+        default: false
+      what_to_test:
+        description: TestFlight "What to Test" text for iOS auto-submit
+        required: false
+        type: string
+        default: "SyndeoCare mobile build from GitHub Actions."
 
 concurrency:
   group: mobile-${{ github.ref }}
@@ -93,6 +108,9 @@ jobs:
       EAS_PLATFORM: ${{ github.event_name == 'workflow_dispatch' && inputs.platform || 'android' }}
       EAS_PROFILE: ${{ github.event_name == 'workflow_dispatch' && inputs.profile || 'preview' }}
       RUN_EAS_BUILD: ${{ github.event_name != 'workflow_dispatch' || inputs.run_eas_build }}
+      WAIT_FOR_BUILD: ${{ github.event_name == 'workflow_dispatch' && inputs.wait_for_build || false }}
+      AUTO_SUBMIT: ${{ github.event_name == 'workflow_dispatch' && inputs.auto_submit || false }}
+      WHAT_TO_TEST: ${{ github.event_name == 'workflow_dispatch' && inputs.what_to_test || 'SyndeoCare mobile build from GitHub Actions.' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -117,11 +135,28 @@ jobs:
         if: env.EXPO_TOKEN != '' && env.RUN_EAS_BUILD == 'true'
         working-directory: apps/mobile
         run: |
-          npx eas-cli@latest build \
-            --platform "$EAS_PLATFORM" \
-            --profile "$EAS_PROFILE" \
-            --non-interactive \
-            --no-wait
+          args=(
+            build
+            --platform "$EAS_PLATFORM"
+            --profile "$EAS_PROFILE"
+            --non-interactive
+            --message "GitHub Actions ${GITHUB_SHA}"
+          )
+
+          if [ "$AUTO_SUBMIT" = "true" ]; then
+            args+=(--auto-submit)
+            if [ "$EAS_PLATFORM" = "ios" ] || [ "$EAS_PLATFORM" = "all" ]; then
+              args+=(--what-to-test "$WHAT_TO_TEST")
+            fi
+          fi
+
+          if [ "$WAIT_FOR_BUILD" = "true" ] || [ "$AUTO_SUBMIT" = "true" ]; then
+            args+=(--wait)
+          else
+            args+=(--no-wait)
+          fi
+
+          npx eas-cli@latest "${args[@]}"
 
       - name: EAS build disabled
         if: env.EXPO_TOKEN != '' && env.RUN_EAS_BUILD != 'true'

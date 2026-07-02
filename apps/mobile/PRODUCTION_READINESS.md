@@ -4,17 +4,23 @@ This Expo app uses Expo Router, TanStack Query, SecureStore-backed auth sessions
 
 ## Required GitHub Secrets
 
-- `EXPO_TOKEN`: required for GitHub Actions to start EAS cloud builds.
+- `EXPO_TOKEN`: required for GitHub Actions to start EAS cloud builds. Create it in the Expo dashboard for the `syndeocareplatform` account/project, then add it to GitHub repository secrets as `EXPO_TOKEN`.
 
 ## Required GitHub / EAS Variables
 
 - `EXPO_PUBLIC_API_GATEWAY_BASE_URL`: optional override for the API gateway. If unset, the app defaults to `https://api.syndeocare.ai/v1`.
 
+Configured EAS project variables:
+
+- `development`: `EXPO_PUBLIC_API_GATEWAY_BASE_URL=https://api.syndeocare.ai/v1`
+- `preview`: `EXPO_PUBLIC_API_GATEWAY_BASE_URL=https://api.syndeocare.ai/v1`
+- `production`: `EXPO_PUBLIC_API_GATEWAY_BASE_URL=https://api.syndeocare.ai/v1`
+
 ## EAS Profiles
 
-- `development`: internal development client, Android APK, iOS simulator.
-- `preview`: internal testing build, Android APK, iOS simulator.
-- `production`: prepared for later store builds with remote versioning and auto-increment.
+- `development`: internal development client on the `development` update channel, Android APK, iOS simulator.
+- `preview`: internal testing build on the `preview` update channel, Android APK, iOS simulator.
+- `production`: store build on the `production` update channel, Android App Bundle, iOS App Store build, remote versioning, and auto-increment.
 
 Production App Store and Play Store submission are not enabled yet because Apple Developer and Google Play Console credentials are not available.
 
@@ -59,6 +65,13 @@ Configured prompts:
 ## CI
 
 The `Mobile` GitHub Actions workflow runs for mobile paths and shared workspace files required by the mobile build. It runs Expo dependency checks, TypeScript, ESLint, and Android/iOS export builds. It starts EAS cloud builds only when `EXPO_TOKEN` is configured.
+
+Manual workflow dispatch supports:
+
+- platform: `android`, `ios`, or `all`
+- profile: `development`, `preview`, or `production`
+- build-only or build-and-submit through EAS `--auto-submit`
+- waiting for build completion when store submission is requested
 
 The platform workflows are path-scoped:
 
