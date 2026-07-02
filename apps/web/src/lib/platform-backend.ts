@@ -762,7 +762,8 @@ export async function listLegacyJobs(filters?: {
   employmentType?: "temporary_shift" | "permanent_role" | "contract";
   verificationRequired?: boolean;
 }) {
-  if (!platformApiBaseUrl) {
+  const jobsBaseUrl = apiGatewayBaseUrl ?? platformApiBaseUrl;
+  if (!jobsBaseUrl) {
     throw new BackendRequestError("Platform API is not configured.", 500);
   }
 
@@ -781,7 +782,7 @@ export async function listLegacyJobs(filters?: {
   }
 
   const response = await requestJson<{ items: PlatformJob[] }>(
-    `${platformApiBaseUrl}/jobs${params.size > 0 ? `?${params.toString()}` : ""}`,
+    `${jobsBaseUrl}/jobs${params.size > 0 ? `?${params.toString()}` : ""}`,
   );
 
   return response.items.map(mapJobToLegacyShift);
@@ -803,12 +804,13 @@ export async function listCurrentClinicLegacyJobs(bridge: BackendActorBridge) {
 }
 
 export async function getLegacyJobById(jobId: string) {
-  if (!platformApiBaseUrl) {
+  const jobsBaseUrl = apiGatewayBaseUrl ?? platformApiBaseUrl;
+  if (!jobsBaseUrl) {
     throw new BackendRequestError("Platform API is not configured.", 500);
   }
 
   const response = await requestJson<PlatformJob>(
-    `${platformApiBaseUrl}/jobs/${encodeURIComponent(jobId)}`,
+    `${jobsBaseUrl}/jobs/${encodeURIComponent(jobId)}`,
   );
 
   return mapJobToLegacyShift(response);

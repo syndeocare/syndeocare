@@ -676,7 +676,7 @@ module "platform_api_service" {
     SERVICE_DIR           = "services/platform-api"
     API_DOCS_PATH         = "docs"
     API_PUBLIC_URL        = "${local.public_base_url}/platform-api/v1"
-    API_CORS_ORIGINS      = local.public_base_url
+    API_CORS_ORIGINS      = join(",", distinct(compact([local.public_base_url, var.web_public_url])))
     CACHE_TTL_SECONDS     = "60"
     NATS_URL              = module.event_backbone.nats_url
     REQUEST_TIMEOUT_MS    = "5000"

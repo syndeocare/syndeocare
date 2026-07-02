@@ -2093,7 +2093,27 @@ export async function requestBookingBySubject(
       requestedAt: now,
       lastUpdatedAt: now,
     })
-    .returning({ id: bookings.id });
+    .returning({ id: bookings.id })
+    .catch(async (error: unknown) => {
+      const activeExisting = await db
+        .select({ booking: bookings })
+        .from(bookings)
+        .where(
+          and(
+            eq(bookings.jobId, input.jobId),
+            eq(bookings.professionalId, professional.id),
+            sql`${bookings.status} in ('requested', 'accepted', 'confirmed')`,
+          ),
+        )
+        .limit(1);
+
+      const activeBooking = activeExisting[0]?.booking;
+      if (activeBooking) {
+        return [{ id: activeBooking.id }];
+      }
+
+      throw error;
+    });
 
   const booking = inserted[0]
     ? await getBookingByIdForSubject(subject, inserted[0].id)
