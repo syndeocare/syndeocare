@@ -1,4 +1,4 @@
-import { and, desc, eq, ne, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import type {
   AppNotification,
   AdminVerificationSnapshot,
@@ -1913,6 +1913,69 @@ export async function getBookingByIdForSubject(
   );
 }
 
+async function findAcceptedBookingTimeConflict(input: {
+  professionalId: string;
+  excludeBookingId: string;
+  startsAt: string;
+  endsAt?: string;
+}) {
+  if (!input.endsAt) return null;
+
+  const db = getDb();
+  const [conflict] = await db
+    .select({ id: bookings.id })
+    .from(bookings)
+    .innerJoin(jobListings, eq(bookings.jobId, jobListings.id))
+    .where(
+      and(
+        eq(bookings.professionalId, input.professionalId),
+        ne(bookings.id, input.excludeBookingId),
+        sql`${bookings.status} in ('accepted', 'confirmed')`,
+        sql`${jobListings.startsAt} < ${new Date(input.endsAt)}`,
+        sql`coalesce(${jobListings.endsAt}, ${jobListings.startsAt}) > ${new Date(input.startsAt)}`,
+      ),
+    )
+    .limit(1);
+
+  return conflict ?? null;
+}
+
+async function cancelOverlappingRequestedBookings(input: {
+  professionalId: string;
+  excludeBookingId: string;
+  startsAt: string;
+  endsAt?: string;
+  now: Date;
+}) {
+  if (!input.endsAt) return;
+
+  const db = getDb();
+  const overlappingRequests = await db
+    .select({ id: bookings.id })
+    .from(bookings)
+    .innerJoin(jobListings, eq(bookings.jobId, jobListings.id))
+    .where(
+      and(
+        eq(bookings.professionalId, input.professionalId),
+        ne(bookings.id, input.excludeBookingId),
+        eq(bookings.status, "requested"),
+        sql`${jobListings.startsAt} < ${new Date(input.endsAt)}`,
+        sql`coalesce(${jobListings.endsAt}, ${jobListings.startsAt}) > ${new Date(input.startsAt)}`,
+      ),
+    );
+
+  const bookingIds = overlappingRequests.map((booking) => booking.id);
+  if (bookingIds.length === 0) return;
+
+  await db
+    .update(bookings)
+    .set({
+      lastUpdatedAt: input.now,
+      status: "cancelled",
+    })
+    .where(inArray(bookings.id, bookingIds));
+}
+
 export async function requestBookingBySubject(
   subject: string,
   input: BookingRequestInput,
@@ -2124,6 +2187,25 @@ export async function updateBookingStatusBySubject(
     };
   }
 
+  if (input.status === "accepted") {
+    const conflict = await findAcceptedBookingTimeConflict({
+      professionalId: current.professionalId,
+      excludeBookingId: bookingId,
+      startsAt: current.startsAt,
+      endsAt: current.endsAt,
+    });
+
+    if (conflict) {
+      return {
+        ok: false,
+        code: "BOOKING_SCHEDULE_CONFLICT",
+        message:
+          "This professional already has an accepted booking during this time slot.",
+        statusCode: 409,
+      };
+    }
+  }
+
   if (
     (input.status === "confirmed" || input.status === "completed") &&
     current.status !== "accepted" &&
@@ -2170,6 +2252,14 @@ export async function updateBookingStatusBySubject(
         updatedAt: now,
       })
       .where(eq(jobListings.id, current.jobId));
+
+    await cancelOverlappingRequestedBookings({
+      professionalId: current.professionalId,
+      excludeBookingId: bookingId,
+      startsAt: current.startsAt,
+      endsAt: current.endsAt,
+      now,
+    });
   }
 
   if (

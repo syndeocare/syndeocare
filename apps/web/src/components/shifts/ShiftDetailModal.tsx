@@ -70,7 +70,6 @@ interface ShiftDetailModalProps {
 }
 
 const conflictBookingStatuses = new Set([
-  "requested",
   "accepted",
   "confirmed",
   "checked_in",
