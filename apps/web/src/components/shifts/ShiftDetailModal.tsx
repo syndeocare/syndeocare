@@ -29,7 +29,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/contexts/AuthContext";
 import {
+  BackendRequestError,
   isGatewayBackendConfigured,
+  isVerifiedStatus,
   requestLegacyBooking,
 } from "@/lib/platform-backend";
 import { formatHourlyRate, formatMoney } from "@/lib/format";
@@ -85,7 +87,7 @@ const ShiftDetailModal = ({
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const isVerified = verificationStatus === "verified";
+  const isVerified = isVerifiedStatus(verificationStatus);
   const canViewClinicIdentity = [
     "accepted",
     "confirmed",
@@ -213,7 +215,26 @@ const ShiftDetailModal = ({
     } catch (error) {
       const message =
         error instanceof Error ? error.message : t("shifts.applyError");
+      const code =
+        error instanceof BackendRequestError ? error.code : undefined;
+      const status =
+        error instanceof BackendRequestError ? error.status : undefined;
+
       if (
+        code === "BOOKING_VERIFICATION_REQUIRED" ||
+        status === 403 ||
+        message.toLowerCase().includes("verification-approved")
+      ) {
+        toast({
+          variant: "destructive",
+          title: t("shifts.modal.verificationRequired"),
+          description: t("shifts.modal.verificationRequiredDesc"),
+        });
+        return;
+      }
+
+      if (
+        code === "BOOKING_ALREADY_EXISTS" ||
         message.toLowerCase().includes("already exists") ||
         message.toLowerCase().includes("already applied")
       ) {
@@ -226,10 +247,23 @@ const ShiftDetailModal = ({
         return;
       }
 
+      if (code === "JOB_NOT_OPEN" || code === "JOB_ALREADY_STARTED") {
+        toast({
+          variant: "destructive",
+          title: t("shifts.modal.shiftUnavailable"),
+          description: t("shifts.modal.shiftUnavailableDesc"),
+        });
+        onApplicationSuccess?.();
+        return;
+      }
+
       toast({
         variant: "destructive",
         title: t("shifts.applyError"),
-        description: message,
+        description:
+          message === "An unexpected error occurred."
+            ? t("shifts.modal.applyUnexpectedDesc")
+            : message,
       });
     } finally {
       setIsApplying(false);

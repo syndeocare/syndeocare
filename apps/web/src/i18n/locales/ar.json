@@ -428,10 +428,13 @@
       "conflictTitle": "تعارض في الجدول",
       "conflictDesc": "لديك حجز بالفعل خلال هذا الوقت.",
       "timeConflict": "تعارض الوقت",
+      "shiftUnavailable": "الوردية غير متاحة",
+      "shiftUnavailableDesc": "هذه الوردية لم تعد تستقبل طلبات جديدة. تم تحديث القائمة.",
       "clinicHidden": "بيانات المنشأة مخفية",
       "clinicHiddenDesc": "ستظهر تفاصيل المنشأة بعد قبول طلبك لهذه الوردية.",
       "proposalLabel": "رسالة قصيرة",
-      "proposalPlaceholder": "اكتب للمنشأة لماذا أنت مناسب لهذه الوردية."
+      "proposalPlaceholder": "اكتب للمنشأة لماذا أنت مناسب لهذه الوردية.",
+      "applyUnexpectedDesc": "تعذر إرسال طلبك لهذه الوردية. حدّث قائمة الورديات ثم حاول مرة أخرى."
     },
     "invitations": {
       "title": "دعوات الورديات",

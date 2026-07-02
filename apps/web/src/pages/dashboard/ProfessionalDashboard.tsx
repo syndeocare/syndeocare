@@ -142,6 +142,9 @@ const ProfessionalDashboard = () => {
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [bookingStatusByShiftId, setBookingStatusByShiftId] = useState<
+    Record<string, string>
+  >({});
   const [isLoading, setIsLoading] = useState(true);
   const [selectedShift, setSelectedShift] = useState<Shift | null>(null);
   const [showShiftDetail, setShowShiftDetail] = useState(false);
@@ -234,6 +237,17 @@ const ProfessionalDashboard = () => {
                 onboardingCompleted: profileData.onboarding_completed,
                 displayName: profileData.full_name,
               });
+              setBookingStatusByShiftId(
+                Object.fromEntries(
+                  bookings
+                    .filter((booking) =>
+                      ["requested", "accepted", "confirmed"].includes(
+                        booking.status,
+                      ),
+                    )
+                    .map((booking) => [booking.shift.id, booking.status]),
+                ),
+              );
 
               const completedBookings = bookings.filter((booking) =>
                 ["completed"].includes(booking.status),
@@ -362,7 +376,15 @@ const ProfessionalDashboard = () => {
     }
   };
 
-  const fetchShifts = async () => {
+  const fetchShifts = async (
+    excludedShiftIds = new Set(
+      Object.entries(bookingStatusByShiftId)
+        .filter(([, status]) =>
+          ["requested", "accepted", "confirmed"].includes(status),
+        )
+        .map(([shiftId]) => shiftId),
+    ),
+  ) => {
     const today = new Date().toISOString().split("T")[0];
     let data: Shift[] = [];
 
@@ -443,6 +465,7 @@ const ProfessionalDashboard = () => {
 
     setShifts(
       uniqueData
+        .filter((shift) => !excludedShiftIds.has(shift.id))
         .filter((shift) =>
           filters.minRate
             ? shift.hourly_rate >= parseFloat(filters.minRate)
@@ -858,6 +881,30 @@ const ProfessionalDashboard = () => {
         shift={selectedShift}
         profileId={profile?.id || ""}
         verificationStatus={profile?.verification_status || "pending"}
+        currentBookingStatus={
+          selectedShift ? bookingStatusByShiftId[selectedShift.id] : undefined
+        }
+        onApplicationSuccess={() => {
+          if (selectedShift) {
+            const nextExcluded = new Set(
+              Object.entries(bookingStatusByShiftId)
+                .filter(([, status]) =>
+                  ["requested", "accepted", "confirmed"].includes(status),
+                )
+                .map(([shiftId]) => shiftId),
+            );
+            nextExcluded.add(selectedShift.id);
+            setBookingStatusByShiftId((current) => ({
+              ...current,
+              [selectedShift.id]: "requested",
+            }));
+            setShifts((current) =>
+              current.filter((shift) => shift.id !== selectedShift.id),
+            );
+            void fetchShifts(nextExcluded);
+          }
+          setShowShiftDetail(false);
+        }}
       />
     </main>
   );

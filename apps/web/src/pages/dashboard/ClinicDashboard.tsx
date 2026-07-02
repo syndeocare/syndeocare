@@ -32,10 +32,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import {
   getCurrentClinicProfile,
   isGatewayBackendConfigured,
-  isPlatformBackendConfigured,
   listCurrentClinicLegacyJobs,
   listLegacyBookings,
-  listLegacyJobs,
 } from "@/lib/platform-backend";
 import { formatHourlyRate, formatMoney } from "@/lib/format";
 
@@ -140,20 +138,6 @@ const ClinicDashboard = () => {
           );
         } catch (error) {
           console.warn("Falling back to public clinic shifts fetch", error);
-        }
-      }
-
-      if (collected.length === 0 && isPlatformBackendConfigured()) {
-        try {
-          const jobs = await listLegacyJobs();
-          collected.push(
-            ...((jobs as unknown as Shift[]).filter(
-              (shift) =>
-                shift.clinic?.id === clinicData.id && shift.shift_date >= today,
-            ) ?? []),
-          );
-        } catch (error) {
-          console.warn("Falling back to BackendDb clinic shifts fetch", error);
         }
       }
 

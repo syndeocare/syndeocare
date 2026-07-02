@@ -428,10 +428,13 @@
       "conflictTitle": "Schedule Conflict",
       "conflictDesc": "You already have a booking during this time slot.",
       "timeConflict": "Time Conflict",
+      "shiftUnavailable": "Shift unavailable",
+      "shiftUnavailableDesc": "This shift is no longer accepting applications. The list has been refreshed.",
       "clinicHidden": "Facility hidden",
       "clinicHiddenDesc": "Facility details are shared after your application is accepted.",
       "proposalLabel": "Short proposal",
-      "proposalPlaceholder": "Tell the facility why you are a good fit for this shift."
+      "proposalPlaceholder": "Tell the facility why you are a good fit for this shift.",
+      "applyUnexpectedDesc": "We could not submit this application. Please refresh the shifts and try again."
     },
     "invitations": {
       "title": "Shift Invitations",

@@ -14,6 +14,9 @@ export type LegacyVerificationStatus =
   | "pending"
   | "verified"
   | "rejected"
+  | "not_started"
+  | "pending_review"
+  | "approved"
   | null;
 
 export interface BackendActorBridge {
@@ -312,12 +315,14 @@ export type GatewayOnboardingStatus = {
   reviewedAt?: string;
 };
 
-class BackendRequestError extends Error {
+export class BackendRequestError extends Error {
   status: number;
+  code?: string;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, code?: string) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -356,13 +361,25 @@ function mapVerificationStatus(
 
 function mapVerificationStatusToGateway(status?: LegacyVerificationStatus) {
   switch (status) {
+    case "approved":
     case "verified":
       return "approved";
     case "rejected":
       return "rejected";
+    case "not_started":
+      return "not_started";
+    case "pending_review":
     default:
       return "pending_review";
   }
+}
+
+export function isVerifiedStatus(status?: string | null) {
+  return (
+    mapVerificationStatus(
+      status as PlatformVerificationStatus | LegacyVerificationStatus,
+    ) === "verified"
+  );
 }
 
 function buildLocationAddress(city?: string, region?: string) {
@@ -417,7 +434,11 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
       typeof body?.message === "string"
         ? body.message
         : `Backend request failed with status ${response.status}.`;
-    throw new BackendRequestError(message, response.status);
+    throw new BackendRequestError(
+      message,
+      response.status,
+      typeof body?.code === "string" ? body.code : undefined,
+    );
   }
 
   return body as T;

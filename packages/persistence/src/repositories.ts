@@ -558,6 +558,17 @@ export async function createNotificationForExternalUserId(input: {
   return mapAppNotification(rows[0]!);
 }
 
+async function createNotificationForExternalUserIdSafely(
+  input: Parameters<typeof createNotificationForExternalUserId>[0],
+  context: string,
+) {
+  try {
+    await createNotificationForExternalUserId(input);
+  } catch (error) {
+    console.warn(`Notification side effect failed during ${context}.`, error);
+  }
+}
+
 export async function markNotificationReadForExternalUserId(
   externalUserId: string,
   notificationId: string,
@@ -1943,6 +1954,24 @@ export async function requestBookingBySubject(
     };
   }
 
+  if (job.status !== "open") {
+    return {
+      ok: false,
+      code: "JOB_NOT_OPEN",
+      message: "This shift is no longer accepting applications.",
+      statusCode: 409,
+    };
+  }
+
+  if (new Date(job.startsAt).getTime() <= Date.now()) {
+    return {
+      ok: false,
+      code: "JOB_ALREADY_STARTED",
+      message: "This shift has already started and cannot be requested.",
+      statusCode: 409,
+    };
+  }
+
   if (
     job.verificationRequired &&
     aggregate.actor.verificationStatus !== "approved"
@@ -2018,13 +2047,16 @@ export async function requestBookingBySubject(
     clinicActor?.externalUserId ?? clinicActor?.authSubject;
 
   if (clinicNotificationRecipient) {
-    await createNotificationForExternalUserId({
-      recipientExternalUserId: clinicNotificationRecipient,
-      type: "booking_request",
-      title: "New shift application",
-      message: `${professional.fullName} applied for "${job.title}".`,
-      data: { bookingId: booking.id, jobId: job.id },
-    });
+    await createNotificationForExternalUserIdSafely(
+      {
+        recipientExternalUserId: clinicNotificationRecipient,
+        type: "booking_request",
+        title: "New shift application",
+        message: `${professional.fullName} applied for "${job.title}".`,
+        data: { bookingId: booking.id, jobId: job.id },
+      },
+      "booking request",
+    );
   }
 
   return { ok: true, data: booking };
@@ -2196,13 +2228,16 @@ export async function updateBookingStatusBySubject(
             ? "booking_confirmed"
             : "booking_completed";
 
-    await createNotificationForExternalUserId({
-      recipientExternalUserId: professionalNotificationRecipient,
-      type: notificationType,
-      title: "Shift application updated",
-      message: `Your application for "${current.jobTitle}" is now ${input.status}.`,
-      data: { bookingId: updated.id, jobId: updated.jobId },
-    });
+    await createNotificationForExternalUserIdSafely(
+      {
+        recipientExternalUserId: professionalNotificationRecipient,
+        type: notificationType,
+        title: "Shift application updated",
+        message: `Your application for "${current.jobTitle}" is now ${input.status}.`,
+        data: { bookingId: updated.id, jobId: updated.jobId },
+      },
+      "booking status update",
+    );
   }
 
   return { ok: true, data: updated };
@@ -2857,18 +2892,21 @@ export async function sendConversationMessageBySubject(input: {
     recipient?.actor.externalUserId ?? recipient?.actor.authSubject;
 
   if (notificationRecipient) {
-    await createNotificationForExternalUserId({
-      recipientExternalUserId: notificationRecipient,
-      type: "new_message",
-      title: "New message",
-      message: `${actorDisplayName(actor)} sent you a message.`,
-      data: {
-        conversationId: conversation.id,
-        conversationKind: conversation.kind,
-        messageId: message.id,
-        senderRole: actor.role,
+    await createNotificationForExternalUserIdSafely(
+      {
+        recipientExternalUserId: notificationRecipient,
+        type: "new_message",
+        title: "New message",
+        message: `${actorDisplayName(actor)} sent you a message.`,
+        data: {
+          conversationId: conversation.id,
+          conversationKind: conversation.kind,
+          messageId: message.id,
+          senderRole: actor.role,
+        },
       },
-    });
+      "message send",
+    );
   }
 
   return {
