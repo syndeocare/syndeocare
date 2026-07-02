@@ -711,6 +711,11 @@ export const conversationMessageListResponseSchema = z.object({
   total: z.number().int().nonnegative(),
 });
 
+export const deleteResultSchema = z.object({
+  deleted: z.literal(true),
+  id: z.string().uuid(),
+});
+
 export const adminConversationStartInputSchema = z.object({
   targetSubject: z.string().min(1),
 });
@@ -1123,6 +1128,18 @@ export const initialV1RouteCatalog = [
     method: "POST",
     path: "/v1/conversations/:conversationId/messages",
     summary: "Send a message to a visible conversation",
+    protected: true,
+  },
+  {
+    method: "DELETE",
+    path: "/v1/conversations/:conversationId/messages/:messageId",
+    summary: "Delete a sent message from a visible conversation",
+    protected: true,
+  },
+  {
+    method: "DELETE",
+    path: "/v1/conversations/:conversationId",
+    summary: "Delete a visible conversation and its messages",
     protected: true,
   },
   {

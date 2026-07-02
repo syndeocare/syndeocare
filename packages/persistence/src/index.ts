@@ -5,6 +5,8 @@ export {
   createNotificationForExternalUserId,
   deleteActorBySubject,
   deleteAllNotificationsForExternalUserId,
+  deleteConversationBySubject,
+  deleteConversationMessageBySubject,
   deleteNotificationForExternalUserId,
   deletePushTokensBySubject,
   ensureActorAccount,

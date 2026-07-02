@@ -110,7 +110,7 @@ export const ChatMediaGallery = ({
             ] as const;
           } catch (error) {
             console.warn("Unable to resolve chat media gallery URL", error);
-            return [fileUrl, fileUrl] as const;
+            return [fileUrl, ""] as const;
           }
         }),
       );
@@ -149,13 +149,18 @@ export const ChatMediaGallery = ({
     mediaItems.forEach((item) => {
       if (item.content) {
         const matches = item.content.match(urlRegex);
-        matches?.forEach((url) =>
-          links.push({
-            url,
-            content: item.content,
-            created_at: item.created_at,
-          }),
-        );
+        matches
+          ?.filter(
+            (url) =>
+              !url.includes("amazonaws.com") && !url.includes("cloudfront.net"),
+          )
+          .forEach((url) =>
+            links.push({
+              url,
+              content: item.content,
+              created_at: item.created_at,
+            }),
+          );
       }
     });
     return links;
@@ -169,7 +174,7 @@ export const ChatMediaGallery = ({
   };
 
   const getResolvedMediaUrl = (fileUrl: string) =>
-    resolvedMediaUrls[fileUrl] ?? resolveMediaUrl(fileUrl) ?? fileUrl;
+    resolvedMediaUrls[fileUrl] ?? resolveMediaUrl(fileUrl) ?? "";
 
   return (
     <>
@@ -228,22 +233,31 @@ export const ChatMediaGallery = ({
                   </div>
                 ) : (
                   <div className="grid grid-cols-3 gap-2">
-                    {images.map((img) => (
-                      <button
-                        key={img.id}
-                        onClick={() =>
-                          setSelectedImage(getResolvedMediaUrl(img.file_url))
-                        }
-                        className="aspect-square rounded-lg overflow-hidden hover:opacity-80 transition-opacity"
-                      >
-                        <img
-                          src={getResolvedMediaUrl(img.file_url)}
-                          alt={img.file_name || ""}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                      </button>
-                    ))}
+                    {images.map((img) => {
+                      const resolvedUrl = getResolvedMediaUrl(img.file_url);
+                      return (
+                        <button
+                          key={img.id}
+                          onClick={() =>
+                            resolvedUrl && setSelectedImage(resolvedUrl)
+                          }
+                          className="aspect-square rounded-lg overflow-hidden hover:opacity-80 transition-opacity bg-muted"
+                        >
+                          {resolvedUrl ? (
+                            <img
+                              src={resolvedUrl}
+                              alt={img.file_name || ""}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
+                              {t("chat.loadingAttachment")}
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </TabsContent>
@@ -261,38 +275,45 @@ export const ChatMediaGallery = ({
                     <p>{t("chat.noVideos")}</p>
                   </div>
                 ) : (
-                  videos.map((v) => (
-                    <div
-                      key={v.id}
-                      className="rounded-lg overflow-hidden bg-muted"
-                    >
-                      {v.file_type?.startsWith("video/") ? (
-                        <video
-                          controls
-                          preload="metadata"
-                          className="w-full max-h-48 rounded-lg"
-                        >
-                          <source
-                            src={getResolvedMediaUrl(v.file_url)}
-                            type={v.file_type}
-                          />
-                        </video>
-                      ) : (
-                        <div className="p-3">
-                          <audio controls preload="metadata" className="w-full">
-                            <source
-                              src={getResolvedMediaUrl(v.file_url)}
-                              type={v.file_type}
-                            />
-                          </audio>
-                        </div>
-                      )}
-                      <p className="text-xs text-muted-foreground p-2">
-                        {v.file_name} •{" "}
-                        {format(new Date(v.created_at), "MMM d, yyyy")}
-                      </p>
-                    </div>
-                  ))
+                  videos.map((v) => {
+                    const resolvedUrl = getResolvedMediaUrl(v.file_url);
+                    return (
+                      <div
+                        key={v.id}
+                        className="rounded-lg overflow-hidden bg-muted"
+                      >
+                        {resolvedUrl ? (
+                          v.file_type?.startsWith("video/") ? (
+                            <video
+                              controls
+                              preload="metadata"
+                              className="w-full max-h-48 rounded-lg"
+                            >
+                              <source src={resolvedUrl} type={v.file_type} />
+                            </video>
+                          ) : (
+                            <div className="p-3">
+                              <audio
+                                controls
+                                preload="metadata"
+                                className="w-full"
+                              >
+                                <source src={resolvedUrl} type={v.file_type} />
+                              </audio>
+                            </div>
+                          )
+                        ) : (
+                          <div className="flex h-32 items-center justify-center text-xs text-muted-foreground">
+                            {t("chat.loadingAttachment")}
+                          </div>
+                        )}
+                        <p className="text-xs text-muted-foreground p-2">
+                          {v.file_name} •{" "}
+                          {format(new Date(v.created_at), "MMM d, yyyy")}
+                        </p>
+                      </div>
+                    );
+                  })
                 )}
               </TabsContent>
 
@@ -309,31 +330,45 @@ export const ChatMediaGallery = ({
                     <p>{t("chat.noFiles")}</p>
                   </div>
                 ) : (
-                  files.map((file) => (
-                    <div
-                      key={file.id}
-                      className="flex items-center gap-3 p-3 bg-muted rounded-lg"
-                    >
-                      <File className="h-10 w-10 p-2 bg-background rounded shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{file.file_name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatFileSize(file.file_size)} •{" "}
-                          {format(new Date(file.created_at), "MMM d, yyyy")}
-                        </p>
-                      </div>
-                      <Button variant="ghost" size="icon" asChild>
-                        <a
-                          href={getResolvedMediaUrl(file.file_url)}
-                          download={file.file_name}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                  files.map((file) => {
+                    const resolvedUrl = getResolvedMediaUrl(file.file_url);
+                    return (
+                      <div
+                        key={file.id}
+                        className="flex items-center gap-3 p-3 bg-muted rounded-lg"
+                      >
+                        <File className="h-10 w-10 p-2 bg-background rounded shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">
+                            {file.file_name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatFileSize(file.file_size)} •{" "}
+                            {format(new Date(file.created_at), "MMM d, yyyy")}
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          asChild={Boolean(resolvedUrl)}
+                          disabled={!resolvedUrl}
                         >
-                          <Download className="h-4 w-4" />
-                        </a>
-                      </Button>
-                    </div>
-                  ))
+                          {resolvedUrl ? (
+                            <a
+                              href={resolvedUrl}
+                              download={file.file_name}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <Download className="h-4 w-4" />
+                            </a>
+                          ) : (
+                            <Download className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                    );
+                  })
                 )}
               </TabsContent>
 

@@ -5,10 +5,13 @@ import {
   conversationMessageSchema,
   conversationMessageSendInputSchema,
   conversationSummarySchema,
+  deleteResultSchema,
   domainEventCatalog,
   standardConversationStartInputSchema,
 } from "@repo/contracts";
 import {
+  deleteConversationBySubject,
+  deleteConversationMessageBySubject,
   listConversationMessagesForSubject,
   listConversationsForSubject,
   sendConversationMessageBySubject,
@@ -24,6 +27,9 @@ const subjectParamsSchema = z.object({
 const conversationParamsSchema = z.object({
   conversationId: z.string().uuid(),
   subject: z.string().min(1),
+});
+const conversationMessageParamsSchema = conversationParamsSchema.extend({
+  messageId: z.string().uuid(),
 });
 
 void startService({
@@ -170,6 +176,61 @@ void startService({
         }
 
         return conversationMessageSchema.parse(message);
+      },
+    );
+
+    app.delete(
+      "/internal/conversations/:subject/:conversationId/messages/:messageId",
+      async (request, reply) => {
+        const parsedParams = conversationMessageParamsSchema.safeParse(
+          request.params,
+        );
+
+        if (!parsedParams.success) {
+          return reply.code(400).send({
+            code: "VALIDATION_ERROR",
+            message:
+              "A valid actor subject, conversation id, and message id are required.",
+          });
+        }
+
+        const result = await deleteConversationMessageBySubject(
+          parsedParams.data,
+        );
+
+        if (!result.ok) {
+          return reply.code(result.statusCode).send({
+            code: result.code,
+            message: result.message,
+          });
+        }
+
+        return deleteResultSchema.parse({ deleted: true, id: result.id });
+      },
+    );
+
+    app.delete(
+      "/internal/conversations/:subject/:conversationId",
+      async (request, reply) => {
+        const parsedParams = conversationParamsSchema.safeParse(request.params);
+
+        if (!parsedParams.success) {
+          return reply.code(400).send({
+            code: "VALIDATION_ERROR",
+            message: "A valid actor subject and conversation id are required.",
+          });
+        }
+
+        const result = await deleteConversationBySubject(parsedParams.data);
+
+        if (!result.ok) {
+          return reply.code(result.statusCode).send({
+            code: result.code,
+            message: result.message,
+          });
+        }
+
+        return deleteResultSchema.parse({ deleted: true, id: result.id });
       },
     );
   },

@@ -2923,3 +2923,118 @@ export async function sendConversationMessageBySubject(input: {
     createdAt: message.createdAt.toISOString(),
   };
 }
+
+export async function deleteConversationMessageBySubject(input: {
+  subject: string;
+  conversationId: string;
+  messageId: string;
+}): Promise<
+  | { ok: true; id: string }
+  | { ok: false; code: string; message: string; statusCode: 403 | 404 }
+> {
+  const actor = await getActorByAuthSubject(input.subject);
+  const db = getDb();
+  const [conversation] = await db
+    .select()
+    .from(conversations)
+    .where(eq(conversations.id, input.conversationId));
+
+  if (
+    !actor ||
+    !conversation ||
+    !(await canAccessConversation(actor, conversation))
+  ) {
+    return {
+      ok: false,
+      code: "CONVERSATION_NOT_FOUND",
+      message: "No visible conversation was found for this actor.",
+      statusCode: 404,
+    };
+  }
+
+  const [message] = await db
+    .select()
+    .from(conversationMessages)
+    .where(
+      and(
+        eq(conversationMessages.id, input.messageId),
+        eq(conversationMessages.conversationId, input.conversationId),
+      ),
+    )
+    .limit(1);
+
+  if (!message) {
+    return {
+      ok: false,
+      code: "MESSAGE_NOT_FOUND",
+      message: "No message was found for the requested id.",
+      statusCode: 404,
+    };
+  }
+
+  if (message.senderActorId !== actor.id) {
+    return {
+      ok: false,
+      code: "MESSAGE_DELETE_FORBIDDEN",
+      message: "Only the sender can delete this message.",
+      statusCode: 403,
+    };
+  }
+
+  const [deleted] = await db
+    .delete(conversationMessages)
+    .where(eq(conversationMessages.id, input.messageId))
+    .returning({ id: conversationMessages.id });
+
+  const [latestMessage] = await db
+    .select({ createdAt: conversationMessages.createdAt })
+    .from(conversationMessages)
+    .where(eq(conversationMessages.conversationId, input.conversationId))
+    .orderBy(desc(conversationMessages.createdAt))
+    .limit(1);
+
+  await db
+    .update(conversations)
+    .set({
+      lastMessageAt: latestMessage?.createdAt ?? conversation.createdAt,
+      updatedAt: new Date(),
+    })
+    .where(eq(conversations.id, input.conversationId));
+
+  return { ok: true, id: deleted?.id ?? input.messageId };
+}
+
+export async function deleteConversationBySubject(input: {
+  subject: string;
+  conversationId: string;
+}): Promise<
+  | { ok: true; id: string }
+  | { ok: false; code: string; message: string; statusCode: 404 }
+> {
+  const actor = await getActorByAuthSubject(input.subject);
+  const db = getDb();
+  const [conversation] = await db
+    .select()
+    .from(conversations)
+    .where(eq(conversations.id, input.conversationId));
+
+  if (
+    !actor ||
+    !conversation ||
+    !(await canAccessConversation(actor, conversation))
+  ) {
+    return {
+      ok: false,
+      code: "CONVERSATION_NOT_FOUND",
+      message: "No visible conversation was found for this actor.",
+      statusCode: 404,
+    };
+  }
+
+  const [deleted] = await db
+    .delete(conversations)
+    .where(eq(conversations.id, input.conversationId))
+    .returning({ id: conversations.id });
+
+  return { ok: true, id: deleted?.id ?? input.conversationId };
+}

@@ -854,6 +854,43 @@ class GatewayQueryBuilder {
   }
 
   private async executeDelete() {
+    const id = getFilter(this.filters, "id")?.value;
+
+    if (this.table === "messages" || this.table === "admin_messages") {
+      const conversationId =
+        getFilter(this.filters, "conversation_id")?.value ??
+        getFilter(this.filters, "admin_conversation_id")?.value;
+
+      if (id && conversationId) {
+        await requestGateway(
+          `/conversations/${encodeURIComponent(String(conversationId))}/messages/${encodeURIComponent(String(id))}`,
+          {
+            method: "DELETE",
+            headers: authHeaders(),
+          },
+        );
+
+        return emptyResult([], 1);
+      }
+    }
+
+    if (
+      this.table === "conversations" ||
+      this.table === "admin_conversations"
+    ) {
+      if (id) {
+        await requestGateway(
+          `/conversations/${encodeURIComponent(String(id))}`,
+          {
+            method: "DELETE",
+            headers: authHeaders(),
+          },
+        );
+
+        return emptyResult([], 1);
+      }
+    }
+
     return emptyResult([], 0);
   }
 }

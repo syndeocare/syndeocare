@@ -995,6 +995,41 @@ export async function sendGatewayConversationMessage(
   );
 }
 
+export async function deleteGatewayConversationMessage(
+  bridge: BackendActorBridge,
+  conversationId: string,
+  messageId: string,
+) {
+  if (!apiGatewayBaseUrl) {
+    throw new BackendRequestError("API gateway is not configured.", 500);
+  }
+
+  return requestJson<{ deleted: true; id: string }>(
+    `${apiGatewayBaseUrl}/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}`,
+    {
+      method: "DELETE",
+      headers: buildGatewayHeaders(bridge),
+    },
+  );
+}
+
+export async function deleteGatewayConversation(
+  bridge: BackendActorBridge,
+  conversationId: string,
+) {
+  if (!apiGatewayBaseUrl) {
+    throw new BackendRequestError("API gateway is not configured.", 500);
+  }
+
+  return requestJson<{ deleted: true; id: string }>(
+    `${apiGatewayBaseUrl}/conversations/${encodeURIComponent(conversationId)}`,
+    {
+      method: "DELETE",
+      headers: buildGatewayHeaders(bridge),
+    },
+  );
+}
+
 export async function updateLegacyBookingStatus(
   bridge: BackendActorBridge,
   bookingId: string,

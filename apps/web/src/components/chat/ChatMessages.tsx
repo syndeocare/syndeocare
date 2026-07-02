@@ -56,6 +56,11 @@ import {
   isS3StorageUri,
   resolveMediaUrl,
 } from "@/lib/storage";
+import {
+  deleteGatewayConversation,
+  deleteGatewayConversationMessage,
+  isGatewayBackendConfigured,
+} from "@/lib/platform-backend";
 import { VerificationBadge } from "@/components/ui/verification-badge";
 import type { Database } from "@/integrations/backend/types";
 
@@ -106,12 +111,19 @@ interface ChatMessagesProps {
   onBack?: () => void;
 }
 
-const renderMessageContent = (content: string, isOwn: boolean) => {
+const renderMessageContent = (
+  content: string,
+  isOwn: boolean,
+  attachmentLabel: string,
+) => {
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   const parts = content.split(urlRegex);
   return parts.map((part, i) => {
     if (urlRegex.test(part)) {
       urlRegex.lastIndex = 0;
+      if (isStorageUrl(part)) {
+        return <span key={i}>{attachmentLabel}</span>;
+      }
       return (
         <a
           key={i}
@@ -126,6 +138,24 @@ const renderMessageContent = (content: string, isOwn: boolean) => {
     }
     return <span key={i}>{part}</span>;
   });
+};
+
+const isStorageUrl = (value: string) =>
+  value.startsWith("s3://") ||
+  value.includes("amazonaws.com") ||
+  value.includes("cloudfront.net");
+
+const shouldHideMessageContent = (
+  content: string,
+  fileUrl?: string | null,
+  fileName?: string | null,
+) => {
+  const trimmed = content.trim();
+  if (!trimmed) return true;
+  if (trimmed.startsWith("📎")) return true;
+  if (fileUrl && trimmed === fileUrl) return true;
+  if (fileName && trimmed === fileName) return true;
+  return isStorageUrl(trimmed);
 };
 
 const getFileIcon = (fileName?: string | null) => {
@@ -184,8 +214,9 @@ export const ChatMessages = ({
           (m) =>
             resolvedMediaUrls[m.file_url!] ??
             resolveMediaUrl(m.file_url!) ??
-            m.file_url!,
-        ),
+            "",
+        )
+        .filter(Boolean),
     [messages, resolvedMediaUrls],
   );
   const currentImageIndex = previewImage ? allImages.indexOf(previewImage) : -1;
@@ -202,7 +233,7 @@ export const ChatMessages = ({
   };
 
   const getResolvedMediaUrl = (fileUrl: string) =>
-    resolvedMediaUrls[fileUrl] ?? resolveMediaUrl(fileUrl) ?? fileUrl;
+    resolvedMediaUrls[fileUrl] ?? resolveMediaUrl(fileUrl) ?? "";
 
   useEffect(() => {
     const s3Urls = Array.from(
@@ -231,7 +262,7 @@ export const ChatMessages = ({
             ] as const;
           } catch (error) {
             console.warn("Unable to resolve chat media URL", error);
-            return [fileUrl, fileUrl] as const;
+            return [fileUrl, ""] as const;
           }
         }),
       );
@@ -556,11 +587,31 @@ export const ChatMessages = ({
   const handleDeleteMessage = async () => {
     if (!deleteMessageId) return;
     try {
-      const { error } = await backendDb
-        .from(conversationKind === "admin" ? "admin_messages" : "messages")
-        .delete()
-        .eq("id", deleteMessageId);
-      if (error) throw error;
+      if (user && isGatewayBackendConfigured()) {
+        await deleteGatewayConversationMessage(
+          {
+            user,
+            userRole: userType,
+            profileId: userType === "professional" ? profileId : undefined,
+            clinicId: userType === "clinic" ? profileId : undefined,
+            verificationStatus: "verified",
+          },
+          rawConversationId,
+          deleteMessageId,
+        );
+      } else {
+        const { error } = await backendDb
+          .from(conversationKind === "admin" ? "admin_messages" : "messages")
+          .delete()
+          .eq("id", deleteMessageId)
+          .eq(
+            conversationKind === "admin"
+              ? "admin_conversation_id"
+              : "conversation_id",
+            rawConversationId,
+          );
+        if (error) throw error;
+      }
       await fetchMessages();
       toast({ title: t("chat.messageDeleted") });
     } catch (error) {
@@ -576,26 +627,28 @@ export const ChatMessages = ({
 
   const handleDeleteConversation = async () => {
     try {
-      if (conversationKind === "admin") {
-        await backendDb
-          .from("admin_messages")
-          .delete()
-          .eq("admin_conversation_id", rawConversationId);
+      if (user && isGatewayBackendConfigured()) {
+        await deleteGatewayConversation(
+          {
+            user,
+            userRole: userType,
+            profileId: userType === "professional" ? profileId : undefined,
+            clinicId: userType === "clinic" ? profileId : undefined,
+            verificationStatus: "verified",
+          },
+          rawConversationId,
+        );
       } else {
-        await backendDb
-          .from("messages")
+        const { error } = await backendDb
+          .from(
+            conversationKind === "admin"
+              ? "admin_conversations"
+              : "conversations",
+          )
           .delete()
-          .eq("conversation_id", rawConversationId);
+          .eq("id", rawConversationId);
+        if (error) throw error;
       }
-      const { error } = await backendDb
-        .from(
-          conversationKind === "admin"
-            ? "admin_conversations"
-            : "conversations",
-        )
-        .delete()
-        .eq("id", rawConversationId);
-      if (error) throw error;
       toast({ title: t("chat.conversationDeleted") });
       onBack?.();
     } catch (error) {
@@ -800,8 +853,12 @@ export const ChatMessages = ({
               const hasImage = msg.file_type?.startsWith("image/");
               const hasVideo = msg.file_type?.startsWith("video/");
               const hasAudio = msg.file_type?.startsWith("audio/");
+              const hasPdf = msg.file_type === "application/pdf";
               const hasFile =
                 msg.file_url && !hasImage && !hasVideo && !hasAudio;
+              const resolvedFileUrl = msg.file_url
+                ? getResolvedMediaUrl(msg.file_url)
+                : "";
               const msgDate = safeDate(msg.created_at);
               const prevDate =
                 idx > 0 ? safeDate(messages[idx - 1].created_at) : null;
@@ -841,31 +898,43 @@ export const ChatMessages = ({
                       {hasImage && msg.file_url && (
                         <button
                           onClick={() =>
-                            setPreviewImage(getResolvedMediaUrl(msg.file_url!))
+                            resolvedFileUrl && setPreviewImage(resolvedFileUrl)
                           }
                           className="block mb-2 rounded-xl overflow-hidden hover:opacity-90 transition-opacity shadow-sm"
                         >
-                          <img
-                            src={getResolvedMediaUrl(msg.file_url!)}
-                            alt={msg.file_name || "Image"}
-                            className="max-w-full max-h-64 object-cover rounded-xl"
-                            loading="lazy"
-                          />
+                          {resolvedFileUrl ? (
+                            <img
+                              src={resolvedFileUrl}
+                              alt={msg.file_name || "Image"}
+                              className="max-w-full max-h-64 object-cover rounded-xl"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="h-40 w-64 max-w-full rounded-xl bg-background/10 flex items-center justify-center text-xs opacity-70">
+                              {t("chat.loadingAttachment")}
+                            </div>
+                          )}
                         </button>
                       )}
 
                       {hasVideo && msg.file_url && (
                         <div className="mb-2 rounded-xl overflow-hidden shadow-sm">
-                          <video
-                            controls
-                            preload="metadata"
-                            className="max-w-full max-h-64 rounded-xl w-full"
-                          >
-                            <source
-                              src={getResolvedMediaUrl(msg.file_url!)}
-                              type={msg.file_type || "video/mp4"}
-                            />
-                          </video>
+                          {resolvedFileUrl ? (
+                            <video
+                              controls
+                              preload="metadata"
+                              className="max-w-full max-h-64 rounded-xl w-full"
+                            >
+                              <source
+                                src={resolvedFileUrl}
+                                type={msg.file_type || "video/mp4"}
+                              />
+                            </video>
+                          ) : (
+                            <div className="h-40 w-64 max-w-full rounded-xl bg-background/10 flex items-center justify-center text-xs opacity-70">
+                              {t("chat.loadingAttachment")}
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -878,19 +947,35 @@ export const ChatMessages = ({
                             className="w-full h-8 [&::-webkit-media-controls-panel]:bg-transparent"
                           >
                             <source
-                              src={getResolvedMediaUrl(msg.file_url!)}
+                              src={resolvedFileUrl}
                               type={msg.file_type || "audio/mpeg"}
                             />
                           </audio>
                         </div>
                       )}
 
+                      {hasPdf && msg.file_url && resolvedFileUrl && (
+                        <div className="mb-2 overflow-hidden rounded-xl bg-background/10">
+                          <iframe
+                            src={resolvedFileUrl}
+                            title={msg.file_name || t("chat.filePreview")}
+                            className="h-72 w-72 max-w-full border-0 bg-background"
+                          />
+                        </div>
+                      )}
+
                       {hasFile && (
                         <a
-                          href={getResolvedMediaUrl(msg.file_url!)}
+                          href={resolvedFileUrl || undefined}
                           target="_blank"
                           rel="noopener noreferrer"
+                          download={msg.file_name || undefined}
                           className={`flex items-center gap-2 p-2.5 rounded-lg mb-2 ${isOwn ? "bg-primary-foreground/10 hover:bg-primary-foreground/20" : "bg-muted hover:bg-muted/80"} transition-colors`}
+                          onClick={(event) => {
+                            if (!resolvedFileUrl) {
+                              event.preventDefault();
+                            }
+                          }}
                         >
                           {getFileIcon(msg.file_name)}
                           <div className="flex-1 min-w-0">
@@ -907,11 +992,20 @@ export const ChatMessages = ({
                         </a>
                       )}
 
-                      {msg.content && !msg.content.startsWith("📎") && (
-                        <p className="text-sm whitespace-pre-wrap break-words">
-                          {renderMessageContent(msg.content, isOwn)}
-                        </p>
-                      )}
+                      {msg.content &&
+                        !shouldHideMessageContent(
+                          msg.content,
+                          msg.file_url,
+                          msg.file_name,
+                        ) && (
+                          <p className="text-sm whitespace-pre-wrap break-words">
+                            {renderMessageContent(
+                              msg.content,
+                              isOwn,
+                              t("chat.attachment"),
+                            )}
+                          </p>
+                        )}
 
                       <div className="flex items-center justify-end gap-1 mt-1">
                         <p

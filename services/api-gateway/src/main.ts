@@ -46,6 +46,7 @@ import {
   conversationMessageSendInputSchema,
   conversationSummarySchema,
   createAppNotificationInputSchema,
+  deleteResultSchema,
   deleteNotificationsResponseSchema,
   documentAccessRequestSchema,
   documentAccessResponseSchema,
@@ -177,6 +178,9 @@ const adminCatalogParamsSchema = z.object({
 });
 const conversationIdParamsSchema = z.object({
   conversationId: z.string().uuid(),
+});
+const conversationMessageIdParamsSchema = conversationIdParamsSchema.extend({
+  messageId: z.string().uuid(),
 });
 
 const auth = createAccessControl();
@@ -3329,6 +3333,132 @@ void startService({
         if (!downstream.ok) {
           return reply
             .code(mapDownstreamStatusCode(downstream.statusCode))
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.delete(
+      "/v1/conversations/:conversationId/messages/:messageId",
+      {
+        schema: {
+          operationId: "deleteConversationMessage",
+          summary: "Delete a sent message from a visible conversation",
+          tags: ["messages"],
+          security: [{ bearerAuth: [] }],
+          params: {
+            type: "object",
+            required: ["conversationId", "messageId"],
+            properties: {
+              conversationId: { type: "string" },
+              messageId: { type: "string" },
+            },
+          },
+          response: {
+            200: toJsonSchema(deleteResultSchema, "DeletedConversationMessage"),
+            400: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorMessageDeleteValidation",
+            ),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorized"),
+            403: toJsonSchema(apiErrorSchema, "ApiErrorForbidden"),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorNotFound"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
+          },
+        },
+        preHandler: auth.requireAccess(),
+      },
+      async (request, reply) => {
+        const actor = request.authContext as AuthPrincipal;
+        const parsedParams = conversationMessageIdParamsSchema.safeParse(
+          request.params,
+        );
+
+        if (!parsedParams.success) {
+          return reply
+            .code(400)
+            .send(buildValidationError(parsedParams.error.issues));
+        }
+
+        const downstream = await requestDownstreamResource(
+          "messaging",
+          `/internal/conversations/${encodeURIComponent(actor.sub)}/${encodeURIComponent(parsedParams.data.conversationId)}/messages/${encodeURIComponent(parsedParams.data.messageId)}`,
+          deleteResultSchema,
+          {
+            method: "DELETE",
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(
+              downstream.statusCode === 403 || downstream.statusCode === 404
+                ? downstream.statusCode
+                : mapDownstreamStatusCode(downstream.statusCode),
+            )
+            .send(downstream.body);
+        }
+
+        return downstream.data;
+      },
+    );
+
+    app.delete(
+      "/v1/conversations/:conversationId",
+      {
+        schema: {
+          operationId: "deleteConversation",
+          summary: "Delete a visible conversation and its messages",
+          tags: ["messages"],
+          security: [{ bearerAuth: [] }],
+          params: {
+            type: "object",
+            required: ["conversationId"],
+            properties: { conversationId: { type: "string" } },
+          },
+          response: {
+            200: toJsonSchema(deleteResultSchema, "DeletedConversation"),
+            400: toJsonSchema(
+              apiErrorSchema,
+              "ApiErrorConversationDeleteValidation",
+            ),
+            401: toJsonSchema(apiErrorSchema, "ApiErrorUnauthorized"),
+            404: toJsonSchema(apiErrorSchema, "ApiErrorNotFound"),
+            503: toJsonSchema(apiErrorSchema, "ApiErrorUnavailable"),
+          },
+        },
+        preHandler: auth.requireAccess(),
+      },
+      async (request, reply) => {
+        const actor = request.authContext as AuthPrincipal;
+        const parsedParams = conversationIdParamsSchema.safeParse(
+          request.params,
+        );
+
+        if (!parsedParams.success) {
+          return reply
+            .code(400)
+            .send(buildValidationError(parsedParams.error.issues));
+        }
+
+        const downstream = await requestDownstreamResource(
+          "messaging",
+          `/internal/conversations/${encodeURIComponent(actor.sub)}/${encodeURIComponent(parsedParams.data.conversationId)}`,
+          deleteResultSchema,
+          {
+            method: "DELETE",
+          },
+        );
+
+        if (!downstream.ok) {
+          return reply
+            .code(
+              downstream.statusCode === 404
+                ? 404
+                : mapDownstreamStatusCode(downstream.statusCode),
+            )
             .send(downstream.body);
         }
 
