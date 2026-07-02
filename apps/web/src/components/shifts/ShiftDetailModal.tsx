@@ -32,6 +32,7 @@ import {
   BackendRequestError,
   isGatewayBackendConfigured,
   isVerifiedStatus,
+  listLegacyBookings,
   requestLegacyBooking,
 } from "@/lib/platform-backend";
 import { formatHourlyRate, formatMoney } from "@/lib/format";
@@ -68,6 +69,43 @@ interface ShiftDetailModalProps {
   onApplicationSuccess?: () => void;
 }
 
+const conflictBookingStatuses = new Set([
+  "requested",
+  "accepted",
+  "confirmed",
+  "checked_in",
+]);
+
+function buildShiftDateTime(date: string, time: string) {
+  const normalizedTime = time.length === 5 ? `${time}:00` : time;
+  const parsed = new Date(`${date}T${normalizedTime}`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function buildShiftRange(input: {
+  shift_date: string;
+  start_time: string;
+  end_time: string;
+}) {
+  const start = buildShiftDateTime(input.shift_date, input.start_time);
+  const end = buildShiftDateTime(input.shift_date, input.end_time);
+
+  if (!start || !end) return null;
+
+  if (end.getTime() <= start.getTime()) {
+    end.setDate(end.getDate() + 1);
+  }
+
+  return { start, end };
+}
+
+function shiftRangesOverlap(
+  first: NonNullable<ReturnType<typeof buildShiftRange>>,
+  second: NonNullable<ReturnType<typeof buildShiftRange>>,
+) {
+  return first.start < second.end && second.start < first.end;
+}
+
 const ShiftDetailModal = ({
   open,
   onOpenChange,
@@ -102,7 +140,45 @@ const ShiftDetailModal = ({
       if (!profileId || !shift) return;
 
       if (isGatewayBackendConfigured() && shift.source === "platform") {
-        setHasConflict(false);
+        if (!user) {
+          setHasConflict(false);
+          return;
+        }
+
+        try {
+          const targetRange = buildShiftRange(shift);
+          if (!targetRange) {
+            setHasConflict(false);
+            return;
+          }
+
+          const bookings = await listLegacyBookings({
+            user,
+            userRole: "professional",
+            profileId,
+            verificationStatus:
+              verificationStatus === "verified"
+                ? "verified"
+                : verificationStatus === "rejected"
+                  ? "rejected"
+                  : "pending",
+          });
+
+          const hasPlatformConflict = bookings.some((booking) => {
+            if (booking.shift.id === shift.id) return false;
+            if (!conflictBookingStatuses.has(booking.status)) return false;
+
+            const bookedRange = buildShiftRange(booking.shift);
+            return bookedRange
+              ? shiftRangesOverlap(targetRange, bookedRange)
+              : false;
+          });
+
+          setHasConflict(hasPlatformConflict);
+        } catch (error) {
+          console.warn("Unable to check platform shift overlap", error);
+          setHasConflict(false);
+        }
         return;
       }
 
@@ -118,7 +194,7 @@ const ShiftDetailModal = ({
       setHasConflict(data === true);
     };
     checkOverlap();
-  }, [profileId, shift]);
+  }, [profileId, shift, user, verificationStatus]);
 
   useEffect(() => {
     setProposal("");
@@ -254,6 +330,23 @@ const ShiftDetailModal = ({
           description: t("shifts.modal.shiftUnavailableDesc"),
         });
         onApplicationSuccess?.();
+        return;
+      }
+
+      if (
+        code === "BOOKING_SCHEDULE_CONFLICT" ||
+        code === "BOOKING_CONFLICT" ||
+        message.toLowerCase().includes("schedule conflict") ||
+        message.toLowerCase().includes("overlap") ||
+        message.includes("تعارض") ||
+        message.includes("تقاطع")
+      ) {
+        setHasConflict(true);
+        toast({
+          variant: "destructive",
+          title: t("shifts.modal.conflictTitle"),
+          description: t("shifts.modal.conflictDesc"),
+        });
         return;
       }
 
