@@ -152,6 +152,10 @@ const ShiftSearch = () => {
               bookedIds.add(booking.shift.id);
               nextBookingStatusByShiftId[booking.shift.id] = booking.status;
             });
+
+          setBookingStatusByShiftId(nextBookingStatusByShiftId);
+          setBookedShiftIds(Array.from(bookedIds));
+          return;
         } catch (error) {
           console.warn(
             "Falling back to backend database booking lookup",

@@ -69,7 +69,11 @@ const ActiveBookingsSection = ({
             profileId: userType === "professional" ? profileId : undefined,
             clinicId: userType === "clinic" ? profileId : undefined,
           });
-          setBookings((data as unknown as Booking[]) || []);
+          setBookings(
+            ((data as unknown as Booking[]) || []).filter((booking) =>
+              ["accepted", "confirmed", "completed"].includes(booking.status),
+            ),
+          );
           return;
         } catch (error) {
           console.warn(
@@ -135,13 +139,10 @@ const ActiveBookingsSection = ({
     setShowCancelModal(true);
   };
 
-  // Filter bookings needing rating (checked_out but not yet rated)
-  const needsRating = bookings.filter((b) => b.status === "checked_out");
+  // Platform bookings use completed as the post-shift state that can be rated.
+  const needsRating = bookings.filter((b) => b.status === "completed");
   const activeBookings = bookings.filter(
-    (b) =>
-      b.status === "accepted" ||
-      b.status === "confirmed" ||
-      b.status === "checked_in",
+    (b) => b.status === "accepted" || b.status === "confirmed",
   );
 
   if (isLoading) {
@@ -152,7 +153,7 @@ const ActiveBookingsSection = ({
     );
   }
 
-  if (bookings.length === 0) {
+  if (activeBookings.length === 0 && needsRating.length === 0) {
     return (
       <EmptyState
         icon={Calendar}

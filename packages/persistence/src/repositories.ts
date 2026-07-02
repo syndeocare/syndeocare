@@ -2056,11 +2056,22 @@ export async function requestBookingBySubject(
       and(
         eq(bookings.jobId, input.jobId),
         eq(bookings.professionalId, professional.id),
+        sql`${bookings.status} in ('requested', 'accepted', 'confirmed')`,
       ),
     )
     .limit(1);
 
-  if (existing[0]) {
+  const existingBooking = existing[0]?.booking;
+  if (
+    existingBooking &&
+    ["requested", "accepted", "confirmed"].includes(existingBooking.status)
+  ) {
+    const booking = await getBookingByIdForSubject(subject, existingBooking.id);
+
+    if (booking) {
+      return { ok: true, data: booking };
+    }
+
     return {
       ok: false,
       code: "BOOKING_ALREADY_EXISTS",

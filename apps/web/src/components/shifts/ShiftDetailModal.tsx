@@ -225,7 +225,7 @@ const ShiftDetailModal = ({
     setIsApplying(true);
     try {
       if (user && isGatewayBackendConfigured() && shift.source === "platform") {
-        await requestLegacyBooking(
+        const booking = await requestLegacyBooking(
           {
             user,
             userRole: "professional",
@@ -241,10 +241,17 @@ const ShiftDetailModal = ({
           proposal.trim() || undefined,
         );
 
-        toast({
-          title: t("shifts.applySuccess"),
-          description: t("shifts.modal.applicantAcceptedDesc"),
-        });
+        if (booking.status === "requested") {
+          toast({
+            title: t("shifts.applySuccess"),
+            description: t("shifts.modal.applicantAcceptedDesc"),
+          });
+        } else {
+          toast({
+            title: t("shifts.modal.alreadyApplied"),
+            description: t("shifts.modal.alreadyAppliedDesc"),
+          });
+        }
 
         setHasApplied(true);
         onApplicationSuccess?.();
