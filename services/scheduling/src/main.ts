@@ -318,7 +318,7 @@ void startService({
         });
       }
 
-      await publishDomainEvent({
+      publishDomainEvent({
         name: "scheduling.booking.requested",
         payload: {
           clinicId: booking.data.clinicId,
@@ -328,6 +328,11 @@ void startService({
         },
         producer: "scheduling",
         subject: booking.data.id,
+      }).catch((error: unknown) => {
+        request.log.warn(
+          { error, bookingId: booking.data.id },
+          "Failed to publish booking requested event after persisting booking.",
+        );
       });
 
       return bookingDetailSchema.parse(booking.data);

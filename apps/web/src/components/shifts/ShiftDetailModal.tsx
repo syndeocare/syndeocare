@@ -378,10 +378,15 @@ const ShiftDetailModal = ({
 
   const estimatedEarnings = calculateShiftHours() * shift.hourly_rate;
 
+  const applyDisabled = !isVerified || isApplying || hasApplied || hasConflict;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg" dir={isRTL ? "rtl" : "ltr"}>
-        <DialogHeader>
+      <DialogContent
+        className="top-auto bottom-0 flex max-h-[92svh] w-full max-w-none translate-y-0 flex-col gap-0 rounded-t-2xl border-x-0 border-b-0 p-0 sm:top-[50%] sm:bottom-auto sm:max-h-[88vh] sm:max-w-lg sm:translate-y-[-50%] sm:rounded-lg sm:border"
+        dir={isRTL ? "rtl" : "ltr"}
+      >
+        <DialogHeader className="shrink-0 border-b border-border/60 px-5 pb-4 pt-5 text-start sm:px-6">
           <DialogTitle className="flex items-center gap-2">
             {shift.title}
             {shift.is_urgent && (
@@ -393,17 +398,14 @@ const ShiftDetailModal = ({
           <DialogDescription>{shift.role_required}</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4 sm:px-6">
           {/* Key Details */}
           <div
-            className="grid grid-cols-2 gap-3"
+            className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2"
             role="list"
             aria-label={t("shifts.modal.details")}
           >
-            <div
-              className="bg-secondary/50 rounded-lg p-4 min-h-[72px]"
-              role="listitem"
-            >
+            <div className="bg-secondary/50 rounded-lg p-4" role="listitem">
               <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                 <Calendar className="w-4 h-4" aria-hidden="true" />
                 <span>{t("shifts.date")}</span>
@@ -419,10 +421,7 @@ const ShiftDetailModal = ({
                 )}
               </p>
             </div>
-            <div
-              className="bg-secondary/50 rounded-lg p-4 min-h-[72px]"
-              role="listitem"
-            >
+            <div className="bg-secondary/50 rounded-lg p-4" role="listitem">
               <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                 <Clock className="w-4 h-4" aria-hidden="true" />
                 <span>{t("shifts.time")}</span>
@@ -431,10 +430,7 @@ const ShiftDetailModal = ({
                 {shift.start_time} - {shift.end_time}
               </p>
             </div>
-            <div
-              className="bg-secondary/50 rounded-lg p-4 min-h-[72px]"
-              role="listitem"
-            >
+            <div className="bg-secondary/50 rounded-lg p-4" role="listitem">
               <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                 <Banknote className="w-4 h-4" aria-hidden="true" />
                 <span>{t("shifts.rate")}</span>
@@ -443,10 +439,7 @@ const ShiftDetailModal = ({
                 {formatHourlyRate(shift.hourly_rate, language, shift.currency)}
               </p>
             </div>
-            <div
-              className="bg-primary/10 rounded-lg p-4 min-h-[72px]"
-              role="listitem"
-            >
+            <div className="bg-primary/10 rounded-lg p-4" role="listitem">
               <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                 <Banknote className="w-4 h-4 text-primary" aria-hidden="true" />
                 <span>{t("shifts.modal.estimated")}</span>
@@ -621,19 +614,20 @@ const ShiftDetailModal = ({
               </div>
             </>
           )}
+        </div>
 
-          {/* Action Button */}
-          <div className="flex gap-3 pt-2">
+        <div className="shrink-0 border-t border-border/60 bg-background/95 px-5 py-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:px-6">
+          <div className="flex flex-col-reverse gap-3 min-[380px]:flex-row">
             <Button
               variant="outline"
-              className="flex-1 min-h-[48px]"
+              className="min-h-[48px] flex-1"
               onClick={() => onOpenChange(false)}
             >
               {t("common.close")}
             </Button>
             <Button
-              className="flex-1 min-h-[48px]"
-              disabled={!isVerified || isApplying || hasApplied || hasConflict}
+              className="min-h-[48px] flex-1"
+              disabled={applyDisabled}
               onClick={handleApply}
               aria-describedby={
                 !isVerified

@@ -1906,11 +1906,58 @@ export async function getBookingByIdForSubject(
   subject: string,
   bookingId: string,
 ): Promise<BookingDetail | null> {
-  const bookingsVisibleToActor = await listBookingsForSubject(subject);
+  const aggregate = await getActorAggregateBySubject(subject);
 
-  return (
-    bookingsVisibleToActor.find((booking) => booking.id === bookingId) ?? null
-  );
+  if (!aggregate) {
+    return null;
+  }
+
+  const [clinic, professional] = await Promise.all([
+    aggregate.actor.role === "clinic"
+      ? getClinicProfileBySubject(subject)
+      : null,
+    aggregate.actor.role === "professional"
+      ? getProfessionalProfileBySubject(subject)
+      : null,
+  ]);
+
+  const db = getDb();
+  const rows = await db
+    .select({
+      booking: bookings,
+      clinic: clinicProfiles,
+      job: jobListings,
+      professional: professionalProfiles,
+    })
+    .from(bookings)
+    .innerJoin(jobListings, eq(bookings.jobId, jobListings.id))
+    .innerJoin(clinicProfiles, eq(bookings.clinicId, clinicProfiles.id))
+    .innerJoin(
+      professionalProfiles,
+      eq(bookings.professionalId, professionalProfiles.id),
+    )
+    .where(eq(bookings.id, bookingId))
+    .limit(1);
+
+  const row = rows[0];
+
+  if (!row) {
+    return null;
+  }
+
+  if (aggregate.actor.role === "admin") {
+    return mapBookingDetail(row);
+  }
+
+  if (aggregate.actor.role === "clinic") {
+    return clinic && row.booking.clinicId === clinic.id
+      ? mapBookingDetail(row)
+      : null;
+  }
+
+  return professional && row.booking.professionalId === professional.id
+    ? mapBookingDetail(row)
+    : null;
 }
 
 async function findAcceptedBookingTimeConflict(input: {
