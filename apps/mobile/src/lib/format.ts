@@ -17,6 +17,8 @@ const arabicLabelMap = new Map<string, string>([
   ["requested", "قيد الانتظار"],
   ["accepted", "مقبول"],
   ["confirmed", "مؤكد"],
+  ["checked_in", "تم الحضور"],
+  ["checked_out", "تم الانصراف"],
   ["completed", "مكتمل"],
   ["cancelled", "ملغى"],
   ["not_started", "لم يبدأ"],

@@ -508,7 +508,13 @@ export const listBookings = () =>
   authenticatedRequest<ApiList<Booking>>("/bookings");
 export const updateBookingStatus = (
   bookingId: string,
-  status: "accepted" | "cancelled" | "confirmed" | "completed",
+  status:
+    | "accepted"
+    | "cancelled"
+    | "confirmed"
+    | "checked_in"
+    | "checked_out"
+    | "completed",
 ) =>
   authenticatedRequest<Booking>(`/bookings/${encodeURIComponent(bookingId)}`, {
     body: JSON.stringify({ status }),

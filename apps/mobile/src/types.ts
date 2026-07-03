@@ -123,13 +123,22 @@ export type Booking = {
   id: string;
   jobId: string;
   jobTitle: string;
-  status: "requested" | "accepted" | "confirmed" | "completed" | "cancelled";
+  status:
+    | "requested"
+    | "accepted"
+    | "confirmed"
+    | "checked_in"
+    | "checked_out"
+    | "completed"
+    | "cancelled";
   clinicId: string;
   clinicName: string;
   professionalId: string;
   professionalName: string;
   startsAt: string;
   endsAt?: string;
+  checkInTime?: string;
+  checkOutTime?: string;
   location: LocationValue;
   compensation: Money;
   notes?: string;

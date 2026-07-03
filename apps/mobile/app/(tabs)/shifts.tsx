@@ -65,6 +65,7 @@ import {
 import { usePreferences, useT } from "../../src/lib/preferences";
 import { queryClient } from "../../src/lib/query";
 import type {
+  Booking,
   CatalogItem,
   Job,
   JobCreateInput,
@@ -141,6 +142,25 @@ function localShiftCompensation(value: Job["compensation"]) {
     ...value,
     currency: value.currency === "USD" ? "YER" : value.currency,
   };
+}
+
+const activeBookingStatuses: Booking["status"][] = [
+  "requested",
+  "accepted",
+  "confirmed",
+  "checked_in",
+  "checked_out",
+];
+
+function formatBookingWindow(booking: Booking, language: "ar" | "en") {
+  return formatShiftWindow(
+    {
+      compensation: booking.compensation,
+      endsAt: booking.endsAt,
+      startsAt: booking.startsAt,
+    } as Job,
+    language,
+  );
 }
 
 function formatLocalTimeInput(value?: string) {
@@ -265,7 +285,21 @@ export default function ShiftsScreen() {
 
   const appliedJobIds = useMemo(
     () =>
-      new Set(bookingsQuery.data?.items.map((booking) => booking.jobId) ?? []),
+      new Set(
+        (bookingsQuery.data?.items ?? [])
+          .filter((booking) => activeBookingStatuses.includes(booking.status))
+          .map((booking) => booking.jobId),
+      ),
+    [bookingsQuery.data?.items],
+  );
+  const activeProfessionalBookings = useMemo(
+    () =>
+      (bookingsQuery.data?.items ?? []).filter(
+        (booking) =>
+          booking.status === "accepted" ||
+          booking.status === "confirmed" ||
+          booking.status === "checked_in",
+      ),
     [bookingsQuery.data?.items],
   );
   const verifiedProfessionals = useMemo(
@@ -418,7 +452,7 @@ export default function ShiftsScreen() {
       status,
     }: {
       bookingId: string;
-      status: "accepted" | "cancelled";
+      status: Exclude<Booking["status"], "requested">;
     }) => updateBookingStatus(bookingId, status),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["bookings"] });
@@ -709,6 +743,73 @@ export default function ShiftsScreen() {
               title={t("shifts.noVerifiedProfessionalsTitle")}
             />
           ) : null}
+        </>
+      ) : null}
+
+      {session?.principal.role === "professional" &&
+      activeProfessionalBookings.length ? (
+        <>
+          <SectionHeader title={t("shifts.myActiveBookings")} />
+          {activeProfessionalBookings.map((booking) => (
+            <Card key={booking.id}>
+              <View style={[styles.row, isRTL && styles.rowReverse]}>
+                <Avatar label={booking.clinicName} size={46} />
+                <View style={styles.grow}>
+                  <Text style={text.h2}>
+                    {displayLabel(booking.jobTitle, language)}
+                  </Text>
+                  <Text style={text.body}>
+                    {displayLabel(booking.clinicName, language)}
+                  </Text>
+                  <Text style={text.body}>
+                    {displayLabel(booking.location.city, language)}
+                    {language === "ar" ? "، " : ", "}
+                    {displayLabel(booking.location.region, language)}
+                  </Text>
+                </View>
+                <Badge
+                  tone={booking.status === "checked_in" ? "success" : "warning"}
+                >
+                  {displayLabel(booking.status, language)}
+                </Badge>
+              </View>
+              <View style={[styles.metaLine, isRTL && styles.rowReverse]}>
+                <Clock color={colors.muted} size={16} />
+                <Text style={text.body}>
+                  {formatBookingWindow(booking, language)}
+                </Text>
+              </View>
+              <View style={styles.actions}>
+                {booking.status === "accepted" ||
+                booking.status === "confirmed" ? (
+                  <Button
+                    loading={bookingStatusMutation.isPending}
+                    onPress={() =>
+                      bookingStatusMutation.mutate({
+                        bookingId: booking.id,
+                        status: "checked_in",
+                      })
+                    }
+                  >
+                    {t("shifts.checkIn")}
+                  </Button>
+                ) : null}
+                {booking.status === "checked_in" ? (
+                  <Button
+                    loading={bookingStatusMutation.isPending}
+                    onPress={() =>
+                      bookingStatusMutation.mutate({
+                        bookingId: booking.id,
+                        status: "checked_out",
+                      })
+                    }
+                  >
+                    {t("shifts.checkOut")}
+                  </Button>
+                ) : null}
+              </View>
+            </Card>
+          ))}
         </>
       ) : null}
 
