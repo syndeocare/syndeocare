@@ -71,7 +71,13 @@ const ActiveBookingsSection = ({
           });
           setBookings(
             ((data as unknown as Booking[]) || []).filter((booking) =>
-              ["accepted", "confirmed", "completed"].includes(booking.status),
+              [
+                "accepted",
+                "confirmed",
+                "checked_in",
+                "checked_out",
+                "completed",
+              ].includes(booking.status),
             ),
           );
           return;
@@ -139,10 +145,15 @@ const ActiveBookingsSection = ({
     setShowCancelModal(true);
   };
 
-  // Platform bookings use completed as the post-shift state that can be rated.
-  const needsRating = bookings.filter((b) => b.status === "completed");
+  // Platform bookings use checked_out/completed as post-shift states that can be rated.
+  const needsRating = bookings.filter(
+    (b) => b.status === "checked_out" || b.status === "completed",
+  );
   const activeBookings = bookings.filter(
-    (b) => b.status === "accepted" || b.status === "confirmed",
+    (b) =>
+      b.status === "accepted" ||
+      b.status === "confirmed" ||
+      b.status === "checked_in",
   );
 
   if (isLoading) {

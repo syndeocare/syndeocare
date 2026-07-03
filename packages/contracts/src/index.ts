@@ -55,6 +55,8 @@ export const bookingStatusSchema = z.enum([
   "requested",
   "accepted",
   "confirmed",
+  "checked_in",
+  "checked_out",
   "completed",
   "cancelled",
 ]);
@@ -804,6 +806,8 @@ export const bookingSummarySchema = z.object({
 
 export const bookingDetailSchema = bookingSummarySchema.extend({
   requestedAt: z.string().datetime(),
+  checkInTime: z.string().datetime().optional(),
+  checkOutTime: z.string().datetime().optional(),
   lastUpdatedAt: z.string().datetime(),
 });
 
@@ -818,7 +822,14 @@ export const bookingRequestInputSchema = z.object({
 });
 
 export const bookingStatusUpdateInputSchema = z.object({
-  status: z.enum(["accepted", "cancelled", "confirmed", "completed"]),
+  status: z.enum([
+    "accepted",
+    "cancelled",
+    "confirmed",
+    "checked_in",
+    "checked_out",
+    "completed",
+  ]),
 });
 
 export const initialV1RouteCatalog = [

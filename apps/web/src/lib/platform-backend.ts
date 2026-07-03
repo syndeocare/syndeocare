@@ -115,7 +115,14 @@ type PlatformBooking = {
   id: string;
   jobId: string;
   jobTitle: string;
-  status: "requested" | "accepted" | "confirmed" | "completed" | "cancelled";
+  status:
+    | "requested"
+    | "accepted"
+    | "confirmed"
+    | "checked_in"
+    | "checked_out"
+    | "completed"
+    | "cancelled";
   clinicId: string;
   clinicName: string;
   professionalId: string;
@@ -135,6 +142,8 @@ type PlatformBooking = {
     unit: "hour" | "day" | "shift" | "contract";
   };
   requestedAt?: string;
+  checkInTime?: string;
+  checkOutTime?: string;
   lastUpdatedAt?: string;
   notes?: string;
 };
@@ -627,8 +636,8 @@ function mapBookingToLegacy(item: PlatformBooking): LegacyBooking {
     id: item.id,
     status: item.status,
     notes: item.notes ?? null,
-    check_in_time: null,
-    check_out_time: null,
+    check_in_time: item.checkInTime ?? null,
+    check_out_time: item.checkOutTime ?? null,
     professional_id: item.professionalId,
     professional_name: item.professionalName,
     clinic_id: item.clinicId,

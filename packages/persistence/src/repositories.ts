@@ -1602,6 +1602,8 @@ function mapBookingDetail(row: {
       unit: row.job.compensationUnit,
     },
     requestedAt: row.booking.requestedAt.toISOString(),
+    checkInTime: row.booking.checkInTime?.toISOString(),
+    checkOutTime: row.booking.checkOutTime?.toISOString(),
     lastUpdatedAt: row.booking.lastUpdatedAt.toISOString(),
     notes: row.booking.notes ?? undefined,
   };
@@ -1984,7 +1986,7 @@ async function findAcceptedBookingTimeConflict(input: {
       and(
         eq(bookings.professionalId, input.professionalId),
         ne(bookings.id, input.excludeBookingId),
-        sql`${bookings.status} in ('accepted', 'confirmed')`,
+        sql`${bookings.status} in ('accepted', 'confirmed', 'checked_in')`,
         sql`${jobListings.startsAt} < ${new Date(input.endsAt)}`,
         sql`coalesce(${jobListings.endsAt}, ${jobListings.startsAt}) > ${new Date(input.startsAt)}`,
       ),
@@ -2110,7 +2112,7 @@ export async function requestBookingBySubject(
       and(
         eq(bookings.jobId, input.jobId),
         eq(bookings.professionalId, professional.id),
-        sql`${bookings.status} in ('requested', 'accepted', 'confirmed')`,
+        sql`${bookings.status} in ('requested', 'accepted', 'confirmed', 'checked_in', 'checked_out')`,
       ),
     )
     .limit(1);
@@ -2156,7 +2158,7 @@ export async function requestBookingBySubject(
           and(
             eq(bookings.jobId, input.jobId),
             eq(bookings.professionalId, professional.id),
-            sql`${bookings.status} in ('requested', 'accepted', 'confirmed')`,
+            sql`${bookings.status} in ('requested', 'accepted', 'confirmed', 'checked_in', 'checked_out')`,
           ),
         )
         .limit(1);
@@ -2242,10 +2244,15 @@ export async function updateBookingStatusBySubject(
 
   const role = aggregate.actor.role;
   const clinicCanDecide = role === "clinic" || role === "admin";
+  const professionalCanProgress =
+    role === "professional" &&
+    (input.status === "checked_in" ||
+      input.status === "checked_out" ||
+      input.status === "completed");
   const professionalCanCancel =
     role === "professional" && input.status === "cancelled";
 
-  if (!clinicCanDecide && !professionalCanCancel) {
+  if (!clinicCanDecide && !professionalCanProgress && !professionalCanCancel) {
     return {
       ok: false,
       code: "BOOKING_STATUS_FORBIDDEN",
@@ -2294,7 +2301,8 @@ export async function updateBookingStatusBySubject(
   if (
     (input.status === "confirmed" || input.status === "completed") &&
     current.status !== "accepted" &&
-    current.status !== "confirmed"
+    current.status !== "confirmed" &&
+    current.status !== "checked_out"
   ) {
     return {
       ok: false,
@@ -2306,14 +2314,39 @@ export async function updateBookingStatusBySubject(
 
   const now = new Date();
   const db = getDb();
+  const updates: Partial<typeof bookings.$inferInsert> = {
+    lastUpdatedAt: now,
+    status: input.status,
+  };
 
-  await db
-    .update(bookings)
-    .set({
-      lastUpdatedAt: now,
-      status: input.status,
-    })
-    .where(eq(bookings.id, bookingId));
+  if (input.status === "checked_in") {
+    if (current.status !== "accepted" && current.status !== "confirmed") {
+      return {
+        ok: false,
+        code: "BOOKING_CHECK_IN_INVALID_STATUS",
+        message: "Only accepted or confirmed bookings can be checked in.",
+        statusCode: 409,
+      };
+    }
+
+    updates.checkInTime = now;
+    updates.checkOutTime = null;
+  }
+
+  if (input.status === "checked_out") {
+    if (current.status !== "checked_in") {
+      return {
+        ok: false,
+        code: "BOOKING_CHECK_OUT_INVALID_STATUS",
+        message: "Only checked-in bookings can be checked out.",
+        statusCode: 409,
+      };
+    }
+
+    updates.checkOutTime = now;
+  }
+
+  await db.update(bookings).set(updates).where(eq(bookings.id, bookingId));
 
   if (input.status === "accepted") {
     await db
@@ -2360,7 +2393,7 @@ export async function updateBookingStatusBySubject(
       .where(eq(jobListings.id, current.jobId));
   }
 
-  if (input.status === "completed") {
+  if (input.status === "checked_out" || input.status === "completed") {
     await db
       .update(jobListings)
       .set({
@@ -2401,7 +2434,9 @@ export async function updateBookingStatusBySubject(
           ? "booking_cancelled"
           : input.status === "confirmed"
             ? "booking_confirmed"
-            : "booking_completed";
+            : input.status === "checked_in"
+              ? "booking_checked_in"
+              : "booking_completed";
 
     await createNotificationForExternalUserIdSafely(
       {

@@ -45,6 +45,8 @@ export const bookingStatusEnum = pgEnum("booking_status", [
   "requested",
   "accepted",
   "confirmed",
+  "checked_in",
+  "checked_out",
   "completed",
   "cancelled",
 ]);
@@ -264,6 +266,8 @@ export const bookings = pgTable(
       .references(() => professionalProfiles.id, { onDelete: "cascade" }),
     status: bookingStatusEnum("status").notNull().default("requested"),
     notes: text("notes"),
+    checkInTime: timestamp("check_in_time", { withTimezone: true }),
+    checkOutTime: timestamp("check_out_time", { withTimezone: true }),
     requestedAt: timestamp("requested_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -288,7 +292,9 @@ export const bookings = pgTable(
       "bookings_active_job_professional_unique_idx",
     )
       .on(table.jobId, table.professionalId)
-      .where(sql`${table.status} IN ('requested', 'accepted', 'confirmed')`),
+      .where(
+        sql`${table.status} IN ('requested', 'accepted', 'confirmed', 'checked_in', 'checked_out')`,
+      ),
   }),
 );
 

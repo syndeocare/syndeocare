@@ -242,8 +242,8 @@ function mapBooking(item: any) {
     clinic_id: item.clinicId ?? item.clinic_id,
     shift_id: item.jobId ?? item.shift_id,
     notes: item.notes ?? null,
-    check_in_time: item.check_in_time ?? null,
-    check_out_time: item.check_out_time ?? null,
+    check_in_time: item.checkInTime ?? item.check_in_time ?? null,
+    check_out_time: item.checkOutTime ?? item.check_out_time ?? null,
     shift: item.shift ?? {
       id: item.jobId,
       title: item.jobTitle,
