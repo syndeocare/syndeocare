@@ -1666,6 +1666,9 @@ export async function listJobListings(
 
 export async function getJobListingById(
   jobId: string,
+  options: { redactClinicIdentity?: boolean } = {
+    redactClinicIdentity: true,
+  },
 ): Promise<JobListingDetail | null> {
   const db = getDb();
   const rows = await db
@@ -1679,7 +1682,11 @@ export async function getJobListingById(
     .limit(1);
   const row = rows[0];
 
-  return row ? mapJobListingDetail(row, { redactClinicIdentity: true }) : null;
+  return row
+    ? mapJobListingDetail(row, {
+        redactClinicIdentity: options.redactClinicIdentity ?? true,
+      })
+    : null;
 }
 
 export async function listJobListingsBySubject(
@@ -2042,7 +2049,7 @@ export async function requestBookingBySubject(
   }
 
   const [job, professional] = await Promise.all([
-    getJobListingById(input.jobId),
+    getJobListingById(input.jobId, { redactClinicIdentity: false }),
     getProfessionalProfileBySubject(subject),
   ]);
 
