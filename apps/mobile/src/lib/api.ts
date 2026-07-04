@@ -560,6 +560,11 @@ export const sendMessageWithAttachment = (
       method: "POST",
     },
   );
+export const deleteMessage = (conversationId: string, messageId: string) =>
+  authenticatedRequest<{ deleted?: number; id?: string; ok?: boolean }>(
+    `/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}`,
+    { method: "DELETE" },
+  );
 
 export async function uploadChatMedia(asset: {
   mimeType?: string | null;

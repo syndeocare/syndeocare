@@ -68,6 +68,9 @@ const en = {
   "conversation.attachFile": "Attach file",
   "conversation.composerTitle": "New message",
   "conversation.composerHint": "Messages and files are shared securely.",
+  "conversation.deleteMessage": "Delete message",
+  "conversation.deleteMessageConfirm":
+    "Delete this message? This cannot be undone.",
   "conversation.emptyBody":
     "Send the first message when you are ready to continue the conversation.",
   "conversation.emptyTitle": "No messages yet",
@@ -415,6 +418,9 @@ const ar: Record<TranslationKey, string> = {
   "conversation.attachFile": "إرفاق ملف",
   "conversation.composerTitle": "رسالة جديدة",
   "conversation.composerHint": "تتم مشاركة الرسائل والملفات بأمان.",
+  "conversation.deleteMessage": "حذف الرسالة",
+  "conversation.deleteMessageConfirm":
+    "هل تريد حذف هذه الرسالة؟ لا يمكن التراجع عن هذا الإجراء.",
   "conversation.emptyBody":
     "أرسل أول رسالة عندما تكون جاهزاً لمتابعة المحادثة.",
   "conversation.emptyTitle": "لا توجد رسائل بعد",

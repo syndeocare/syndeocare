@@ -11,13 +11,16 @@ import {
   Paperclip,
   PlayCircle,
   Send,
+  Trash2,
   X,
 } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Alert,
   FlatList,
   Image,
   Linking,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -40,6 +43,7 @@ import {
   useThemePalette,
 } from "../../src/components/ui";
 import {
+  deleteMessage,
   getChatMediaAccessUrl,
   listMessages,
   sendMessageWithAttachment,
@@ -113,6 +117,10 @@ export default function ConversationScreen() {
   const [content, setContent] = useState("");
   const [attachment, setAttachment] =
     useState<DocumentPicker.DocumentPickerAsset | null>(null);
+  const [imagePreview, setImagePreview] = useState<{
+    title: string;
+    url: string;
+  } | null>(null);
 
   const messagesQuery = useQuery({
     enabled: Boolean(id),
@@ -199,6 +207,15 @@ export default function ConversationScreen() {
       hapticSuccess();
     },
   });
+  const deleteMutation = useMutation({
+    mutationFn: (messageId: string) => deleteMessage(id, messageId),
+    onError: () => hapticError(),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["conversation", id] });
+      await queryClient.invalidateQueries({ queryKey: ["conversations"] });
+      hapticSuccess();
+    },
+  });
   const accessMutation = useMutation({
     mutationFn: (fileUrl: string) => getChatMediaAccessUrl(id, fileUrl),
     onError: () => hapticError(),
@@ -219,6 +236,22 @@ export default function ConversationScreen() {
       setAttachment(picked.assets[0]);
       hapticSelection();
     }
+  };
+
+  const confirmDeleteMessage = (messageId: string) => {
+    hapticSelection();
+    Alert.alert(
+      t("conversation.deleteMessage"),
+      t("conversation.deleteMessageConfirm"),
+      [
+        { style: "cancel", text: t("common.cancel") },
+        {
+          onPress: () => deleteMutation.mutate(messageId),
+          style: "destructive",
+          text: t("conversation.deleteMessage"),
+        },
+      ],
+    );
   };
 
   const renderMessage = ({
@@ -263,21 +296,41 @@ export default function ConversationScreen() {
           ]}
         >
           <View style={[styles.messageHeader, isRTL && styles.rowReverse]}>
-            <Text
-              style={[
-                text.strong,
-                isMine &&
-                  (theme === "dark"
-                    ? styles.messageSenderMineDark
-                    : styles.messageSenderMineLight),
-              ]}
-            >
-              {isMine
-                ? t("conversation.you")
-                : message.senderRole === "admin"
-                  ? displayLabel("Platform Admin", language)
-                  : t(`roles.${message.senderRole}`)}
-            </Text>
+            <View style={[styles.messageAuthorRow, isRTL && styles.rowReverse]}>
+              <Text
+                style={[
+                  text.strong,
+                  isMine &&
+                    (theme === "dark"
+                      ? styles.messageSenderMineDark
+                      : styles.messageSenderMineLight),
+                ]}
+              >
+                {isMine
+                  ? t("conversation.you")
+                  : message.senderRole === "admin"
+                    ? displayLabel("Platform Admin", language)
+                    : t(`roles.${message.senderRole}`)}
+              </Text>
+              {isMine ? (
+                <Pressable
+                  accessibilityLabel={t("conversation.deleteMessage")}
+                  accessibilityRole="button"
+                  disabled={deleteMutation.isPending}
+                  hitSlop={8}
+                  onPress={() => confirmDeleteMessage(message.id)}
+                  style={({ pressed }) => [
+                    styles.deleteMessageButton,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <Trash2
+                    color={theme === "dark" ? "#F2EAF5" : colors.danger}
+                    size={14}
+                  />
+                </Pressable>
+              ) : null}
+            </View>
             <Text
               style={[
                 styles.time,
@@ -319,9 +372,17 @@ export default function ConversationScreen() {
               fileUrl={message.fileUrl}
               isMine={isMine}
               language={language}
-              onOpen={() =>
-                message.fileUrl ? accessMutation.mutate(message.fileUrl) : null
-              }
+              onOpen={(previewUrl) => {
+                if (previewUrl) {
+                  setImagePreview({
+                    title:
+                      message.fileName ?? t("conversation.imageAttachment"),
+                    url: previewUrl,
+                  });
+                  return;
+                }
+                if (message.fileUrl) accessMutation.mutate(message.fileUrl);
+              }}
               palette={palette}
               theme={theme}
             />
@@ -353,9 +414,11 @@ export default function ConversationScreen() {
                 ? messagesQuery.error.message
                 : sendMutation.error instanceof Error
                   ? sendMutation.error.message
-                  : accessMutation.error instanceof Error
-                    ? accessMutation.error.message
-                    : undefined
+                  : deleteMutation.error instanceof Error
+                    ? deleteMutation.error.message
+                    : accessMutation.error instanceof Error
+                      ? accessMutation.error.message
+                      : undefined
             }
           />
 
@@ -505,6 +568,49 @@ export default function ConversationScreen() {
           </View>
         </View>
       </Screen>
+      <Modal
+        animationType="fade"
+        onRequestClose={() => setImagePreview(null)}
+        transparent
+        visible={Boolean(imagePreview)}
+      >
+        <View style={styles.imagePreviewShade}>
+          <View
+            style={[
+              styles.imagePreviewPanel,
+              { backgroundColor: palette.surface, borderColor: palette.border },
+            ]}
+          >
+            <View
+              style={[styles.imagePreviewHeader, isRTL && styles.rowReverse]}
+            >
+              <Text
+                numberOfLines={1}
+                style={[text.strong, styles.previewTitle]}
+              >
+                {displayLabel(imagePreview?.title, language)}
+              </Text>
+              <Pressable
+                accessibilityLabel={t("common.cancel")}
+                accessibilityRole="button"
+                hitSlop={8}
+                onPress={() => setImagePreview(null)}
+                style={styles.removeAttachmentButton}
+              >
+                <X color={palette.text} size={20} />
+              </Pressable>
+            </View>
+            {imagePreview ? (
+              <Image
+                accessibilityIgnoresInvertColors
+                resizeMode="contain"
+                source={{ uri: imagePreview.url }}
+                style={styles.fullImagePreview}
+              />
+            ) : null}
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
@@ -675,7 +781,7 @@ function MessageAttachmentPreview({
   fileUrl?: null | string;
   isMine: boolean;
   language: "ar" | "en";
-  onOpen: () => void;
+  onOpen: (previewUrl?: string) => void;
   palette: ReturnType<typeof useThemePalette>;
   theme: "dark" | "light";
 }) {
@@ -703,7 +809,7 @@ function MessageAttachmentPreview({
     return (
       <Pressable
         accessibilityRole="imagebutton"
-        onPress={onOpen}
+        onPress={() => onOpen(signedUrl)}
         style={({ pressed }) => [
           styles.mediaPreview,
           pressed && styles.pressed,
@@ -723,7 +829,7 @@ function MessageAttachmentPreview({
     <Pressable
       accessibilityRole="button"
       disabled={!fileUrl}
-      onPress={onOpen}
+      onPress={() => onOpen()}
       style={({ pressed }) => [
         styles.mediaCard,
         {
@@ -922,9 +1028,47 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800",
   },
+  deleteMessageButton: {
+    alignItems: "center",
+    borderRadius: 999,
+    height: 26,
+    justifyContent: "center",
+    width: 26,
+  },
   grow: {
     flex: 1,
     gap: 2,
+  },
+  fullImagePreview: {
+    borderRadius: 18,
+    height: "88%",
+    width: "100%",
+  },
+  imagePreviewHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "space-between",
+  },
+  imagePreviewPanel: {
+    borderRadius: 24,
+    borderWidth: 1,
+    gap: 12,
+    height: "82%",
+    padding: 14,
+    width: "92%",
+  },
+  imagePreviewShade: {
+    alignItems: "center",
+    backgroundColor: "rgba(19,13,25,0.86)",
+    flex: 1,
+    justifyContent: "center",
+    padding: 14,
+  },
+  messageAuthorRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 4,
   },
   messageGroup: {
     gap: 10,
@@ -941,6 +1085,9 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.72,
     transform: [{ scale: 0.98 }],
+  },
+  previewTitle: {
+    flex: 1,
   },
   removeAttachmentButton: {
     alignItems: "center",

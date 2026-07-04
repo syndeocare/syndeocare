@@ -26,6 +26,11 @@ import {
 } from "react-native";
 
 import {
+  createLocationSelection,
+  LocationField,
+  toLocationValue,
+} from "../../src/components/LocationField";
+import {
   Avatar,
   Badge,
   Button,
@@ -117,23 +122,6 @@ function addMonths(value: Date, amount: number) {
   return new Date(value.getFullYear(), value.getMonth() + amount, 1);
 }
 
-function splitLocation(
-  value: string,
-  fallback?: { city?: string; region?: string },
-) {
-  const [city, region] = value
-    .split(",")
-    .map((part) => part.trim())
-    .filter(Boolean);
-
-  return {
-    city: city || fallback?.city || "",
-    latitude: 0,
-    longitude: 0,
-    region: region || fallback?.region || "Yemen",
-  };
-}
-
 const MIN_HOURLY_RATE_YER = 500;
 const MAX_HOURLY_RATE_YER = 100000;
 
@@ -184,7 +172,7 @@ function draftFromJob(job: Job) {
       job.requirements?.some((requirement) =>
         requirement.toLowerCase().includes("urgent"),
       ) ?? false,
-    locationAddress: `${job.location.city}, ${job.location.region}`,
+    location: createLocationSelection(job.location),
     requiredCertifications: job.requirements ?? [],
     role: job.specialty,
     shiftDate: Number.isNaN(startsAt.getTime())
@@ -227,7 +215,7 @@ export default function ShiftsScreen() {
     description: "",
     endTime: "16:00",
     isUrgent: false,
-    locationAddress: "",
+    location: createLocationSelection(),
     requiredCertifications: [] as string[],
     role: "",
     shiftDate: "",
@@ -242,10 +230,12 @@ export default function ShiftsScreen() {
       "jobs",
       session?.principal.role === "clinic" ? "mine" : "public",
     ],
+    refetchInterval: 15_000,
   });
   const bookingsQuery = useQuery({
     queryFn: listBookings,
     queryKey: ["bookings"],
+    refetchInterval: 10_000,
   });
   const professionalsQuery = useQuery({
     enabled: session?.principal.role === "clinic",
@@ -364,15 +354,28 @@ export default function ShiftsScreen() {
     if (amount < MIN_HOURLY_RATE_YER || amount > MAX_HOURLY_RATE_YER) {
       throw new Error(t("shifts.amountRangeInvalid"));
     }
-    if (!shiftDraft.locationAddress.trim() && !clinicProfileQuery.data?.city) {
+    const fallbackClinicLocation = createLocationSelection(
+      clinicProfileQuery.data
+        ? {
+            city: clinicProfileQuery.data.city,
+            latitude: clinicProfileQuery.data.latitude,
+            longitude: clinicProfileQuery.data.longitude,
+            region: clinicProfileQuery.data.region,
+          }
+        : null,
+    );
+    const selectedShiftLocation =
+      shiftDraft.location.latitude != null &&
+      shiftDraft.location.longitude != null
+        ? shiftDraft.location
+        : fallbackClinicLocation;
+
+    if (
+      selectedShiftLocation.latitude == null ||
+      selectedShiftLocation.longitude == null
+    ) {
       throw new Error(t("shifts.locationRequired"));
     }
-
-    const location = splitLocation(shiftDraft.locationAddress, {
-      city: clinicProfileQuery.data?.city,
-      region: clinicProfileQuery.data?.region,
-    });
-    if (!location.city) throw new Error(t("shifts.locationRequired"));
 
     const requirements = [
       ...shiftDraft.requiredCertifications,
@@ -391,7 +394,7 @@ export default function ShiftsScreen() {
       employmentType: "temporary_shift",
       endsAt: endsAt.toISOString(),
       languages: ["ar", "en"],
-      location,
+      location: toLocationValue(selectedShiftLocation),
       requirements,
       specialty: shiftDraft.role.trim(),
       startsAt: startsAtIso,
@@ -427,7 +430,7 @@ export default function ShiftsScreen() {
         description: "",
         endTime: "16:00",
         isUrgent: false,
-        locationAddress: "",
+        location: createLocationSelection(),
         requiredCertifications: [],
         role: "",
         shiftDate: "",
@@ -570,7 +573,16 @@ export default function ShiftsScreen() {
                   description: "",
                   endTime: "16:00",
                   isUrgent: false,
-                  locationAddress: "",
+                  location: createLocationSelection(
+                    clinicProfileQuery.data
+                      ? {
+                          city: clinicProfileQuery.data.city,
+                          latitude: clinicProfileQuery.data.latitude,
+                          longitude: clinicProfileQuery.data.longitude,
+                          region: clinicProfileQuery.data.region,
+                        }
+                      : null,
+                  ),
                   requiredCertifications: [],
                   role: "",
                   shiftDate: "",
@@ -1126,44 +1138,35 @@ export default function ShiftsScreen() {
                     <View
                       style={[styles.twoColumn, isNarrow && styles.oneColumn]}
                     >
-                      <Field
-                        autoComplete="off"
+                      <TimePickerField
                         label={t("shifts.startTime")}
-                        onChangeText={(value) =>
+                        onChange={(value) =>
                           setShiftDraft((draft) => ({
                             ...draft,
                             startTime: value,
                           }))
                         }
-                        placeholder="08:00"
-                        returnKeyType="next"
                         value={shiftDraft.startTime}
                       />
-                      <Field
-                        autoComplete="off"
+                      <TimePickerField
                         label={t("shifts.endTime")}
-                        onChangeText={(value) =>
+                        onChange={(value) =>
                           setShiftDraft((draft) => ({
                             ...draft,
                             endTime: value,
                           }))
                         }
-                        placeholder="16:00"
-                        returnKeyType="next"
                         value={shiftDraft.endTime}
                       />
                     </View>
-                    <Field
-                      label={t("shifts.location")}
-                      onChangeText={(value) =>
+                    <LocationField
+                      onChange={(location) =>
                         setShiftDraft((draft) => ({
                           ...draft,
-                          locationAddress: value,
+                          location,
                         }))
                       }
-                      placeholder={t("shifts.locationPlaceholder")}
-                      returnKeyType="next"
-                      value={shiftDraft.locationAddress}
+                      value={shiftDraft.location}
                     />
                   </>
                 ) : null}
@@ -1291,7 +1294,7 @@ export default function ShiftsScreen() {
                     <ReviewRow
                       label={t("shifts.location")}
                       value={displayLabel(
-                        shiftDraft.locationAddress ||
+                        shiftDraft.location.address ||
                           `${clinicProfileQuery.data?.city ?? ""}, ${
                             clinicProfileQuery.data?.region ?? ""
                           }`,
@@ -1631,6 +1634,116 @@ function DatePickerField({
   );
 }
 
+function TimePickerField({
+  label,
+  onChange,
+  value,
+}: {
+  label: string;
+  onChange: (value: string) => void;
+  value: string;
+}) {
+  const t = useT();
+  const textStyles = useTextStyles();
+  const palette = useThemePalette();
+  const { language } = usePreferences();
+  const [isOpen, setIsOpen] = useState(false);
+  const locale = language === "ar" ? "ar-YE" : "en";
+  const timeOptions = Array.from({ length: 48 }, (_, index) => {
+    const hour = Math.floor(index / 2);
+    const minute = index % 2 === 0 ? 0 : 30;
+    return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+  });
+  const displayValue = /^\d{2}:\d{2}$/.test(value)
+    ? new Intl.DateTimeFormat(locale, {
+        hour: "numeric",
+        minute: "2-digit",
+      }).format(new Date(`2026-01-01T${value}:00+03:00`))
+    : value;
+
+  return (
+    <View style={styles.dateField}>
+      <Text style={textStyles.strong}>{label}</Text>
+      <Pressable
+        accessibilityLabel={label}
+        accessibilityRole="button"
+        onPress={() => setIsOpen(true)}
+        style={({ pressed }) => [
+          styles.dateInput,
+          { backgroundColor: palette.input, borderColor: palette.border },
+          pressed && styles.pressedChip,
+        ]}
+      >
+        <Clock color={palette.placeholder} size={18} />
+        <Text style={[styles.dateInputText, { color: palette.text }]}>
+          {displayValue || label}
+        </Text>
+      </Pressable>
+
+      <Modal
+        animationType="fade"
+        onRequestClose={() => setIsOpen(false)}
+        transparent
+        visible={isOpen}
+      >
+        <View style={styles.calendarShade}>
+          <View
+            style={[
+              styles.calendarPanel,
+              { backgroundColor: palette.surface, borderColor: palette.border },
+            ]}
+          >
+            <Text style={textStyles.h2}>{label}</Text>
+            <ScrollView
+              contentContainerStyle={styles.timeGrid}
+              showsVerticalScrollIndicator={false}
+              style={styles.timeList}
+            >
+              {timeOptions.map((option) => {
+                const selected = option === value;
+                const optionLabel = new Intl.DateTimeFormat(locale, {
+                  hour: "numeric",
+                  minute: "2-digit",
+                }).format(new Date(`2026-01-01T${option}:00+03:00`));
+                return (
+                  <Pressable
+                    accessibilityRole="button"
+                    key={option}
+                    onPress={() => {
+                      onChange(option);
+                      setIsOpen(false);
+                    }}
+                    style={[
+                      styles.timeOption,
+                      {
+                        backgroundColor: selected
+                          ? colors.primary
+                          : palette.surfaceMuted,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.timeOptionText,
+                        { color: selected ? "#ffffff" : palette.text },
+                      ]}
+                    >
+                      {optionLabel}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+            <Button onPress={() => setIsOpen(false)} tone="secondary">
+              {t("common.cancel")}
+            </Button>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   cancel: {
     alignItems: "center",
@@ -1715,6 +1828,26 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: "800",
+  },
+  timeGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    paddingBottom: 2,
+  },
+  timeList: {
+    maxHeight: 280,
+  },
+  timeOption: {
+    alignItems: "center",
+    borderRadius: 13,
+    minHeight: 42,
+    justifyContent: "center",
+    width: "30.8%",
+  },
+  timeOptionText: {
+    fontSize: 14,
+    fontWeight: "900",
   },
   choiceChip: {
     alignItems: "center",
