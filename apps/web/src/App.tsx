@@ -10,6 +10,7 @@ import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import PageSkeleton from "@/components/PageSkeleton";
+import { SEO } from "@/components/SEO";
 import { lazy, Suspense } from "react";
 import { useNativeBootstrap } from "@/hooks/useNative";
 import { useNativePush } from "@/hooks/useNativePush";
@@ -84,6 +85,7 @@ const App = () => (
             <Sonner />
             <BrowserRouter>
               <AuthProvider>
+                <SEO />
                 <NativeBridge />
                 <main id="main-content">
                   <Suspense fallback={<PageSkeleton />}>

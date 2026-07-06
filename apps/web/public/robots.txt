@@ -1,14 +1,55 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /auth
+Disallow: /dashboard
+Disallow: /design-system
+Disallow: /login
+Disallow: /logout
+Disallow: /messages
+Disallow: /onboarding
+Disallow: /profile
+Disallow: /reset-password
+Disallow: /search
+Disallow: /settings
+Disallow: /shifts
+Disallow: /signup
+Disallow: /verify
+
 User-agent: Googlebot
 Allow: /
+Disallow: /admin
+Disallow: /auth
+Disallow: /dashboard
+Disallow: /design-system
+Disallow: /login
+Disallow: /logout
+Disallow: /messages
+Disallow: /onboarding
+Disallow: /profile
+Disallow: /reset-password
+Disallow: /search
+Disallow: /settings
+Disallow: /shifts
+Disallow: /signup
+Disallow: /verify
 
 User-agent: Bingbot
 Allow: /
+Disallow: /admin
+Disallow: /auth
+Disallow: /dashboard
+Disallow: /design-system
+Disallow: /login
+Disallow: /logout
+Disallow: /messages
+Disallow: /onboarding
+Disallow: /profile
+Disallow: /reset-password
+Disallow: /search
+Disallow: /settings
+Disallow: /shifts
+Disallow: /signup
+Disallow: /verify
 
-User-agent: Twitterbot
-Allow: /
-
-User-agent: facebookexternalhit
-Allow: /
-
-User-agent: *
-Allow: /
+Sitemap: https://syndeocare.ai/sitemap.xml

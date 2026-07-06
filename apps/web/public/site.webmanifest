@@ -1,0 +1,27 @@
+{
+  "name": "SyndeoCare.ai - Healthcare Staffing",
+  "short_name": "SyndeoCare",
+  "description": "Bilingual Arabic and English healthcare staffing platform for clinics, medical shifts, verified healthcare professionals, onboarding, bookings, and secure messaging in Yemen.",
+  "lang": "en",
+  "dir": "auto",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#160d1d",
+  "theme_color": "#663C6D",
+  "categories": ["business", "health", "medical", "productivity"],
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
