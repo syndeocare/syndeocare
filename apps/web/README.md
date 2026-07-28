@@ -53,7 +53,7 @@ Backend (Custom gateway/services + owned PostgreSQL persistence)
 | Forms       | React Hook Form, Zod                          |
 | i18n        | i18next (EN + AR with RTL)                    |
 | Backend     | API gateway, Keycloak, PostgreSQL, S3 storage |
-| Email       | Resend API                                    |
+| Email       | Amazon SES                                    |
 | Geolocation | PostGIS                                       |
 
 ## Project Structure
@@ -137,7 +137,7 @@ The app will be available at `http://localhost:8080`.
 Edge function secrets:
 | Secret | Description |
 |--------|-------------|
-| `RESEND_API_KEY` | Resend email service API key |
+| `EMAIL_FROM_ADDRESS` | Verified Amazon SES sender address |
 | `APP_URL` | Application URL for email links (default: `https://syndeocare.ai`) |
 
 ## Database Schema

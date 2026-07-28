@@ -174,15 +174,25 @@ export function registerPlatformHttpHooks(
     const statusCode =
       typeof typedError.statusCode === "number" ? typedError.statusCode : 500;
     const message = buildErrorMessage(typedError);
+    const productionInternalError =
+      process.env.NODE_ENV === "production" && statusCode >= 500;
+    const errorContext = productionInternalError
+      ? {
+          correlationId: request.correlationId,
+          errorName: typedError.name,
+          statusCode,
+        }
+      : {
+          correlationId: request.correlationId,
+          err: error,
+          statusCode,
+        };
 
-    request.log.error(
-      {
-        err: error,
-        correlationId: request.correlationId,
-        statusCode,
-      },
-      "Request failed",
-    );
+    if (statusCode >= 500) {
+      request.log.error(errorContext, "Request failed");
+    } else {
+      request.log.warn(errorContext, "Request rejected");
+    }
 
     void reply.code(statusCode).send({
       code: buildErrorCode(statusCode),
@@ -582,6 +592,26 @@ function getEventBusUrl() {
   return process.env.NATS_URL ?? DEFAULT_NATS_URL;
 }
 
+function buildCorsOriginPolicy() {
+  const configuredOrigins = (process.env.API_CORS_ORIGINS ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  if (configuredOrigins.length === 0) {
+    return process.env.NODE_ENV === "production" ? false : true;
+  }
+
+  const allowedOrigins = new Set(configuredOrigins);
+
+  return (
+    origin: string | undefined,
+    callback: (error: Error | null, allowed: boolean) => void,
+  ) => {
+    callback(null, origin === undefined || allowedOrigins.has(origin));
+  };
+}
+
 async function getEventBusConnection() {
   if (!natsConnectionPromise) {
     natsConnectionPromise = connect({
@@ -640,7 +670,8 @@ export async function createServiceApp(options: ServiceBootstrapOptions) {
       "x-dev-verification-status",
     ],
     methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    origin: true,
+    exposedHeaders: [CORRELATION_ID_HEADER],
+    origin: buildCorsOriginPolicy(),
   });
   await app.register(swagger, {
     openapi: {

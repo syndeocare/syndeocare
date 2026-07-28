@@ -21,9 +21,10 @@
     "version-packages": "changeset version",
     "release": "changeset publish",
     "smoke:web": "node scripts/ci-smoke-web.mjs",
+    "test": "turbo run test",
     "clean": "rimraf .turbo apps/*/.next apps/*/dist packages/*/dist services/*/dist",
     "validate": "pnpm format:check && pnpm lint && pnpm check-types",
-    "validate:ci": "pnpm validate && pnpm build",
+    "validate:ci": "pnpm validate && pnpm test && pnpm build",
     "prepare": "husky"
   },
   "devDependencies": {
@@ -39,6 +40,27 @@
     "turbo": "^2.9.14",
     "tsx": "^4.20.6",
     "typescript": "5.9.2"
+  },
+  "pnpm": {
+    "overrides": {
+      "ajv@>=6 <7": "6.15.0",
+      "brace-expansion@1": "1.1.16",
+      "brace-expansion@5": "5.0.7",
+      "fast-uri@3": "3.1.4",
+      "flatted@<3.4.2": "3.4.2",
+      "joi@17": "17.13.4",
+      "js-yaml@3": "3.15.0",
+      "js-yaml@4": "4.3.0",
+      "minimatch@3": "3.1.4",
+      "minimatch@9": "9.0.7",
+      "picomatch@2": "2.3.2",
+      "picomatch@4": "4.0.4",
+      "postcss": "8.5.22",
+      "sharp": "0.35.3",
+      "shell-quote": "1.9.0",
+      "tar@7": "7.5.21",
+      "uuid": "11.1.1"
+    }
   },
   "packageManager": "pnpm@9.0.0",
   "engines": {

@@ -1,0 +1,63 @@
+name: Mobile OTA update
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/mobile/app/**"
+      - "apps/mobile/assets/**"
+      - "apps/mobile/src/**"
+      - ".github/workflows/mobile-update.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: mobile-ota-production
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Validate and publish production update
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.0.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.20.2
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate mobile application
+        run: |
+          pnpm --filter mobile check-types
+          pnpm --filter mobile exec eslint app src --ext .ts,.tsx
+          pnpm --filter mobile build
+
+      - name: Require Expo token
+        if: env.EXPO_TOKEN == ''
+        run: |
+          echo "EXPO_TOKEN is required to publish production OTA updates."
+          exit 1
+
+      - name: Publish production update
+        working-directory: apps/mobile
+        run: |
+          npx eas-cli@latest update \
+            --channel production \
+            --environment production \
+            --platform all \
+            --non-interactive \
+            --message "Production update ${GITHUB_SHA}"

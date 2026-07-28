@@ -25,11 +25,13 @@ import {
   registerPushTokenBySubject,
 } from "@repo/persistence";
 import { startService } from "@repo/service-core";
+import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
 import { z } from "zod";
 
-const resendResponseSchema = notificationDeliveryResponseSchema.extend({
+const emailDeliveryResponseSchema = notificationDeliveryResponseSchema.extend({
   accepted: notificationDeliveryResponseSchema.shape.accepted.default(true),
 });
+const ses = new SESv2Client({});
 const actorParamsSchema = z.object({
   subject: z.string().min(1),
 });
@@ -62,49 +64,49 @@ void startService({
         });
       }
 
-      const resendApiKey = process.env.RESEND_API_KEY;
       const fromEmail =
-        process.env.RESEND_FROM_EMAIL?.trim() || "onboarding@resend.dev";
-      const targetEmail =
-        process.env.RESEND_TEST_EMAIL?.trim() || parsedBody.data.toEmail;
+        process.env.EMAIL_FROM_ADDRESS?.trim() ||
+        "SyndeoCare <no-reply@syndeocare.ai>";
 
-      if (!resendApiKey) {
+      try {
+        const response = await ses.send(
+          new SendEmailCommand({
+            FromEmailAddress: fromEmail,
+            Destination: { ToAddresses: [parsedBody.data.toEmail] },
+            Content: {
+              Simple: {
+                Subject: { Data: parsedBody.data.subject, Charset: "UTF-8" },
+                Body: {
+                  Html: { Data: parsedBody.data.html, Charset: "UTF-8" },
+                },
+              },
+            },
+          }),
+        );
+
+        if (!response.MessageId) {
+          throw new Error("Amazon SES did not return a message id.");
+        }
+
+        return emailDeliveryResponseSchema.parse({
+          accepted: true,
+          deliveredTo: parsedBody.data.toEmail,
+          providerMessageId: response.MessageId,
+        });
+      } catch (error) {
+        request.log.error(
+          {
+            err: error,
+            recipientDomain: parsedBody.data.toEmail.split("@")[1],
+          },
+          "Amazon SES could not accept the notification.",
+        );
+
         return reply.code(503).send({
           code: "NOTIFICATION_PROVIDER_UNAVAILABLE",
-          message:
-            "RESEND_API_KEY is not configured for the notifications service.",
+          message: "Email delivery is temporarily unavailable.",
         });
       }
-
-      const response = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${resendApiKey}`,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          from: fromEmail,
-          to: [targetEmail],
-          subject: parsedBody.data.subject,
-          html: parsedBody.data.html,
-        }),
-      });
-      const payload = (await response.json().catch(() => undefined)) as
-        | Record<string, unknown>
-        | undefined;
-
-      if (!response.ok || typeof payload?.id !== "string") {
-        return reply.code(503).send({
-          code: "NOTIFICATION_PROVIDER_UNAVAILABLE",
-          message: "Resend could not accept the notification request.",
-        });
-      }
-
-      return resendResponseSchema.parse({
-        accepted: true,
-        deliveredTo: targetEmail,
-        providerMessageId: payload.id,
-      });
     });
 
     app.get(

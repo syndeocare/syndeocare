@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
@@ -221,6 +221,7 @@ const ProfessionalDashboard = () => {
 
         if (profileData) {
           setProfile(profileData);
+          let loadedBookingStatsFromGateway = false;
 
           if (isGatewayBackendConfigured()) {
             try {
@@ -268,6 +269,7 @@ const ProfessionalDashboard = () => {
                 );
               }, 0);
               setMonthlyEarnings(earnings);
+              loadedBookingStatsFromGateway = true;
             } catch (error) {
               console.warn(
                 "Falling back to BackendDb professional booking stats",
@@ -276,7 +278,7 @@ const ProfessionalDashboard = () => {
             }
           }
 
-          if (!monthlyEarnings && !completedShifts) {
+          if (!loadedBookingStatsFromGateway) {
             const startOfMonth = new Date();
             startOfMonth.setDate(1);
             startOfMonth.setHours(0, 0, 0, 0);
@@ -326,14 +328,6 @@ const ProfessionalDashboard = () => {
         if (docsData) {
           setDocuments(docsData);
         }
-
-        // Fetch available shifts
-        await fetchShifts();
-
-        // Fetch invitations
-        if (profileData) {
-          await fetchInvitations(profileData.id);
-        }
       } finally {
         setIsLoading(false);
       }
@@ -344,7 +338,7 @@ const ProfessionalDashboard = () => {
     }
   }, [user, isOnboardingComplete]);
 
-  const fetchInvitations = async (profId: string) => {
+  const fetchInvitations = useCallback(async (profId: string) => {
     const { data } = await backendDb
       .from("shift_invitations")
       .select(
@@ -374,35 +368,39 @@ const ProfessionalDashboard = () => {
       );
       setInvitations(enriched);
     }
-  };
+  }, []);
 
-  const fetchShifts = async (
-    excludedShiftIds = new Set(
-      Object.entries(bookingStatusByShiftId)
-        .filter(([, status]) =>
-          ["requested", "accepted", "confirmed"].includes(status),
-        )
-        .map(([shiftId]) => shiftId),
-    ),
-  ) => {
-    const today = new Date().toISOString().split("T")[0];
-    let data: Shift[] = [];
+  const fetchShifts = useCallback(
+    async (
+      excludedShiftIds = new Set(
+        Object.entries(bookingStatusByShiftId)
+          .filter(([, status]) =>
+            ["requested", "accepted", "confirmed"].includes(status),
+          )
+          .map(([shiftId]) => shiftId),
+      ),
+    ) => {
+      const today = new Date().toISOString().split("T")[0];
+      let data: Shift[] = [];
 
-    if (isPlatformBackendConfigured()) {
-      try {
-        const jobs = await listLegacyJobs({
-          specialty: filters.role !== "All Roles" ? filters.role : undefined,
-        });
-        data = jobs as unknown as Shift[];
-      } catch (error) {
-        console.warn("Falling back to BackendDb professional jobs feed", error);
+      if (isPlatformBackendConfigured()) {
+        try {
+          const jobs = await listLegacyJobs({
+            specialty: filters.role !== "All Roles" ? filters.role : undefined,
+          });
+          data = jobs as unknown as Shift[];
+        } catch (error) {
+          console.warn(
+            "Falling back to BackendDb professional jobs feed",
+            error,
+          );
+        }
       }
-    }
 
-    let query = backendDb
-      .from("shifts")
-      .select(
-        `
+      let query = backendDb
+        .from("shifts")
+        .select(
+          `
         id,
         title,
         role_required,
@@ -416,82 +414,90 @@ const ProfessionalDashboard = () => {
         is_urgent,
         clinic:clinics(id, name, address, rating_avg)
       `,
-      )
-      .eq("is_filled", false)
-      .gte("shift_date", today)
-      .order("shift_date", { ascending: true })
-      .limit(20);
+        )
+        .eq("is_filled", false)
+        .gte("shift_date", today)
+        .order("shift_date", { ascending: true })
+        .limit(20);
 
-    if (filters.role && filters.role !== "All Roles") {
-      query = query.ilike("role_required", `%${filters.role}%`);
-    }
+      if (filters.role && filters.role !== "All Roles") {
+        query = query.ilike("role_required", `%${filters.role}%`);
+      }
 
-    if (filters.minRate) {
-      query = query.gte("hourly_rate", parseFloat(filters.minRate));
-    }
+      if (filters.minRate) {
+        query = query.gte("hourly_rate", parseFloat(filters.minRate));
+      }
 
-    if (filters.dateRange === "today") {
-      const today = new Date().toISOString().split("T")[0];
-      query = query.eq("shift_date", today);
-    } else if (filters.dateRange === "week") {
+      if (filters.dateRange === "today") {
+        const today = new Date().toISOString().split("T")[0];
+        query = query.eq("shift_date", today);
+      } else if (filters.dateRange === "week") {
+        const nextWeek = new Date();
+        nextWeek.setDate(nextWeek.getDate() + 7);
+        query = query.lte("shift_date", nextWeek.toISOString().split("T")[0]);
+      } else if (filters.dateRange === "month") {
+        const nextMonth = new Date();
+        nextMonth.setMonth(nextMonth.getMonth() + 1);
+        query = query.lte("shift_date", nextMonth.toISOString().split("T")[0]);
+      }
+
+      const { data: shiftsData } = await query;
+
+      if (shiftsData) {
+        data = [
+          ...data,
+          ...(shiftsData as unknown as Shift[]).map((shift) => ({
+            ...shift,
+            source: "legacy" as const,
+          })),
+        ];
+      }
+
+      const uniqueData = Array.from(
+        new Map(data.map((shift) => [shift.id, shift])).values(),
+      );
       const nextWeek = new Date();
       nextWeek.setDate(nextWeek.getDate() + 7);
-      query = query.lte("shift_date", nextWeek.toISOString().split("T")[0]);
-    } else if (filters.dateRange === "month") {
       const nextMonth = new Date();
       nextMonth.setMonth(nextMonth.getMonth() + 1);
-      query = query.lte("shift_date", nextMonth.toISOString().split("T")[0]);
-    }
 
-    const { data: shiftsData } = await query;
-
-    if (shiftsData) {
-      data = [
-        ...data,
-        ...(shiftsData as unknown as Shift[]).map((shift) => ({
-          ...shift,
-          source: "legacy" as const,
-        })),
-      ];
-    }
-
-    const uniqueData = Array.from(
-      new Map(data.map((shift) => [shift.id, shift])).values(),
-    );
-    const nextWeek = new Date();
-    nextWeek.setDate(nextWeek.getDate() + 7);
-    const nextMonth = new Date();
-    nextMonth.setMonth(nextMonth.getMonth() + 1);
-
-    setShifts(
-      uniqueData
-        .filter((shift) => !excludedShiftIds.has(shift.id))
-        .filter((shift) =>
-          filters.minRate
-            ? shift.hourly_rate >= parseFloat(filters.minRate)
-            : true,
-        )
-        .filter((shift) => shift.shift_date >= today)
-        .filter((shift) => {
-          if (filters.dateRange === "today") {
-            return shift.shift_date === today;
-          }
-          if (filters.dateRange === "week") {
-            return shift.shift_date <= nextWeek.toISOString().split("T")[0];
-          }
-          if (filters.dateRange === "month") {
-            return shift.shift_date <= nextMonth.toISOString().split("T")[0];
-          }
-          return true;
-        }),
-    );
-  };
+      setShifts(
+        uniqueData
+          .filter((shift) => !excludedShiftIds.has(shift.id))
+          .filter((shift) =>
+            filters.minRate
+              ? shift.hourly_rate >= parseFloat(filters.minRate)
+              : true,
+          )
+          .filter((shift) => shift.shift_date >= today)
+          .filter((shift) => {
+            if (filters.dateRange === "today") {
+              return shift.shift_date === today;
+            }
+            if (filters.dateRange === "week") {
+              return shift.shift_date <= nextWeek.toISOString().split("T")[0];
+            }
+            if (filters.dateRange === "month") {
+              return shift.shift_date <= nextMonth.toISOString().split("T")[0];
+            }
+            return true;
+          }),
+      );
+    },
+    [bookingStatusByShiftId, filters],
+  );
 
   useEffect(() => {
     if (user && isOnboardingComplete) {
-      fetchShifts();
+      void fetchShifts();
     }
-  }, [filters]);
+  }, [fetchShifts, isOnboardingComplete, user]);
+
+  useEffect(() => {
+    if (profile?.id) {
+      void fetchInvitations(profile.id);
+    }
+  }, [fetchInvitations, profile?.id]);
 
   const clearFilters = () => {
     setFilters({ role: "All Roles", minRate: "", dateRange: "all" });

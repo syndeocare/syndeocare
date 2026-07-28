@@ -20,6 +20,7 @@
     "CAPACITOR_REMOTE_APP_URL",
     "DATABASE_URL",
     "DATABASE_SSL",
+    "DOWNSTREAM_REQUEST_TIMEOUT_MS",
     "GOOGLE_OAUTH_CLIENT_ID",
     "GOOGLE_OAUTH_CLIENT_SECRET",
     "HOST",
@@ -53,9 +54,7 @@
     "SERVICE_INSTANCE_NAME",
     "HTTP_RETRY_ATTEMPTS",
     "HTTP_RETRY_BACKOFF_MS",
-    "RESEND_API_KEY",
-    "RESEND_FROM_EMAIL",
-    "RESEND_TEST_EMAIL",
+    "EMAIL_FROM_ADDRESS",
     "STORAGE_ACCESS_KEY_ID",
     "STORAGE_ENDPOINT",
     "STORAGE_FORCE_PATH_STYLE",
@@ -76,6 +75,10 @@
     },
     "lint": {
       "dependsOn": ["^lint"]
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "outputs": []
     },
     "check-types": {
       "dependsOn": ["^check-types"]

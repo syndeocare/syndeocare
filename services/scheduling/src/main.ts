@@ -27,10 +27,10 @@ const subjectParamsSchema = z.object({
   subject: z.string().min(1),
 });
 const jobIdParamsSchema = z.object({
-  jobId: z.string().min(1),
+  jobId: z.string().uuid(),
 });
 const bookingParamsSchema = z.object({
-  bookingId: z.string().min(1),
+  bookingId: z.string().uuid(),
   subject: z.string().min(1),
 });
 const jobFiltersSchema = z.object({

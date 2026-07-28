@@ -1668,10 +1668,21 @@ export async function listJobListings(
 
 export async function getJobListingById(
   jobId: string,
-  options: { redactClinicIdentity?: boolean } = {
-    redactClinicIdentity: true,
-  },
 ): Promise<JobListingDetail | null> {
+  const row = await getJobListingRowById(jobId);
+
+  return row ? mapJobListingDetail(row, { redactClinicIdentity: true }) : null;
+}
+
+async function getInternalJobListingById(
+  jobId: string,
+): Promise<JobListingDetail | null> {
+  const row = await getJobListingRowById(jobId);
+
+  return row ? mapJobListingDetail(row, { redactClinicIdentity: false }) : null;
+}
+
+async function getJobListingRowById(jobId: string) {
   const db = getDb();
   const rows = await db
     .select({
@@ -1682,13 +1693,8 @@ export async function getJobListingById(
     .innerJoin(clinicProfiles, eq(jobListings.clinicId, clinicProfiles.id))
     .where(eq(jobListings.id, jobId))
     .limit(1);
-  const row = rows[0];
 
-  return row
-    ? mapJobListingDetail(row, {
-        redactClinicIdentity: options.redactClinicIdentity ?? true,
-      })
-    : null;
+  return rows[0] ?? null;
 }
 
 export async function listJobListingsBySubject(
@@ -1878,7 +1884,7 @@ export async function listBookingsForSubject(
   ]);
 
   const db = getDb();
-  const rows = await db
+  const query = db
     .select({
       booking: bookings,
       clinic: clinicProfiles,
@@ -1891,24 +1897,22 @@ export async function listBookingsForSubject(
     .innerJoin(
       professionalProfiles,
       eq(bookings.professionalId, professionalProfiles.id),
-    )
-    .orderBy(desc(bookings.requestedAt));
+    );
 
-  return rows
-    .filter((row) => {
-      if (aggregate.actor.role === "admin") {
-        return true;
-      }
+  const rows =
+    aggregate.actor.role === "admin"
+      ? await query.orderBy(desc(bookings.requestedAt))
+      : aggregate.actor.role === "clinic" && clinic
+        ? await query
+            .where(eq(bookings.clinicId, clinic.id))
+            .orderBy(desc(bookings.requestedAt))
+        : aggregate.actor.role === "professional" && professional
+          ? await query
+              .where(eq(bookings.professionalId, professional.id))
+              .orderBy(desc(bookings.requestedAt))
+          : [];
 
-      if (aggregate.actor.role === "clinic") {
-        return clinic ? row.booking.clinicId === clinic.id : false;
-      }
-
-      return professional
-        ? row.booking.professionalId === professional.id
-        : false;
-    })
-    .map(mapBookingDetail);
+  return rows.map(mapBookingDetail);
 }
 
 export async function getBookingByIdForSubject(
@@ -2051,7 +2055,7 @@ export async function requestBookingBySubject(
   }
 
   const [job, professional] = await Promise.all([
-    getJobListingById(input.jobId, { redactClinicIdentity: false }),
+    getInternalJobListingById(input.jobId),
     getProfessionalProfileBySubject(subject),
   ]);
 

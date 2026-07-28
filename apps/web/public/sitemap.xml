@@ -1,41 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
-  xmlns:xhtml="http://www.w3.org/1999/xhtml">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://syndeocare.ai/</loc>
-    <lastmod>2026-07-06</lastmod>
+    <lastmod>2026-07-22</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://syndeocare.ai/" />
-    <xhtml:link rel="alternate" hreflang="ar" href="https://syndeocare.ai/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://syndeocare.ai/" />
   </url>
   <url>
     <loc>https://syndeocare.ai/for-clinics</loc>
-    <lastmod>2026-07-06</lastmod>
+    <lastmod>2026-07-22</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://syndeocare.ai/for-clinics" />
-    <xhtml:link rel="alternate" hreflang="ar" href="https://syndeocare.ai/for-clinics" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://syndeocare.ai/for-clinics" />
   </url>
   <url>
     <loc>https://syndeocare.ai/for-professionals</loc>
-    <lastmod>2026-07-06</lastmod>
+    <lastmod>2026-07-22</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://syndeocare.ai/for-professionals" />
-    <xhtml:link rel="alternate" hreflang="ar" href="https://syndeocare.ai/for-professionals" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://syndeocare.ai/for-professionals" />
   </url>
   <url>
     <loc>https://syndeocare.ai/about</loc>
-    <lastmod>2026-07-06</lastmod>
+    <lastmod>2026-07-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://syndeocare.ai/about" />
-    <xhtml:link rel="alternate" hreflang="ar" href="https://syndeocare.ai/about" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://syndeocare.ai/about" />
   </url>
   <url>
     <loc>https://syndeocare.ai/help</loc>

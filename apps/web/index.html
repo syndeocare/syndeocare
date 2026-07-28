@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
     <title>
       SyndeoCare.ai | Healthcare Staffing, Medical Shifts & Clinic Staffing in
@@ -34,9 +34,6 @@
       content="69fCv3iiI2qGHPU2dQGIAZAziBCRWW-9TzpkK189yCI"
     />
     <link rel="canonical" href="https://syndeocare.ai" />
-    <link rel="alternate" hreflang="en" href="https://syndeocare.ai/" />
-    <link rel="alternate" hreflang="ar" href="https://syndeocare.ai/" />
-    <link rel="alternate" hreflang="x-default" href="https://syndeocare.ai/" />
 
     <!-- Mobile App Meta Tags -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -53,7 +50,7 @@
     <!-- Content Security Policy -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://api.syndeocare.ai https://*.amazonaws.com https://api.resend.com https://fonts.googleapis.com https://fonts.gstatic.com https://nominatim.openstreetmap.org https://geocoding-api.open-meteo.com https://geocode.maps.co; frame-src 'self' https://*.amazonaws.com blob:;"
+      content="default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://api.syndeocare.ai https://*.amazonaws.com https://fonts.googleapis.com https://fonts.gstatic.com https://nominatim.openstreetmap.org https://geocoding-api.open-meteo.com https://geocode.maps.co; frame-src 'self' https://*.amazonaws.com blob:; form-action 'self'; upgrade-insecure-requests;"
     />
 
     <!-- Favicon -->
@@ -87,7 +84,7 @@
     <meta property="og:locale" content="en_US" />
     <meta property="og:locale:alternate" content="ar_YE" />
 
-    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:card" content="summary" />
     <meta name="twitter:site" content="@SyndeoCare" />
     <meta
       name="twitter:title"
@@ -168,43 +165,7 @@
             "applicationCategory": "BusinessApplication",
             "operatingSystem": "Web, iOS, Android",
             "url": "https://syndeocare.ai/",
-            "description": "Bilingual Arabic and English healthcare staffing app for medical shifts, clinic staffing, professional onboarding, verification, and messaging.",
-            "offers": {
-              "@type": "Offer",
-              "price": "0",
-              "priceCurrency": "YER"
-            }
-          },
-          {
-            "@type": "FAQPage",
-            "@id": "https://syndeocare.ai/#faq",
-            "inLanguage": ["en", "ar"],
-            "mainEntity": [
-              {
-                "@type": "Question",
-                "name": "What is SyndeoCare?",
-                "acceptedAnswer": {
-                  "@type": "Answer",
-                  "text": "SyndeoCare is a healthcare staffing platform that connects verified healthcare professionals with clinics and medical facilities for shifts, bookings, verification, and secure communication."
-                }
-              },
-              {
-                "@type": "Question",
-                "name": "هل يدعم SyndeoCare اللغة العربية؟",
-                "acceptedAnswer": {
-                  "@type": "Answer",
-                  "text": "نعم، يدعم SyndeoCare العربية والإنجليزية لمساعدة المنشآت الصحية والمختصين الصحيين على إدارة الورديات والتوثيق والرسائل بسهولة."
-                }
-              },
-              {
-                "@type": "Question",
-                "name": "Who can use SyndeoCare?",
-                "acceptedAnswer": {
-                  "@type": "Answer",
-                  "text": "Clinics and healthcare facilities can use SyndeoCare to post shifts and manage applicants, while healthcare professionals can create verified profiles and apply for available medical shifts."
-                }
-              }
-            ]
+            "description": "Bilingual Arabic and English healthcare staffing app for medical shifts, clinic staffing, professional onboarding, verification, and messaging."
           }
         ]
       }
@@ -228,7 +189,26 @@
         </p>
       </section>
     </noscript>
-    <div id="root"></div>
+    <div id="root">
+      <main>
+        <section>
+          <h1>SyndeoCare healthcare staffing in Yemen</h1>
+          <p>
+            Find verified healthcare professionals, nursing shifts, medical
+            jobs, and trusted clinic staffing across Yemen.
+          </p>
+          <p lang="ar" dir="rtl">
+            سنديوكير منصة توظيف صحي وورديات طبية في اليمن تربط المنشآت الصحية
+            بالمختصين الصحيين الموثقين لإدارة الوظائف والطلبات والحجوزات بأمان.
+          </p>
+          <nav aria-label="Public pages">
+            <a href="/for-professionals">Healthcare jobs for professionals</a>
+            <a href="/for-clinics">Staffing for clinics</a>
+            <a href="/about">About SyndeoCare</a>
+          </nav>
+        </section>
+      </main>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

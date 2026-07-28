@@ -115,20 +115,9 @@ variable "google_oauth_client_secret" {
   default   = ""
 }
 
-variable "resend_api_key" {
-  type      = string
-  sensitive = true
-  default   = ""
-}
-
-variable "resend_from_email" {
+variable "email_from_address" {
   type    = string
-  default = "onboarding@resend.dev"
-}
-
-variable "resend_test_email" {
-  type    = string
-  default = "onboarding@resend.dev"
+  default = "SyndeoCare <no-reply@syndeocare.ai>"
 }
 
 variable "storage_access_key_id" {
@@ -182,6 +171,8 @@ data "aws_availability_zones" "available" {
   state = "available"
 }
 
+data "aws_caller_identity" "current" {}
+
 locals {
   environment    = "staging"
   name           = "syndeocare-staging"
@@ -215,7 +206,6 @@ resource "aws_secretsmanager_secret_version" "runtime" {
     internal_service_token     = random_password.internal_service_token.result
     keycloak_admin_password    = var.keycloak_admin_password
     google_oauth_client_secret = var.google_oauth_client_secret
-    resend_api_key             = var.resend_api_key
     storage_access_key_id      = var.storage_access_key_id
     storage_secret_access_key  = var.storage_secret_access_key
   })
@@ -419,17 +409,25 @@ module "notifications_service" {
   container_name                   = "notifications"
   container_port                   = 4115
   health_check_path                = "/health"
+  attach_task_role_policy          = true
+  task_role_policy_json = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["ses:SendEmail"]
+      Resource = "arn:aws:ses:${var.aws_region}:${data.aws_caller_identity.current.account_id}:identity/syndeocare.ai"
+    }]
+  })
   environment = {
-    NODE_ENV          = "production"
-    PORT              = "4115"
-    SERVICE_DIR       = "services/notifications"
-    RESEND_FROM_EMAIL = var.resend_from_email
-    RESEND_TEST_EMAIL = var.resend_test_email
+    AWS_REGION         = var.aws_region
+    EMAIL_FROM_ADDRESS = var.email_from_address
+    NODE_ENV           = "production"
+    PORT               = "4115"
+    SERVICE_DIR        = "services/notifications"
   }
   secrets = {
     DATABASE_URL           = "${module.postgres.secret_arn}:url::"
     INTERNAL_SERVICE_TOKEN = "${aws_secretsmanager_secret.runtime.arn}:internal_service_token::"
-    RESEND_API_KEY         = "${aws_secretsmanager_secret.runtime.arn}:resend_api_key::"
   }
   tags = local.tags
 }
@@ -616,6 +614,8 @@ module "api_gateway_service" {
     AUTH_ISSUER_URL                = "${var.keycloak_base_url}/realms/${var.auth_realm}"
     AUTH_MODE                      = "strict"
     AUTH_REALM                     = var.auth_realm
+    API_CORS_ORIGINS               = join(",", distinct(compact([var.web_public_url])))
+    DOWNSTREAM_REQUEST_TIMEOUT_MS  = "5000"
     KEYCLOAK_BASE_URL              = var.keycloak_base_url
     KEYCLOAK_PUBLIC_CLIENT_ID      = var.keycloak_public_client_id
     SERVICE_CLINICS_URL            = "http://${module.clinics_service.service_discovery_service_name}:4113"

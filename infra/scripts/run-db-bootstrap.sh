@@ -5,7 +5,17 @@ ENVIRONMENT="${1:?usage: run-db-bootstrap.sh <dev|staging|prod>}"
 AWS_REGION="${AWS_REGION:-us-east-1}"
 CLUSTER_NAME="syndeocare-${ENVIRONMENT}-cluster"
 SERVICE_NAME="syndeocare-${ENVIRONMENT}-profiles"
-BOOTSTRAP_COMMAND="cd /app && node packages/persistence/dist/scripts/migrate.js && node packages/persistence/dist/scripts/seed.js"
+SEED_MODE="${2:-${RUN_DB_SEED:-false}}"
+BOOTSTRAP_COMMAND="cd /app && node packages/persistence/dist/scripts/migrate.js"
+
+if [[ "$SEED_MODE" == "--seed" || "$SEED_MODE" == "true" ]]; then
+  if [[ "$ENVIRONMENT" == "prod" || "$ENVIRONMENT" == "production" ]]; then
+    echo "Refusing to seed the production database." >&2
+    exit 1
+  fi
+
+  BOOTSTRAP_COMMAND+=" && node packages/persistence/dist/scripts/seed.js"
+fi
 
 task_definition="$(
   aws ecs describe-services \
@@ -86,7 +96,7 @@ fi
 task_id="${task_arn##*/}"
 log_stream="ecs/${container_name}/${task_id}"
 
-echo "Launched database bootstrap task ${task_id} on ${CLUSTER_NAME}."
+echo "Launched database migration task ${task_id} on ${CLUSTER_NAME}."
 
 aws ecs wait tasks-stopped \
   --cluster "$CLUSTER_NAME" \
@@ -117,4 +127,4 @@ if [[ "$exit_code" != "0" ]]; then
   exit 1
 fi
 
-echo "Database bootstrap completed successfully."
+echo "Database migrations completed successfully."

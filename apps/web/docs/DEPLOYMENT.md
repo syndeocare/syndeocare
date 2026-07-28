@@ -66,5 +66,5 @@ To deploy to a custom domain:
 Edge function secrets (configured in backend):
 | Secret | Description |
 |--------|-------------|
-| `RESEND_API_KEY` | Resend email service API key |
+| `EMAIL_FROM_ADDRESS` | Verified Amazon SES sender address |
 | `DATABASE_URL` | Owned platform PostgreSQL connection string |

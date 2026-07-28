@@ -118,6 +118,8 @@ const noIndexPrefixes = [
   "/messages",
   "/onboarding",
   "/profile",
+  "/professional",
+  "/clinic",
   "/reset-password",
   "/search",
   "/settings",
@@ -159,7 +161,7 @@ function getSeoForPath(pathname: string): SeoDefinition {
   if (noIndexPrefixes.some((prefix) => pathname.startsWith(prefix))) {
     return { ...defaultSeo, noindex: true };
   }
-  return defaultSeo;
+  return { ...defaultSeo, noindex: true };
 }
 
 export function SEO() {

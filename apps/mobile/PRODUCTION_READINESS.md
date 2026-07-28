@@ -1,10 +1,10 @@
 # SyndeoCare Mobile Production Readiness
 
-This Expo app uses Expo Router, TanStack Query, SecureStore-backed auth sessions, Expo Notifications, and EAS Build. It is configured for development and internal preview builds now, with store submission intentionally left unconfigured until Apple and Google credentials are available.
+This Expo app uses Expo Router, TanStack Query, SecureStore-backed auth sessions, Expo Notifications, EAS Build, and EAS Update. Development, preview, production, App Store Connect, and production OTA metadata are configured.
 
 ## Required GitHub Secrets
 
-- `EXPO_TOKEN`: required for GitHub Actions to start EAS cloud builds. Create it in the Expo dashboard for the `syndeocareplatform` account/project, then add it to GitHub repository secrets as `EXPO_TOKEN`.
+- `EXPO_TOKEN`: configured for GitHub Actions to start EAS builds and publish production OTA updates. Rotate it in Expo and GitHub together if it is ever revoked.
 
 ## Required GitHub / EAS Variables
 
@@ -22,15 +22,16 @@ Configured EAS project variables:
 - `preview`: internal testing build on the `preview` update channel, Android APK, iOS simulator.
 - `production`: store build on the `production` update channel, Android App Bundle, iOS App Store build, remote versioning, and auto-increment.
 
-Production App Store and Play Store submission are not enabled yet because Apple Developer and Google Play Console credentials are not available.
+The Apple bundle identifier `ai.syndeocare.mobile` and App Store Connect app `6795712203` are registered. The production submit profile targets that app and Apple team `QH658DPPK4`.
 
-## Future Store Credentials
+## Remaining Store Credentials
 
-- Apple Developer account access.
-- App Store Connect API key or Apple ID credentials managed through EAS.
+- Apple Distribution certificate and App Store provisioning profile managed through EAS.
+- App Store Connect API key or a valid Apple ID session for automated TestFlight submission.
 - Google Play Console app.
 - Google Play service account JSON configured in EAS secrets, not committed to the repo.
-- Privacy policy and terms URLs finalized for store metadata.
+
+Privacy and terms are published at `https://syndeocare.ai/privacy` and `https://syndeocare.ai/terms`. Both are linked from the mobile registration flow.
 
 ## Notifications
 
@@ -65,6 +66,8 @@ Configured prompts:
 ## CI
 
 The `Mobile` GitHub Actions workflow runs for mobile paths and shared workspace files required by the mobile build. It runs Expo dependency checks, TypeScript, ESLint, and Android/iOS export builds. It starts EAS cloud builds only when `EXPO_TOKEN` is configured.
+
+The `Mobile OTA update` workflow publishes to the `production` channel after validating changes to mobile JavaScript, TypeScript, or assets. The app uses Expo's fingerprint runtime policy so native-incompatible changes require a new store build instead of being sent to an incompatible installed binary.
 
 Manual workflow dispatch supports:
 

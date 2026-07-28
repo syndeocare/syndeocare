@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -45,11 +45,7 @@ const AdminNotes = ({ targetUserId, targetType }: AdminNotesProps) => {
   const [noteType, setNoteType] = useState<string>("general");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    fetchNotes();
-  }, [targetUserId]);
-
-  const fetchNotes = async () => {
+  const fetchNotes = useCallback(async () => {
     try {
       const { data, error } = await backendDb
         .from("admin_notes")
@@ -64,7 +60,11 @@ const AdminNotes = ({ targetUserId, targetType }: AdminNotesProps) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [targetUserId]);
+
+  useEffect(() => {
+    void fetchNotes();
+  }, [fetchNotes]);
 
   const handleSubmit = async () => {
     if (!newNote.trim() || !user) return;

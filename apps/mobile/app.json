@@ -10,7 +10,7 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "runtimeVersion": {
-      "policy": "appVersion"
+      "policy": "fingerprint"
     },
     "updates": {
       "url": "https://u.expo.dev/a8d5437c-5cd2-42aa-94e3-8625034cca65"
@@ -37,9 +37,13 @@
       }
     },
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "ai.syndeocare.mobile",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
       "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
         "NSLocationWhenInUseUsageDescription": "SyndeoCare uses your location to save accurate city and coordinates for nearby shift matching.",
         "NSPhotoLibraryUsageDescription": "SyndeoCare lets you choose profile images, clinic logos, and document attachments from your photo library."
       }

@@ -12,6 +12,59 @@ if (!existsSync(distIndex)) {
 }
 
 const indexHtml = readFileSync(distIndex, "utf8");
+const appShellMarker = '<div id="root">';
+
+if (
+  !indexHtml.includes(appShellMarker) ||
+  !indexHtml.includes("healthcare staffing in Yemen") ||
+  !indexHtml.includes('lang="ar"')
+) {
+  console.error("The public app shell is missing bilingual crawlable content.");
+  process.exit(1);
+}
+
+const publicPages = new Map([
+  ["for-clinics", "Clinic Staffing in Yemen | SyndeoCare"],
+  [
+    "for-professionals",
+    "Healthcare Jobs and Medical Shifts in Yemen | SyndeoCare",
+  ],
+  ["about", "About SyndeoCare | Healthcare Staffing in Yemen"],
+  ["help", "SyndeoCare Help Center"],
+  ["privacy", "Privacy Policy | SyndeoCare"],
+  ["terms", "Terms of Service | SyndeoCare"],
+]);
+
+for (const [route, title] of publicPages) {
+  const pageUrl = new URL(`../apps/web/dist/${route}`, import.meta.url);
+  if (!existsSync(pageUrl)) {
+    console.error(`Generated public page is missing: /${route}`);
+    process.exit(1);
+  }
+
+  const pageHtml = readFileSync(pageUrl, "utf8");
+  if (
+    !pageHtml.includes(`<title>${title}</title>`) ||
+    !pageHtml.includes(
+      `<link rel="canonical" href="https://syndeocare.ai/${route}" />`,
+    )
+  ) {
+    console.error(`Generated metadata is invalid for /${route}.`);
+    process.exit(1);
+  }
+}
+
+for (const file of [
+  "robots.txt",
+  "sitemap.xml",
+  "llms.txt",
+  "9f4e6cb84c8f42d5933dcf8f7f77ce4a.txt",
+]) {
+  if (!existsSync(new URL(`../apps/web/dist/${file}`, import.meta.url))) {
+    console.error(`Required public discovery file is missing: ${file}`);
+    process.exit(1);
+  }
+}
 const assetMatches = [...indexHtml.matchAll(/(?:src|href)="([^"]+)"/g)]
   .map((match) => match[1])
   .filter((value) => value.startsWith("/assets/"));
@@ -106,8 +159,18 @@ try {
     if (response.statusCode !== 200) {
       throw new Error(`${path} returned ${response.statusCode}`);
     }
-    if (!response.body.includes('<div id="root"></div>')) {
+    if (!response.body.includes(appShellMarker)) {
       throw new Error(`${path} did not return the app shell.`);
+    }
+  }
+
+  for (const [route, title] of publicPages) {
+    const response = await get(`/${route}`);
+    if (
+      response.statusCode !== 200 ||
+      !response.body.includes(`<title>${title}</title>`)
+    ) {
+      throw new Error(`/${route} did not return its generated public page.`);
     }
   }
 

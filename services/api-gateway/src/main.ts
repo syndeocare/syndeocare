@@ -136,11 +136,11 @@ const jobFiltersSchema = z.object({
 });
 
 const jobIdParamsSchema = z.object({
-  jobId: z.string().min(1),
+  jobId: z.string().uuid(),
 });
 
 const bookingIdParamsSchema = z.object({
-  bookingId: z.string().min(1),
+  bookingId: z.string().uuid(),
 });
 const notificationIdParamsSchema = z.object({
   notificationId: z.string().uuid(),
@@ -376,6 +376,10 @@ type DownstreamResult<T> =
   | { ok: true; data: T }
   | { ok: false; statusCode: number; body: { code: string; message: string } };
 
+type DownstreamRequestLogger = {
+  warn: (context: Record<string, unknown>, message: string) => void;
+};
+
 function mapDownstreamStatusCode(statusCode: number): 404 | 503 {
   return statusCode === 404 ? 404 : 503;
 }
@@ -432,21 +436,27 @@ async function requestDownstreamResource<T>(
   schema: z.ZodType<T>,
   options?: {
     headers?: Record<string, string>;
+    logger?: DownstreamRequestLogger;
     method?: "DELETE" | "GET" | "PATCH" | "POST";
     body?: Record<string, unknown>;
   },
 ): Promise<DownstreamResult<T>> {
+  const method = options?.method ?? "GET";
+
   try {
     const response = await fetch(
       new URL(resourcePath, `${downstreamServices[serviceName]}/`),
       {
-        method: options?.method ?? "GET",
+        method,
         headers: {
           ...buildInternalServiceHeaders(),
           ...(options?.headers ?? {}),
           ...(options?.body ? { "content-type": "application/json" } : {}),
         },
         body: options?.body ? JSON.stringify(options.body) : undefined,
+        signal: AbortSignal.timeout(
+          Number(process.env.DOWNSTREAM_REQUEST_TIMEOUT_MS ?? 5_000),
+        ),
       },
     );
     const parsedBody = (await response.json().catch(() => undefined)) as
@@ -454,6 +464,13 @@ async function requestDownstreamResource<T>(
       | undefined;
 
     if (!response.ok) {
+      if (response.status >= 500) {
+        options?.logger?.warn(
+          { method, serviceName, statusCode: response.status },
+          "Downstream service request failed.",
+        );
+      }
+
       return {
         ok: false,
         statusCode: response.status,
@@ -473,6 +490,16 @@ async function requestDownstreamResource<T>(
     const validated = schema.safeParse(parsedBody);
 
     if (!validated.success) {
+      options?.logger?.warn(
+        {
+          issueCount: validated.error.issues.length,
+          method,
+          serviceName,
+          statusCode: response.status,
+        },
+        "Downstream service response did not match its contract.",
+      );
+
       return {
         ok: false,
         statusCode: 502,
@@ -483,7 +510,16 @@ async function requestDownstreamResource<T>(
     }
 
     return { ok: true, data: validated.data };
-  } catch {
+  } catch (error) {
+    options?.logger?.warn(
+      {
+        error: error instanceof Error ? error.message : "Unknown error",
+        method,
+        serviceName,
+      },
+      "Downstream service could not be reached.",
+    );
+
     return {
       ok: false,
       statusCode: 503,
@@ -591,6 +627,7 @@ void startService({
           authSessionSchema,
           {
             body: parsedBody.data,
+            logger: request.log,
             method: "POST",
           },
         );
@@ -4339,6 +4376,7 @@ void startService({
           "scheduling",
           `/internal/bookings/${encodeURIComponent(actor.sub)}`,
           bookingListResponseSchema,
+          { logger: request.log },
         );
 
         if (!downstream.ok) {
@@ -4388,6 +4426,7 @@ void startService({
           "scheduling",
           `/internal/bookings/${encodeURIComponent(actor.sub)}/${encodeURIComponent(parsedParams.data.bookingId)}`,
           bookingDetailSchema,
+          { logger: request.log },
         );
 
         if (!downstream.ok) {
@@ -4462,6 +4501,7 @@ void startService({
           bookingDetailSchema,
           {
             body: parsedBody.data,
+            logger: request.log,
             method: "PATCH",
           },
         );

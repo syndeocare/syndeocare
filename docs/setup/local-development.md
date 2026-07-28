@@ -112,9 +112,7 @@ STORAGE_FORCE_PATH_STYLE=true
 STORAGE_PUBLIC_BUCKET=syndeocare-public-assets
 STORAGE_PRIVATE_BUCKET=syndeocare-private-documents
 STORAGE_UPLOAD_URL_TTL_SECONDS=900
-RESEND_API_KEY=your_resend_api_key
-RESEND_FROM_EMAIL=onboarding@resend.dev
-RESEND_TEST_EMAIL=onboarding@resend.dev
+EMAIL_FROM_ADDRESS="SyndeoCare <no-reply@syndeocare.ai>"
 INTERNAL_SERVICE_TOKEN=local-internal-token
 SERVICE_IDENTITY_URL=http://127.0.0.1:4111
 SERVICE_PROFILES_URL=http://127.0.0.1:4112
@@ -269,8 +267,8 @@ The response includes a bearer token plus the bootstrapped platform actor
 context. Use `Authorization: Bearer <accessToken>` for protected `/v1/*` routes.
 
 Sign-up also sends a welcome email through the notifications service using
-Resend. For local testing, keep `RESEND_FROM_EMAIL=onboarding@resend.dev` and
-set `RESEND_TEST_EMAIL` to the safe inbox you want to receive development mail.
+Amazon SES. Local email delivery requires AWS credentials with `ses:SendEmail`
+permission and a recipient permitted by the current SES account mode.
 
 For local service-to-service protection, set the same `INTERNAL_SERVICE_TOKEN` value on the gateway and internal services.
 

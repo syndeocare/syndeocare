@@ -15,6 +15,7 @@ import {
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import {
+  Alert,
   Pressable,
   StyleSheet,
   Text,
@@ -124,7 +125,7 @@ function cleanFacilityType(value?: string) {
 }
 
 export default function ProfileScreen() {
-  const { logout, session } = useAuth();
+  const { deleteAccount, logout, session } = useAuth();
   const t = useT();
   const { language } = usePreferences();
   const text = useTextStyles();
@@ -338,6 +339,27 @@ export default function ProfileScreen() {
       setShowPasswordForm(false);
     },
   });
+  const deleteAccountMutation = useMutation({
+    mutationFn: deleteAccount,
+  });
+
+  const confirmAccountDeletion = () => {
+    Alert.alert(
+      t("profile.deleteAccountTitle"),
+      t("profile.deleteAccountBody"),
+      [
+        {
+          style: "cancel",
+          text: t("common.cancel"),
+        },
+        {
+          onPress: () => deleteAccountMutation.mutate(),
+          style: "destructive",
+          text: t("profile.deleteAccount"),
+        },
+      ],
+    );
+  };
 
   const phoneError =
     phoneTouched && !validateYemenPhone(phone)
@@ -864,8 +886,22 @@ export default function ProfileScreen() {
       <Card>
         <SectionHeader title={t("settings.account")} />
         <Text style={text.body}>{t("settings.accountBody")}</Text>
+        <ErrorBanner
+          message={
+            deleteAccountMutation.error instanceof Error
+              ? displayLabel(deleteAccountMutation.error.message, language)
+              : undefined
+          }
+        />
         <Button onPress={logout} tone="danger">
           {t("profile.logout")}
+        </Button>
+        <Button
+          loading={deleteAccountMutation.isPending}
+          onPress={confirmAccountDeletion}
+          tone="danger"
+        >
+          {t("profile.deleteAccount")}
         </Button>
       </Card>
     </Screen>

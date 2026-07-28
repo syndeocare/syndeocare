@@ -410,6 +410,17 @@ export async function updatePassword(input: {
   });
 }
 
+export async function deleteAccount() {
+  const result = await authenticatedRequest<{ deleted: boolean }>(
+    "/auth/account",
+    {
+      method: "DELETE",
+    },
+  );
+  await clearSession();
+  return result;
+}
+
 export async function refreshSession() {
   const current = await readSession();
   if (!current?.tokens.refreshToken) {

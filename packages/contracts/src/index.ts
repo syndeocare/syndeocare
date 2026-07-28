@@ -817,8 +817,8 @@ export const bookingListResponseSchema = z.object({
 });
 
 export const bookingRequestInputSchema = z.object({
-  jobId: z.string().min(1),
-  notes: z.string().min(1).optional(),
+  jobId: z.string().uuid(),
+  notes: z.string().trim().min(1).max(500).optional(),
 });
 
 export const bookingStatusUpdateInputSchema = z.object({

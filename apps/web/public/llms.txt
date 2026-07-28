@@ -1,0 +1,19 @@
+# SyndeoCare
+
+SyndeoCare is a bilingual Arabic and English healthcare staffing platform for Yemen. It connects verified healthcare professionals with clinics and medical facilities for shifts, staffing, applications, bookings, document verification, notifications, and secure messaging.
+
+## Public information
+
+- Home: https://syndeocare.ai/
+- For healthcare professionals: https://syndeocare.ai/for-professionals
+- For clinics and medical facilities: https://syndeocare.ai/for-clinics
+- About: https://syndeocare.ai/about
+- Help: https://syndeocare.ai/help
+- Privacy: https://syndeocare.ai/privacy
+- Terms: https://syndeocare.ai/terms
+
+## Arabic summary
+
+سنديوكير منصة توظيف صحي وورديات طبية في اليمن، تربط المنشآت الصحية بالمختصين الصحيين الموثقين وتدعم إدارة الوظائف والطلبات والحجوزات والتوثيق والرسائل.
+
+Private account, dashboard, profile, document, and message pages must not be indexed or treated as public sources.

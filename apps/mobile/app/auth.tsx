@@ -17,6 +17,8 @@ import { useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import {
   ActivityIndicator,
+  Linking,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -46,6 +48,9 @@ import type { UserRole } from "../src/types";
 
 type AuthMode = "signin" | "signup";
 type AuthStep = "role" | "method" | "details";
+
+const PRIVACY_URL = "https://syndeocare.ai/privacy";
+const TERMS_URL = "https://syndeocare.ai/terms";
 
 type FormValues = {
   displayName: string;
@@ -85,6 +90,7 @@ export default function AuthScreen() {
   const { signIn, signInWithGoogle, signUp } = useAuth();
   const t = useT();
   const { language } = usePreferences();
+  const googleAvailable = Platform.OS !== "ios";
 
   const resolver = useMemo(() => {
     const signInSchema = z.object({
@@ -177,6 +183,7 @@ export default function AuthScreen() {
   };
 
   const handleGooglePress = () => {
+    if (!googleAvailable) return;
     googleMutation.mutate();
   };
 
@@ -192,6 +199,7 @@ export default function AuthScreen() {
             checks={checks}
             errorMessage={errorMessage}
             form={form}
+            googleAvailable={googleAvailable}
             googlePending={googleMutation.isPending}
             onGooglePress={handleGooglePress}
             onReset={() => resetMutation.mutate()}
@@ -209,7 +217,7 @@ export default function AuthScreen() {
           <RoleContent
             onSelect={(selectedRole) => {
               setRole(selectedRole);
-              setStep("method");
+              setStep(googleAvailable ? "method" : "details");
             }}
             onSwitchToSignin={() => switchMode("signin")}
             role={role}
@@ -370,6 +378,7 @@ function BackButton({ onPress }: { onPress: () => void }) {
 function SignInContent({
   errorMessage,
   form,
+  googleAvailable,
   googlePending,
   onGooglePress,
   onReset,
@@ -384,6 +393,7 @@ function SignInContent({
   checks: { label: string; ok: boolean }[];
   errorMessage?: string;
   form: ReturnType<typeof useForm<FormValues>>;
+  googleAvailable: boolean;
   googlePending: boolean;
   onGooglePress: () => void;
   onReset: () => void;
@@ -412,8 +422,12 @@ function SignInContent({
       <ErrorBanner message={errorMessage} />
 
       <View style={styles.stack}>
-        <GoogleButton loading={googlePending} onPress={onGooglePress} />
-        <GoogleSecureHint />
+        {googleAvailable ? (
+          <>
+            <GoogleButton loading={googlePending} onPress={onGooglePress} />
+            <GoogleSecureHint />
+          </>
+        ) : null}
 
         {step !== "details" ? (
           <EmailToggle onPress={() => setStep("details")}>
@@ -754,7 +768,29 @@ function DetailsContent({
       </View>
 
       <Text style={[styles.terms, copy.body]}>{t("auth.terms")}</Text>
+      <LegalLinks />
     </>
+  );
+}
+
+function LegalLinks() {
+  const t = useT();
+
+  return (
+    <View style={styles.legalLinks}>
+      <Pressable
+        accessibilityRole="link"
+        onPress={() => void Linking.openURL(TERMS_URL)}
+      >
+        <Text style={styles.legalLink}>{t("auth.termsLink")}</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="link"
+        onPress={() => void Linking.openURL(PRIVACY_URL)}
+      >
+        <Text style={styles.legalLink}>{t("auth.privacyLink")}</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -1038,6 +1074,19 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginTop: 18,
     textAlign: "center",
+  },
+  legalLinks: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 20,
+    justifyContent: "center",
+    marginTop: 8,
+  },
+  legalLink: {
+    color: colors.primary,
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    textDecorationLine: "underline",
   },
   title: {
     color: colors.text,

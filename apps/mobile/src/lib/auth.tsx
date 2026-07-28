@@ -9,6 +9,7 @@ import React, {
 } from "react";
 
 import {
+  deleteAccount as apiDeleteAccount,
   deletePushToken,
   logout as apiLogout,
   restoreSession,
@@ -32,6 +33,7 @@ type AuthContextValue = {
     role: Exclude<UserRole, "admin">;
   }) => Promise<void>;
   refresh: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
   logout: () => Promise<void>;
 };
 
@@ -97,6 +99,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
       async refresh() {
         await refresh();
+      },
+      async deleteAccount() {
+        await apiDeleteAccount();
+        await clearStoredPushToken().catch(() => undefined);
+        queryClient.clear();
+        setSession(null);
+        router.replace("/auth");
       },
       async logout() {
         await getStoredPushToken()

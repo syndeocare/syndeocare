@@ -55,8 +55,7 @@ jobs:
       KEYCLOAK_BASE_URL: ${{ vars.KEYCLOAK_BASE_URL }}
       KEYCLOAK_PUBLIC_CLIENT_ID: ${{ vars.KEYCLOAK_PUBLIC_CLIENT_ID }}
       GOOGLE_OAUTH_CLIENT_ID: ${{ vars.GOOGLE_OAUTH_CLIENT_ID }}
-      RESEND_FROM_EMAIL: ${{ vars.RESEND_FROM_EMAIL }}
-      RESEND_TEST_EMAIL: ${{ vars.RESEND_TEST_EMAIL }}
+      EMAIL_FROM_ADDRESS: ${{ vars.EMAIL_FROM_ADDRESS }}
       STORAGE_REGION: ${{ vars.STORAGE_REGION }}
       STORAGE_PUBLIC_BUCKET: ${{ vars.STORAGE_PUBLIC_BUCKET }}
       STORAGE_PRIVATE_BUCKET: ${{ vars.STORAGE_PRIVATE_BUCKET }}
@@ -113,6 +112,15 @@ jobs:
       - name: Smoke test web artifact
         run: pnpm smoke:web
 
+      - name: Verify production database seed guard
+        run: |
+          set -euo pipefail
+          if RUN_DB_SEED=true infra/scripts/run-db-bootstrap.sh prod >/tmp/seed-guard.log 2>&1; then
+            echo "Production seed guard did not reject the request."
+            exit 1
+          fi
+          grep -q "Refusing to seed the production database" /tmp/seed-guard.log
+
       - name: Verify AWS deployment settings
         run: |
           set -euo pipefail
@@ -152,7 +160,6 @@ jobs:
       - name: Sync immutable frontend assets
         run: |
           aws s3 sync apps/web/dist/assets "s3://${WEB_FRONTEND_BUCKET}/assets" \
-            --delete \
             --cache-control "public,max-age=31536000,immutable"
 
       - name: Sync frontend shell
@@ -161,6 +168,12 @@ jobs:
             --delete \
             --exclude "assets/*" \
             --cache-control "no-store,no-cache,must-revalidate"
+
+          while IFS= read -r route; do
+            aws s3 cp "apps/web/dist/${route}" "s3://${WEB_FRONTEND_BUCKET}/${route}" \
+              --content-type "text/html; charset=utf-8" \
+              --cache-control "no-store,no-cache,must-revalidate"
+          done < apps/web/dist/public-routes.txt
 
       - name: Invalidate CloudFront
         run: |
@@ -173,6 +186,14 @@ jobs:
           set -euo pipefail
           public_url="${WEB_PUBLIC_URL:-https://syndeocare.ai}"
           curl -fsSIL --retry 5 --retry-delay 5 --max-time 20 "$public_url" >/dev/null
+          curl -fsS --retry 5 --retry-delay 5 --max-time 20 "$public_url/sitemap.xml" | grep -q '<urlset'
+          curl -fsS --retry 5 --retry-delay 5 --max-time 20 "$public_url/robots.txt" | grep -q 'Sitemap:'
+
+      - name: Notify IndexNow
+        continue-on-error: true
+        env:
+          INDEXNOW_SITE_URL: ${{ vars.WEB_PUBLIC_URL }}
+        run: node scripts/submit-indexnow.mjs
 
       - name: Setup Terraform
         if: ${{ steps.context.outputs.deploy_backend == 'true' && vars.BACKEND_DEPLOY_MODE == 'ecs' }}
@@ -220,9 +241,7 @@ jobs:
           TF_VAR_auth_realm: ${{ vars.AUTH_REALM }}
           TF_VAR_google_oauth_client_id: ${{ vars.GOOGLE_OAUTH_CLIENT_ID }}
           TF_VAR_google_oauth_client_secret: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
-          TF_VAR_resend_api_key: ${{ secrets.RESEND_API_KEY }}
-          TF_VAR_resend_from_email: ${{ vars.RESEND_FROM_EMAIL }}
-          TF_VAR_resend_test_email: ${{ vars.RESEND_TEST_EMAIL }}
+          TF_VAR_email_from_address: ${{ vars.EMAIL_FROM_ADDRESS }}
           TF_VAR_storage_access_key_id: ${{ secrets.STORAGE_ACCESS_KEY_ID }}
           TF_VAR_storage_secret_access_key: ${{ secrets.STORAGE_SECRET_ACCESS_KEY }}
           TF_VAR_storage_region: ${{ vars.STORAGE_REGION }}
@@ -238,7 +257,7 @@ jobs:
         working-directory: infra/terraform/environments/${{ steps.context.outputs.terraform_env }}
         run: terraform apply -input=false -auto-approve tfplan
 
-      - name: Run database migrations and seeders
+      - name: Run database migrations
         if: ${{ steps.context.outputs.deploy_backend == 'true' && vars.BACKEND_DEPLOY_MODE == 'ecs' }}
         env:
           AWS_REGION: ${{ vars.AWS_REGION }}

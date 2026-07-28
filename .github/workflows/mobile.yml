@@ -85,7 +85,9 @@ jobs:
 
       - name: Check Expo SDK compatibility
         working-directory: apps/mobile
-        run: npx expo install --check
+        run: |
+          npx expo install --check
+          npx expo-doctor@latest
 
       - name: Typecheck mobile
         run: pnpm --filter mobile check-types
@@ -100,6 +102,7 @@ jobs:
     name: EAS build
     needs: quality
     runs-on: ubuntu-latest
+    environment: production
     if: >
       github.event_name == 'workflow_dispatch' ||
       github.event_name == 'push'

@@ -182,9 +182,11 @@ not exist`.
 - `AUTH_REALM`
 - `GOOGLE_OAUTH_CLIENT_ID`
 - `GOOGLE_OAUTH_CLIENT_SECRET`
-- `RESEND_API_KEY`
-- `RESEND_FROM_EMAIL`
-- `RESEND_TEST_EMAIL`
+- `EMAIL_FROM_ADDRESS`
+
+Email is delivered through Amazon SES. The ECS notifications task receives a
+least-privilege `ses:SendEmail` policy for the verified `syndeocare.ai`
+identity; no long-lived email-provider credential is stored.
 
 ### Google sign-in
 
