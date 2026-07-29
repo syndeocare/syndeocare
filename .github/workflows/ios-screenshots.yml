@@ -1,0 +1,132 @@
+name: iOS App Store Screenshots
+
+on:
+  workflow_dispatch:
+    inputs:
+      simulator_build_url:
+        description: EAS iOS simulator .tar.gz artifact URL
+        required: true
+        type: string
+      language:
+        description: App language for the screenshot
+        required: true
+        type: choice
+        default: ar
+        options:
+          - ar
+          - en
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-app-store-screenshots
+  cancel-in-progress: true
+
+jobs:
+  capture:
+    name: Capture iPhone screenshots
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      APP_ID: ai.syndeocare.mobile
+      DEVICE_NAME: SyndeoCare App Store
+      SIMULATOR_BUILD_URL: ${{ inputs.simulator_build_url }}
+      SCREENSHOT_LANGUAGE: ${{ inputs.language }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download simulator build
+        run: |
+          mkdir -p "$RUNNER_TEMP/syndeocare-build"
+          curl --fail --location --retry 3 --retry-all-errors \
+            "$SIMULATOR_BUILD_URL" \
+            --output "$RUNNER_TEMP/syndeocare-build/app.tar.gz"
+          tar -xzf "$RUNNER_TEMP/syndeocare-build/app.tar.gz" \
+            -C "$RUNNER_TEMP/syndeocare-build"
+
+          app_path="$(find "$RUNNER_TEMP/syndeocare-build" -type d -name '*.app' -print -quit)"
+          if [ -z "$app_path" ]; then
+            echo "No .app bundle was found in the EAS simulator artifact."
+            exit 1
+          fi
+          echo "APP_PATH=$app_path" >> "$GITHUB_ENV"
+
+      - name: Create and boot App Store simulator
+        run: |
+          device_type="$(
+            xcrun simctl list devicetypes -j |
+              jq -r '.devicetypes[] | select(.name == "iPhone 14 Plus") | .identifier' |
+              head -n 1
+          )"
+          runtime="$(
+            xcrun simctl list runtimes -j |
+              jq -r '[.runtimes[] | select(.platform == "iOS" and .isAvailable == true)] | last | .identifier'
+          )"
+
+          if [ -z "$device_type" ] || [ "$device_type" = "null" ]; then
+            echo "The iPhone 14 Plus simulator device type is unavailable."
+            exit 1
+          fi
+          if [ -z "$runtime" ] || [ "$runtime" = "null" ]; then
+            echo "No available iOS simulator runtime was found."
+            exit 1
+          fi
+
+          udid="$(xcrun simctl create "$DEVICE_NAME" "$device_type" "$runtime")"
+          echo "SIMULATOR_UDID=$udid" >> "$GITHUB_ENV"
+          xcrun simctl boot "$udid"
+          open -a Simulator
+          xcrun simctl bootstatus "$udid" -b
+
+      - name: Install and launch SyndeoCare
+        run: |
+          if [ "$SCREENSHOT_LANGUAGE" = "ar" ]; then
+            locale="ar_YE"
+            languages="(ar)"
+          else
+            locale="en_US"
+            languages="(en)"
+          fi
+
+          xcrun simctl install "$SIMULATOR_UDID" "$APP_PATH"
+          xcrun simctl status_bar "$SIMULATOR_UDID" override \
+            --time "9:41" \
+            --batteryState charged \
+            --batteryLevel 100 \
+            --wifiBars 3 \
+            --cellularBars 4
+          xcrun simctl launch --terminate-running-process "$SIMULATOR_UDID" \
+            "$APP_ID" \
+            -AppleLanguages "$languages" \
+            -AppleLocale "$locale"
+          sleep 12
+
+      - name: Capture and validate screenshot
+        run: |
+          mkdir -p screenshots
+          output="screenshots/syndeocare-auth-${SCREENSHOT_LANGUAGE}-1284x2778.png"
+          xcrun simctl io "$SIMULATOR_UDID" screenshot "$output"
+
+          width="$(sips -g pixelWidth "$output" | awk '/pixelWidth/ { print $2 }')"
+          height="$(sips -g pixelHeight "$output" | awk '/pixelHeight/ { print $2 }')"
+          if [ "$width" != "1284" ] || [ "$height" != "2778" ]; then
+            echo "Unexpected screenshot size: ${width}x${height}; expected 1284x2778."
+            exit 1
+          fi
+
+      - name: Upload screenshot artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-app-store-screenshot-${{ inputs.language }}
+          path: screenshots/*.png
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Shut down simulator
+        if: always()
+        run: |
+          if [ -n "${SIMULATOR_UDID:-}" ]; then
+            xcrun simctl shutdown "$SIMULATOR_UDID" || true
+            xcrun simctl delete "$SIMULATOR_UDID" || true
+          fi
