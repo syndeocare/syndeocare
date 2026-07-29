@@ -1,4 +1,5 @@
 import * as SecureStore from "expo-secure-store";
+import { getLocales, useLocales } from "expo-localization";
 import {
   createContext,
   useCallback,
@@ -8,12 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import {
-  Appearance,
-  NativeModules,
-  Platform,
-  useColorScheme,
-} from "react-native";
+import { Appearance, Platform, useColorScheme } from "react-native";
 
 export type AppLanguage = "en" | "ar";
 export type AppLanguagePreference = "ar" | "device" | "en";
@@ -776,28 +772,15 @@ async function savePreferences(value: StoredPreferences) {
 }
 
 function getDeviceLanguage(): AppLanguage {
-  if (Platform.OS === "web") {
-    const locale =
-      globalThis.navigator?.languages?.[0] || globalThis.navigator?.language;
-    return locale?.toLowerCase().startsWith("ar") ? "ar" : "en";
-  }
-
-  const settings = NativeModules.SettingsManager?.settings as
-    | {
-        AppleLanguages?: string[];
-        AppleLocale?: string;
-      }
-    | undefined;
-  const locale =
-    settings?.AppleLanguages?.[0] ??
-    settings?.AppleLocale ??
-    Intl.DateTimeFormat().resolvedOptions().locale;
-
-  return locale?.toLowerCase().startsWith("ar") ? "ar" : "en";
+  return getLocales()[0]?.languageCode === "ar" ? "ar" : "en";
 }
 
-function resolveLanguage(preference: AppLanguagePreference): AppLanguage {
-  return preference === "device" ? getDeviceLanguage() : preference;
+function resolveLanguage(
+  preference: AppLanguagePreference,
+  deviceLanguage?: string | null,
+): AppLanguage {
+  if (preference !== "device") return preference;
+  return deviceLanguage === "ar" ? "ar" : getDeviceLanguage();
 }
 
 function resolveTheme(
@@ -816,6 +799,7 @@ function normalizeColorScheme(
 
 export function PreferencesProvider({ children }: { children: ReactNode }) {
   const colorScheme = useColorScheme();
+  const locales = useLocales();
   const [appearanceScheme, setAppearanceScheme] = useState<
     "dark" | "light" | null
   >(normalizeColorScheme(Appearance.getColorScheme()));
@@ -824,7 +808,10 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   const [themePreference, setThemePreferenceState] =
     useState<AppThemePreference>("system");
   const systemScheme = colorScheme ?? appearanceScheme;
-  const language = resolveLanguage(languagePreference);
+  const language = resolveLanguage(
+    languagePreference,
+    locales[0]?.languageCode,
+  );
   const theme = resolveTheme(themePreference, systemScheme);
 
   useEffect(() => {
