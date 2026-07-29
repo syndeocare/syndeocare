@@ -8,7 +8,12 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Appearance, Platform, useColorScheme } from "react-native";
+import {
+  Appearance,
+  NativeModules,
+  Platform,
+  useColorScheme,
+} from "react-native";
 
 export type AppLanguage = "en" | "ar";
 export type AppLanguagePreference = "ar" | "device" | "en";
@@ -771,10 +776,22 @@ async function savePreferences(value: StoredPreferences) {
 }
 
 function getDeviceLanguage(): AppLanguage {
+  if (Platform.OS === "web") {
+    const locale =
+      globalThis.navigator?.languages?.[0] || globalThis.navigator?.language;
+    return locale?.toLowerCase().startsWith("ar") ? "ar" : "en";
+  }
+
+  const settings = NativeModules.SettingsManager?.settings as
+    | {
+        AppleLanguages?: string[];
+        AppleLocale?: string;
+      }
+    | undefined;
   const locale =
-    Platform.OS === "web"
-      ? globalThis.navigator?.languages?.[0] || globalThis.navigator?.language
-      : Intl.DateTimeFormat().resolvedOptions().locale;
+    settings?.AppleLanguages?.[0] ??
+    settings?.AppleLocale ??
+    Intl.DateTimeFormat().resolvedOptions().locale;
 
   return locale?.toLowerCase().startsWith("ar") ? "ar" : "en";
 }
