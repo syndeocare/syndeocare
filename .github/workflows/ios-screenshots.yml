@@ -83,11 +83,19 @@ jobs:
         run: |
           if [ "$SCREENSHOT_LANGUAGE" = "ar" ]; then
             locale="ar_YE"
-            languages="(ar)"
+            language="ar"
           else
             locale="en_US"
-            languages="(en)"
+            language="en"
           fi
+
+          xcrun simctl spawn "$SIMULATOR_UDID" defaults write NSGlobalDomain \
+            AppleLanguages -array "$language"
+          xcrun simctl spawn "$SIMULATOR_UDID" defaults write NSGlobalDomain \
+            AppleLocale -string "$locale"
+          xcrun simctl shutdown "$SIMULATOR_UDID"
+          xcrun simctl boot "$SIMULATOR_UDID"
+          xcrun simctl bootstatus "$SIMULATOR_UDID" -b
 
           xcrun simctl install "$SIMULATOR_UDID" "$APP_PATH"
           xcrun simctl status_bar "$SIMULATOR_UDID" override \
@@ -97,9 +105,7 @@ jobs:
             --wifiBars 3 \
             --cellularBars 4
           xcrun simctl launch --terminate-running-process "$SIMULATOR_UDID" \
-            "$APP_ID" \
-            -AppleLanguages "$languages" \
-            -AppleLocale "$locale"
+            "$APP_ID"
           sleep 12
 
       - name: Capture and validate screenshot
