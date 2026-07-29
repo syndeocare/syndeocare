@@ -95,6 +95,10 @@ jobs:
             AppleLocale -string "$locale"
 
           xcrun simctl install "$SIMULATOR_UDID" "$APP_PATH"
+          xcrun simctl spawn "$SIMULATOR_UDID" defaults write "$APP_ID" \
+            AppleLanguages -array "$language"
+          xcrun simctl spawn "$SIMULATOR_UDID" defaults write "$APP_ID" \
+            AppleLocale -string "$locale"
           xcrun simctl status_bar "$SIMULATOR_UDID" override \
             --time "9:41" \
             --batteryState charged \
@@ -102,7 +106,9 @@ jobs:
             --wifiBars 3 \
             --cellularBars 4
           xcrun simctl launch --terminate-running-process "$SIMULATOR_UDID" \
-            "$APP_ID"
+            "$APP_ID" \
+            -AppleLanguages "($language)" \
+            -AppleLocale "$locale"
           sleep 12
 
       - name: Capture and validate screenshot
