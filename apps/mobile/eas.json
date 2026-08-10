@@ -42,6 +42,7 @@
     "production": {
       "ios": {
         "ascAppId": "6795712203",
+        "appleId": "abdullahalwahdi@icloud.com",
         "appleTeamId": "QH658DPPK4"
       },
       "android": {

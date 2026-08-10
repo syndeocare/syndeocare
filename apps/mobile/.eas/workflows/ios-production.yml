@@ -7,6 +7,7 @@ jobs:
   build_ios:
     name: Build signed iOS app
     type: build
+    environment: production
     params:
       platform: ios
       profile: production
@@ -14,6 +15,7 @@ jobs:
   submit:
     name: Submit to App Store Connect
     type: submit
+    environment: production
     needs: [build_ios]
     params:
       build_id: ${{ needs.build_ios.outputs.build_id }}
