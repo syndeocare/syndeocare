@@ -6,7 +6,6 @@ on:
       - main
     paths:
       - "apps/mobile/app/**"
-      - "apps/mobile/assets/**"
       - "apps/mobile/src/**"
       - ".github/workflows/mobile-update.yml"
   workflow_dispatch:

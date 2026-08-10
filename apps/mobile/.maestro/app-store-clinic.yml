@@ -1,0 +1,46 @@
+appId: ai.syndeocare.mobile
+name: App Store clinic journey
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Sign in with email"
+    timeout: 30000
+- tapOn: "Sign in with email"
+- tapOn: "Email"
+- inputText: "${REVIEW_EMAIL}"
+- tapOn: "Password"
+- inputText: "${REVIEW_PASSWORD}"
+- hideKeyboard
+- tapOn: "Sign in"
+- extendedWaitUntil:
+    visible: "Clinic operations"
+    timeout: 30000
+- waitForAnimationToEnd
+- takeScreenshot:
+    path: screenshots/01-clinic-dashboard
+    label: Clinic dashboard
+- tapOn: "Shifts"
+- extendedWaitUntil:
+    visible: "Shifts"
+    timeout: 20000
+- waitForAnimationToEnd
+- takeScreenshot:
+    path: screenshots/02-shift-management
+    label: Clinic shift management
+- tapOn: "Messages"
+- extendedWaitUntil:
+    visible: "Search conversations"
+    timeout: 20000
+- waitForAnimationToEnd
+- takeScreenshot:
+    path: screenshots/03-secure-messages
+    label: Secure conversations
+- tapOn: "Profile"
+- extendedWaitUntil:
+    visible: "Profile details"
+    timeout: 20000
+- waitForAnimationToEnd
+- takeScreenshot:
+    path: screenshots/04-clinic-profile
+    label: Clinic profile

@@ -18,7 +18,19 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-splash-screen",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#170D1C",
+          "image": "./assets/syndeocare-mark.png",
+          "imageWidth": 176,
+          "resizeMode": "contain",
+          "dark": {
+            "backgroundColor": "#170D1C",
+            "image": "./assets/syndeocare-mark.png"
+          }
+        }
+      ],
       [
         "expo-notifications",
         {
@@ -57,15 +69,13 @@
         "NOTIFICATIONS"
       ],
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundColor": "#170D1C",
+        "foregroundImage": "./assets/syndeocare-mark.png"
       },
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/syndeocare-mark.png"
     }
   }
 }

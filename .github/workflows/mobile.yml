@@ -103,17 +103,15 @@ jobs:
     needs: quality
     runs-on: ubuntu-latest
     environment: production
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      github.event_name == 'push'
+    if: github.event_name == 'workflow_dispatch'
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-      EAS_PLATFORM: ${{ github.event_name == 'workflow_dispatch' && inputs.platform || 'android' }}
-      EAS_PROFILE: ${{ github.event_name == 'workflow_dispatch' && inputs.profile || 'preview' }}
-      RUN_EAS_BUILD: ${{ github.event_name != 'workflow_dispatch' || inputs.run_eas_build }}
-      WAIT_FOR_BUILD: ${{ github.event_name == 'workflow_dispatch' && inputs.wait_for_build || false }}
-      AUTO_SUBMIT: ${{ github.event_name == 'workflow_dispatch' && inputs.auto_submit || false }}
-      WHAT_TO_TEST: ${{ github.event_name == 'workflow_dispatch' && inputs.what_to_test || 'SyndeoCare mobile build from GitHub Actions.' }}
+      EAS_PLATFORM: ${{ inputs.platform }}
+      EAS_PROFILE: ${{ inputs.profile }}
+      RUN_EAS_BUILD: ${{ inputs.run_eas_build }}
+      WAIT_FOR_BUILD: ${{ inputs.wait_for_build }}
+      AUTO_SUBMIT: ${{ inputs.auto_submit }}
+      WHAT_TO_TEST: ${{ inputs.what_to_test }}
     steps:
       - uses: actions/checkout@v4
 

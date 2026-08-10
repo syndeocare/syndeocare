@@ -7,14 +7,6 @@ on:
         description: EAS iOS simulator .tar.gz artifact URL
         required: true
         type: string
-      language:
-        description: App language for the screenshot
-        required: true
-        type: choice
-        default: ar
-        options:
-          - ar
-          - en
 
 permissions:
   contents: read
@@ -31,8 +23,10 @@ jobs:
     env:
       APP_ID: ai.syndeocare.mobile
       DEVICE_NAME: SyndeoCare App Store
+      REVIEW_EMAIL: ${{ secrets.APP_REVIEW_CLINIC_EMAIL }}
+      REVIEW_PASSWORD: ${{ secrets.APP_REVIEW_CLINIC_PASSWORD }}
       SIMULATOR_BUILD_URL: ${{ inputs.simulator_build_url }}
-      SCREENSHOT_LANGUAGE: ${{ inputs.language }}
+      SCREENSHOT_LANGUAGE: en
     steps:
       - uses: actions/checkout@v4
 
@@ -111,24 +105,53 @@ jobs:
             -AppleLocale "$locale"
           sleep 12
 
-      - name: Capture and validate screenshot
+      - name: Require review credentials
+        run: |
+          if [ -z "$REVIEW_EMAIL" ] || [ -z "$REVIEW_PASSWORD" ]; then
+            echo "The dedicated clinic review credentials are not configured."
+            exit 1
+          fi
+
+      - name: Install Maestro
+        run: |
+          brew tap mobile-dev-inc/tap
+          brew install mobile-dev-inc/tap/maestro
+          maestro --version
+
+      - name: Capture authenticated product screenshots
+        working-directory: apps/mobile
         run: |
           mkdir -p screenshots
-          output="screenshots/syndeocare-auth-${SCREENSHOT_LANGUAGE}-1284x2778.png"
-          xcrun simctl io "$SIMULATOR_UDID" screenshot "$output"
+          maestro --device "$SIMULATOR_UDID" test \
+            --test-output-dir screenshots/maestro-output \
+            -e REVIEW_EMAIL="$REVIEW_EMAIL" \
+            -e REVIEW_PASSWORD="$REVIEW_PASSWORD" \
+            .maestro/app-store-clinic.yml
 
-          width="$(sips -g pixelWidth "$output" | awk '/pixelWidth/ { print $2 }')"
-          height="$(sips -g pixelHeight "$output" | awk '/pixelHeight/ { print $2 }')"
-          if [ "$width" != "1284" ] || [ "$height" != "2778" ]; then
-            echo "Unexpected screenshot size: ${width}x${height}; expected 1284x2778."
+      - name: Validate screenshots
+        working-directory: apps/mobile
+        run: |
+          count=0
+          while IFS= read -r -d '' output; do
+            width="$(sips -g pixelWidth "$output" | awk '/pixelWidth/ { print $2 }')"
+            height="$(sips -g pixelHeight "$output" | awk '/pixelHeight/ { print $2 }')"
+            if [ "$width" != "1284" ] || [ "$height" != "2778" ]; then
+              echo "Unexpected screenshot size for $output: ${width}x${height}; expected 1284x2778."
+              exit 1
+            fi
+            count=$((count + 1))
+          done < <(find screenshots -maxdepth 1 -name '*.png' -print0)
+
+          if [ "$count" -lt 4 ]; then
+            echo "Expected four authenticated screenshots; found $count."
             exit 1
           fi
 
       - name: Upload screenshot artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ios-app-store-screenshot-${{ inputs.language }}
-          path: screenshots/*.png
+          name: ios-app-store-screenshots-en
+          path: apps/mobile/screenshots/*.png
           if-no-files-found: error
           retention-days: 14
 
