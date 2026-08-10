@@ -128,6 +128,14 @@ jobs:
             -e REVIEW_PASSWORD="$REVIEW_PASSWORD" \
             .maestro/app-store-clinic.yml
 
+          while IFS= read -r -d '' output; do
+            cp "$output" "screenshots/$(basename "$output")"
+          done < <(
+            find screenshots/maestro-output \
+              -path '*/takeScreenshot/screenshots/*.png' \
+              -print0
+          )
+
       - name: Validate screenshots
         working-directory: apps/mobile
         run: |
