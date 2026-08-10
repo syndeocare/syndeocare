@@ -7,9 +7,9 @@ name: App Store clinic journey
     visible: "Sign in with email"
     timeout: 30000
 - tapOn: "Sign in with email"
-- tapOn: "Email"
+- tapOn: "name@example.com"
 - inputText: "${REVIEW_EMAIL}"
-- tapOn: "Password"
+- tapOn: "••••••••"
 - inputText: "${REVIEW_PASSWORD}"
 - hideKeyboard
 - tapOn: "Sign in"
