@@ -11,7 +11,6 @@ name: App Store clinic journey
 - inputText: "${REVIEW_EMAIL}"
 - tapOn: "••••••••"
 - inputText: "${REVIEW_PASSWORD}"
-- hideKeyboard
 - tapOn: "Sign in"
 - extendedWaitUntil:
     visible: "Shifts"
